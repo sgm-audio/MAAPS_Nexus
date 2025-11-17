@@ -1,0 +1,107 @@
+2025-11-15 01:17:33,843 - src.core.message_bus - INFO - Message dispatcher started
+2025-11-15 01:17:33,843 - src.core.message_bus - INFO - Message bus started
+2025-11-15 01:17:33,844 - src.system - INFO - Starting multi-agent audio processing system...
+2025-11-15 01:17:33,844 - src.orchestration.agent_coordinator - INFO - Initializing multi-agent system...
+2025-11-15 01:17:33,844 - src.core.base_agent - INFO - Agent audio_enhancement_agent (Audio Enhancement & Restoration Agent) created
+2025-11-15 01:17:33,845 - src.core.base_agent - INFO - Agent content_generation_agent (Content Generation & Gap Filling Agent) created
+2025-11-15 01:17:33,845 - src.core.base_agent - INFO - Agent performance_optimization_agent (Performance & Resource Optimization Agent) created
+2025-11-15 01:17:33,848 - src.core.base_agent - INFO - Agent metadata_management_agent (Intelligent Metadata & Project Management Agent) created
+2025-11-15 01:17:33,848 - src.core.base_agent - INFO - Agent workflow_engine (Workflow Orchestration Engine) created
+2025-11-15 01:17:33,848 - src.core.base_agent - INFO - Registered agent audio_enhancement_agent
+2025-11-15 01:17:33,848 - src.orchestration.agent_coordinator - INFO - Registered agent: audio_enhancement_agent
+2025-11-15 01:17:33,849 - src.core.base_agent - INFO - Registered agent content_generation_agent
+2025-11-15 01:17:33,849 - src.orchestration.agent_coordinator - INFO - Registered agent: content_generation_agent
+2025-11-15 01:17:33,849 - src.core.base_agent - INFO - Registered agent performance_optimization_agent
+2025-11-15 01:17:33,849 - src.orchestration.agent_coordinator - INFO - Registered agent: performance_optimization_agent
+2025-11-15 01:17:33,849 - src.core.base_agent - INFO - Registered agent metadata_management_agent
+2025-11-15 01:17:33,849 - src.orchestration.agent_coordinator - INFO - Registered agent: metadata_management_agent
+2025-11-15 01:17:33,849 - src.core.base_agent - INFO - Registered agent workflow_engine
+2025-11-15 01:17:33,849 - src.orchestration.agent_coordinator - INFO - Registered agent: workflow_engine
+2025-11-15 01:17:33,850 - src.core.base_agent - INFO - [audio_enhancement_agent] Audio Enhancement Agent initialized successfully
+2025-11-15 01:17:33,850 - src.core.base_agent - INFO - Agent audio_enhancement_agent started
+2025-11-15 01:17:33,851 - src.orchestration.agent_coordinator - INFO - Started agent: audio_enhancement_agent
+2025-11-15 01:17:33,851 - src.core.base_agent - INFO - [content_generation_agent] Content Generation Agent initialized successfully
+2025-11-15 01:17:33,852 - src.core.base_agent - INFO - Agent content_generation_agent started
+2025-11-15 01:17:33,852 - src.orchestration.agent_coordinator - INFO - Started agent: content_generation_agent
+2025-11-15 01:17:33,853 - src.core.base_agent - INFO - [performance_optimization_agent] Performance Optimization Agent initialized successfully
+2025-11-15 01:17:33,854 - src.core.base_agent - INFO - Agent performance_optimization_agent started
+2025-11-15 01:17:33,854 - src.orchestration.agent_coordinator - INFO - Started agent: performance_optimization_agent
+2025-11-15 01:17:33,856 - src.core.base_agent - INFO - [metadata_management_agent] Metadata Management Agent initialized successfully
+2025-11-15 01:17:33,857 - src.core.base_agent - INFO - Agent metadata_management_agent started
+2025-11-15 01:17:33,857 - src.orchestration.agent_coordinator - INFO - Started agent: metadata_management_agent
+2025-11-15 01:17:33,857 - src.core.base_agent - INFO - [workflow_engine] Workflow Engine initialized successfully
+2025-11-15 01:17:33,858 - src.core.base_agent - INFO - Agent workflow_engine started
+2025-11-15 01:17:33,858 - src.orchestration.agent_coordinator - INFO - Started agent: workflow_engine
+2025-11-15 01:17:33,860 - src.orchestration.agent_coordinator - INFO - Health monitoring started
+2025-11-15 01:17:33,860 - src.orchestration.agent_coordinator - INFO - Multi-agent system initialized successfully
+2025-11-15 01:17:33,860 - src.system - INFO - Multi-agent system started successfully
+2025-11-15 01:17:33,860 - src.system - INFO - Stopping multi-agent system...
+2025-11-15 01:17:33,860 - src.orchestration.agent_coordinator - INFO - Shutting down multi-agent system...
+2025-11-15 01:17:35,871 - src.orchestration.agent_coordinator - INFO - Health monitoring stopped
+2025-11-15 01:17:35,871 - src.core.base_agent - INFO - [audio_enhancement_agent] Audio Enhancement Agent shutdown complete
+2025-11-15 01:17:35,871 - src.core.base_agent - INFO - Agent audio_enhancement_agent stopped
+2025-11-15 01:17:35,871 - src.core.base_agent - INFO - Unregistered agent audio_enhancement_agent
+2025-11-15 01:17:35,871 - src.orchestration.agent_coordinator - INFO - Stopped agent: audio_enhancement_agent
+2025-11-15 01:17:35,871 - src.core.base_agent - INFO - [content_generation_agent] Content Generation Agent shutdown complete
+2025-11-15 01:17:35,873 - src.core.base_agent - INFO - Agent content_generation_agent stopped
+2025-11-15 01:17:35,873 - src.core.base_agent - INFO - Unregistered agent content_generation_agent
+2025-11-15 01:17:35,873 - src.orchestration.agent_coordinator - INFO - Stopped agent: content_generation_agent
+2025-11-15 01:17:36,256 - src.core.base_agent - INFO - [performance_optimization_agent] Performance Optimization Agent shutdown complete
+2025-11-15 01:17:36,256 - src.core.base_agent - INFO - Agent performance_optimization_agent stopped
+2025-11-15 01:17:36,257 - src.core.base_agent - INFO - Unregistered agent performance_optimization_agent
+2025-11-15 01:17:36,257 - src.orchestration.agent_coordinator - INFO - Stopped agent: performance_optimization_agent
+2025-11-15 01:17:36,257 - src.core.base_agent - INFO - [metadata_management_agent] Metadata Management Agent shutdown complete
+2025-11-15 01:17:36,258 - src.core.base_agent - INFO - Agent metadata_management_agent stopped
+2025-11-15 01:17:36,258 - src.core.base_agent - INFO - Unregistered agent metadata_management_agent
+2025-11-15 01:17:36,258 - src.orchestration.agent_coordinator - INFO - Stopped agent: metadata_management_agent
+2025-11-15 01:17:36,258 - src.core.base_agent - INFO - [workflow_engine] Workflow Engine shutdown complete
+2025-11-15 01:17:36,259 - src.core.base_agent - INFO - Agent workflow_engine stopped
+2025-11-15 01:17:36,259 - src.core.base_agent - INFO - Unregistered agent workflow_engine
+2025-11-15 01:17:36,259 - src.orchestration.agent_coordinator - INFO - Stopped agent: workflow_engine
+2025-11-15 01:17:36,370 - src.core.message_bus - INFO - Message dispatcher stopped
+2025-11-15 01:17:36,370 - src.core.message_bus - INFO - Message bus stopped
+2025-11-15 01:17:36,370 - src.orchestration.agent_coordinator - INFO - Multi-agent system shutdown complete
+2025-11-15 01:17:36,370 - src.system - INFO - Multi-agent system stopped successfully
+
+============================================================
+Multi-Agent Audio Processing System - Examples
+============================================================
+
+
+Running Example 1: Basic System Startup
+
+============================================================
+Example 1: Basic System Startup and Health Check
+============================================================
+
+Traceback (most recent call last):
+  File "F:\agents\examples\basic_usage.py", line 31, in example_1_basic_system_startup
+    print("\u2713 System started successfully")
+  File "C:\Program Files\Python311\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2713' in position 0: character maps to <undefined>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "F:\agents\examples\basic_usage.py", line 390, in main
+    example_func()
+  File "F:\agents\examples\basic_usage.py", line 55, in example_1_basic_system_startup
+    print("\n\u2713 System stopped")
+  File "C:\Program Files\Python311\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2713' in position 2: character maps to <undefined>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "F:\agents\examples\basic_usage.py", line 402, in <module>
+    main()
+  File "F:\agents\examples\basic_usage.py", line 392, in main
+    print(f"\n\u2717 Example {i} failed with error: {e}")
+  File "C:\Program Files\Python311\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2717' in position 2: character maps to <undefined>

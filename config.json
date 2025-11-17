@@ -1,0 +1,292 @@
+{
+  "system": {
+    "name": "Multi-Agent Audio Processing System",
+    "version": "1.0.0",
+    "environment": "development",
+    "monitoring": {
+      "enabled": true,
+      "interval_seconds": 5.0,
+      "auto_restart_failed_agents": true,
+      "health_check_timeout_seconds": 10.0
+    }
+  },
+  "message_bus": {
+    "max_queue_size": 10000,
+    "priority_enabled": true,
+    "dead_letter_queue_enabled": true,
+    "dispatcher_threads": 4,
+    "message_timeout_seconds": 30.0
+  },
+  "agents": {
+    "audio_enhancement": {
+      "enabled": true,
+      "processing_threads": 4,
+      "default_params": {
+        "noise_reduction_amount": 0.8,
+        "preserve_transients": true,
+        "declicking_sensitivity": 0.5,
+        "declipping_threshold": 0.95,
+        "spectral_repair_enabled": true
+      },
+      "limits": {
+        "max_processing_time_seconds": 300,
+        "max_audio_length_seconds": 600,
+        "max_sample_rate": 192000
+      }
+    },
+    "content_generation": {
+      "enabled": true,
+      "models": {
+        "melody": "default",
+        "harmony": "default",
+        "drums": "default",
+        "bass": "default"
+      },
+      "default_params": {
+        "temperature": 0.8,
+        "top_p": 0.9,
+        "creativity_level": "medium"
+      },
+      "limits": {
+        "max_generation_bars": 32,
+        "max_processing_time_seconds": 60,
+        "min_tempo": 60.0,
+        "max_tempo": 200.0
+      },
+      "constraints": {
+        "enforce_key": true,
+        "enforce_time_signature": true,
+        "voice_leading_enabled": true
+      }
+    },
+    "performance_optimization": {
+      "enabled": true,
+      "monitoring_interval": 1.0,
+      "cache": {
+        "enabled": true,
+        "max_size_mb": 500,
+        "eviction_policy": "lru",
+        "ttl_seconds": 3600
+      },
+      "scheduler": {
+        "algorithm": "resource_aware",
+        "max_concurrent_tasks": 10,
+        "priority_levels": ["high", "medium", "low"],
+        "task_timeout_seconds": 300
+      },
+      "resource_monitoring": {
+        "cpu_threshold_percent": 85.0,
+        "memory_threshold_percent": 90.0,
+        "gpu_threshold_percent": 90.0,
+        "disk_threshold_percent": 95.0
+      }
+    },
+    "metadata_management": {
+      "enabled": true,
+      "database_path": "./data/metadata.db",
+      "deep_analysis_default": true,
+      "search_index_size": 10000,
+      "auto_tag_enabled": true,
+      "version_control": {
+        "enabled": true,
+        "max_versions_per_project": 50,
+        "auto_backup": true
+      },
+      "analysis": {
+        "extract_musical_features": true,
+        "extract_technical_features": true,
+        "extract_quality_metrics": true,
+        "analyze_spectral_content": true
+      }
+    },
+    "workflow_engine": {
+      "enabled": true,
+      "max_concurrent_workflows": 10,
+      "default_timeout_seconds": 300,
+      "max_retries": 3,
+      "retry_delay_seconds": 1.0,
+      "persistence": {
+        "enabled": true,
+        "checkpoint_interval_seconds": 30
+      }
+    },
+    "live_effects_chain": {
+      "enabled": true,
+      "sample_rate": 44100,
+      "automation_update_interval_ms": 10,
+      "max_effect_chains": 16,
+      "max_effects_per_chain": 32,
+      "max_active_automations": 256,
+      "performance": {
+        "target_latency_ms": 2.0,
+        "enable_latency_monitoring": true,
+        "warn_on_high_latency": true,
+        "high_latency_threshold_ms": 5.0
+      },
+      "presets": {
+        "max_presets": 100,
+        "enable_preset_morphing": true,
+        "default_transition_time_seconds": 0.5
+      },
+      "scenes": {
+        "max_scenes": 50,
+        "enable_scene_transitions": true,
+        "default_transition_time_seconds": 1.0
+      }
+    },
+    "live_looping": {
+      "enabled": true,
+      "sample_rate": 44100,
+      "max_loops": 8,
+      "max_loop_length_seconds": 300,
+      "enable_undo_redo": true,
+      "undo_history_size": 10,
+      "sync_mode": "tempo_locked",
+      "quantization_enabled": true,
+      "performance": {
+        "enable_latency_monitoring": true,
+        "warn_on_sync_drift": true
+      },
+      "recording": {
+        "auto_quantize": true,
+        "count_in_bars": 0,
+        "auto_record_threshold_db": -40.0
+      },
+      "manipulation": {
+        "enable_time_stretch": true,
+        "enable_pitch_shift": true,
+        "enable_slicing": true,
+        "max_slices_per_loop": 64
+      }
+    },
+    "synchronization_clock": {
+      "enabled": true,
+      "sample_rate": 48000,
+      "default_tempo_bpm": 120.0,
+      "default_time_signature": "4/4",
+      "clock_precision_ms": 1.0,
+      "midi_clock": {
+        "enabled": false,
+        "port": "MIDI_OUT_1",
+        "send_start_stop": true,
+        "ppq": 24
+      },
+      "ableton_link": {
+        "enabled": false,
+        "set_tempo_on_sync": false,
+        "quantum": 4.0
+      },
+      "tap_tempo": {
+        "enabled": true,
+        "max_taps": 8,
+        "timeout_seconds": 3.0
+      },
+      "transport": {
+        "auto_stop_bars": 0,
+        "loop_enabled": false,
+        "loop_start_bar": 0,
+        "loop_end_bar": 0
+      }
+    },
+    "performance_automation": {
+      "enabled": true,
+      "max_automation_lanes": 64,
+      "max_scenes": 128,
+      "max_macros": 32,
+      "max_cues": 256,
+      "playback_update_interval_ms": 10,
+      "recording": {
+        "auto_smooth": true,
+        "smoothing_window_ms": 50,
+        "min_point_distance_ms": 10
+      },
+      "curves": {
+        "default_curve": "linear",
+        "bezier_resolution": 100
+      },
+      "cues": {
+        "trigger_tolerance_ms": 50,
+        "enable_conditions": true
+      }
+    },
+    "midi_control": {
+      "enabled": true,
+      "max_devices": 16,
+      "max_mappings_per_device": 128,
+      "learn_timeout_seconds": 10,
+      "auto_connect_devices": true,
+      "midi_clock": {
+        "send": false,
+        "receive": true,
+        "sync_to_external": false
+      },
+      "mapping": {
+        "default_curve": "linear",
+        "velocity_sensitive": true,
+        "channel_filtering": true
+      }
+    }
+  },
+  "workflows": {
+    "default_timeout_seconds": 300,
+    "max_retries": 3,
+    "retry_delay_seconds": 1.0,
+    "enable_parallel_execution": true,
+    "max_parallel_steps": 5
+  },
+  "audio_processing": {
+    "default_sample_rate": 44100,
+    "default_buffer_size": 512,
+    "supported_sample_rates": [22050, 44100, 48000, 88200, 96000, 192000],
+    "supported_formats": ["wav", "mp3", "flac", "ogg", "aiff"],
+    "normalization": {
+      "enabled": false,
+      "target_level_db": -3.0
+    }
+  },
+  "storage": {
+    "temp_directory": "./data/temp",
+    "cache_directory": "./data/cache",
+    "max_temp_file_age_hours": 24,
+    "auto_cleanup_enabled": true
+  },
+  "security": {
+    "max_file_size_mb": 500,
+    "allowed_file_extensions": [".wav", ".mp3", ".flac", ".ogg", ".aiff", ".mid", ".midi"],
+    "sanitize_file_names": true,
+    "validate_audio_headers": true
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file": {
+      "enabled": true,
+      "path": "./logs/system.log",
+      "max_size_mb": 100,
+      "backup_count": 5,
+      "rotation": "size"
+    },
+    "console": {
+      "enabled": true,
+      "colorize": true
+    },
+    "agents": {
+      "log_heartbeats": false,
+      "log_message_flow": false,
+      "log_performance_metrics": true
+    }
+  },
+  "development": {
+    "debug_mode": false,
+    "profiling_enabled": false,
+    "mock_ml_models": false,
+    "simulate_processing_delay": false
+  },
+  "production": {
+    "require_authentication": false,
+    "rate_limiting_enabled": false,
+    "cors_enabled": false,
+    "health_check_endpoint": "/health",
+    "metrics_endpoint": "/metrics"
+  }
+}

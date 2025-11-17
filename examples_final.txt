@@ -1,0 +1,545 @@
+2025-11-15 01:21:30,756 - src.core.message_bus - INFO - Message dispatcher started
+2025-11-15 01:21:30,756 - src.core.message_bus - INFO - Message bus started
+2025-11-15 01:21:30,756 - src.system - INFO - Starting multi-agent audio processing system...
+2025-11-15 01:21:30,756 - src.orchestration.agent_coordinator - INFO - Initializing multi-agent system...
+2025-11-15 01:21:30,756 - src.core.base_agent - INFO - Agent audio_enhancement_agent (Audio Enhancement & Restoration Agent) created
+2025-11-15 01:21:30,756 - src.core.base_agent - INFO - Agent content_generation_agent (Content Generation & Gap Filling Agent) created
+2025-11-15 01:21:30,757 - src.core.base_agent - INFO - Agent performance_optimization_agent (Performance & Resource Optimization Agent) created
+2025-11-15 01:21:30,760 - src.core.base_agent - INFO - Agent metadata_management_agent (Intelligent Metadata & Project Management Agent) created
+2025-11-15 01:21:30,761 - src.core.base_agent - INFO - Agent workflow_engine (Workflow Orchestration Engine) created
+2025-11-15 01:21:30,761 - src.core.base_agent - INFO - Registered agent audio_enhancement_agent
+2025-11-15 01:21:30,761 - src.orchestration.agent_coordinator - INFO - Registered agent: audio_enhancement_agent
+2025-11-15 01:21:30,761 - src.core.base_agent - INFO - Registered agent content_generation_agent
+2025-11-15 01:21:30,761 - src.orchestration.agent_coordinator - INFO - Registered agent: content_generation_agent
+2025-11-15 01:21:30,761 - src.core.base_agent - INFO - Registered agent performance_optimization_agent
+2025-11-15 01:21:30,761 - src.orchestration.agent_coordinator - INFO - Registered agent: performance_optimization_agent
+2025-11-15 01:21:30,761 - src.core.base_agent - INFO - Registered agent metadata_management_agent
+2025-11-15 01:21:30,761 - src.orchestration.agent_coordinator - INFO - Registered agent: metadata_management_agent
+2025-11-15 01:21:30,761 - src.core.base_agent - INFO - Registered agent workflow_engine
+2025-11-15 01:21:30,761 - src.orchestration.agent_coordinator - INFO - Registered agent: workflow_engine
+2025-11-15 01:21:30,762 - src.core.base_agent - INFO - [audio_enhancement_agent] Audio Enhancement Agent initialized successfully
+2025-11-15 01:21:30,763 - src.core.base_agent - INFO - Agent audio_enhancement_agent started
+2025-11-15 01:21:30,763 - src.orchestration.agent_coordinator - INFO - Started agent: audio_enhancement_agent
+2025-11-15 01:21:30,764 - src.core.base_agent - INFO - [content_generation_agent] Content Generation Agent initialized successfully
+2025-11-15 01:21:30,764 - src.core.base_agent - INFO - Agent content_generation_agent started
+2025-11-15 01:21:30,764 - src.orchestration.agent_coordinator - INFO - Started agent: content_generation_agent
+2025-11-15 01:21:30,765 - src.core.base_agent - INFO - [performance_optimization_agent] Performance Optimization Agent initialized successfully
+2025-11-15 01:21:30,766 - src.core.base_agent - INFO - Agent performance_optimization_agent started
+2025-11-15 01:21:30,766 - src.orchestration.agent_coordinator - INFO - Started agent: performance_optimization_agent
+2025-11-15 01:21:30,768 - src.core.base_agent - INFO - [metadata_management_agent] Metadata Management Agent initialized successfully
+2025-11-15 01:21:30,769 - src.core.base_agent - INFO - Agent metadata_management_agent started
+2025-11-15 01:21:30,769 - src.orchestration.agent_coordinator - INFO - Started agent: metadata_management_agent
+2025-11-15 01:21:30,770 - src.core.base_agent - INFO - [workflow_engine] Workflow Engine initialized successfully
+2025-11-15 01:21:30,771 - src.core.base_agent - INFO - Agent workflow_engine started
+2025-11-15 01:21:30,771 - src.orchestration.agent_coordinator - INFO - Started agent: workflow_engine
+2025-11-15 01:21:30,771 - src.orchestration.agent_coordinator - INFO - Health monitoring started
+2025-11-15 01:21:30,772 - src.orchestration.agent_coordinator - INFO - Multi-agent system initialized successfully
+2025-11-15 01:21:30,772 - src.system - INFO - Multi-agent system started successfully
+2025-11-15 01:21:32,773 - src.system - INFO - Stopping multi-agent system...
+2025-11-15 01:21:32,773 - src.orchestration.agent_coordinator - INFO - Shutting down multi-agent system...
+2025-11-15 01:21:34,781 - src.orchestration.agent_coordinator - INFO - Health monitoring stopped
+2025-11-15 01:21:34,782 - src.core.base_agent - INFO - [audio_enhancement_agent] Audio Enhancement Agent shutdown complete
+2025-11-15 01:21:34,782 - src.core.base_agent - INFO - Agent audio_enhancement_agent stopped
+2025-11-15 01:21:34,782 - src.core.base_agent - INFO - Unregistered agent audio_enhancement_agent
+2025-11-15 01:21:34,782 - src.orchestration.agent_coordinator - INFO - Stopped agent: audio_enhancement_agent
+2025-11-15 01:21:34,783 - src.core.base_agent - INFO - [content_generation_agent] Content Generation Agent shutdown complete
+2025-11-15 01:21:34,783 - src.core.base_agent - INFO - Agent content_generation_agent stopped
+2025-11-15 01:21:34,783 - src.core.base_agent - INFO - Unregistered agent content_generation_agent
+2025-11-15 01:21:34,783 - src.orchestration.agent_coordinator - INFO - Stopped agent: content_generation_agent
+2025-11-15 01:21:35,556 - src.core.base_agent - INFO - [performance_optimization_agent] Performance Optimization Agent shutdown complete
+2025-11-15 01:21:35,556 - src.core.base_agent - INFO - Agent performance_optimization_agent stopped
+2025-11-15 01:21:35,557 - src.core.base_agent - INFO - Unregistered agent performance_optimization_agent
+2025-11-15 01:21:35,557 - src.orchestration.agent_coordinator - INFO - Stopped agent: performance_optimization_agent
+2025-11-15 01:21:35,557 - src.core.base_agent - INFO - [metadata_management_agent] Metadata Management Agent shutdown complete
+2025-11-15 01:21:35,557 - src.core.base_agent - INFO - Agent metadata_management_agent stopped
+2025-11-15 01:21:35,557 - src.core.base_agent - INFO - Unregistered agent metadata_management_agent
+2025-11-15 01:21:35,557 - src.orchestration.agent_coordinator - INFO - Stopped agent: metadata_management_agent
+2025-11-15 01:21:35,558 - src.core.base_agent - INFO - [workflow_engine] Workflow Engine shutdown complete
+2025-11-15 01:21:35,558 - src.core.base_agent - INFO - Agent workflow_engine stopped
+2025-11-15 01:21:35,558 - src.core.base_agent - INFO - Unregistered agent workflow_engine
+2025-11-15 01:21:35,558 - src.orchestration.agent_coordinator - INFO - Stopped agent: workflow_engine
+2025-11-15 01:21:35,558 - src.core.message_bus - INFO - Message dispatcher stopped
+2025-11-15 01:21:35,558 - src.core.message_bus - INFO - Message bus stopped
+2025-11-15 01:21:35,559 - src.orchestration.agent_coordinator - INFO - Multi-agent system shutdown complete
+2025-11-15 01:21:35,559 - src.system - INFO - Multi-agent system stopped successfully
+2025-11-15 01:21:35,559 - src.system - INFO - Starting multi-agent audio processing system...
+2025-11-15 01:21:35,559 - src.orchestration.agent_coordinator - INFO - Initializing multi-agent system...
+2025-11-15 01:21:35,559 - src.core.base_agent - INFO - Agent audio_enhancement_agent (Audio Enhancement & Restoration Agent) created
+2025-11-15 01:21:35,559 - src.core.base_agent - INFO - Agent content_generation_agent (Content Generation & Gap Filling Agent) created
+2025-11-15 01:21:35,559 - src.core.base_agent - INFO - Agent performance_optimization_agent (Performance & Resource Optimization Agent) created
+2025-11-15 01:21:35,559 - src.core.base_agent - INFO - Agent metadata_management_agent (Intelligent Metadata & Project Management Agent) created
+2025-11-15 01:21:35,559 - src.core.base_agent - INFO - Agent workflow_engine (Workflow Orchestration Engine) created
+2025-11-15 01:21:35,559 - src.core.base_agent - INFO - Registered agent audio_enhancement_agent
+2025-11-15 01:21:35,559 - src.orchestration.agent_coordinator - INFO - Registered agent: audio_enhancement_agent
+2025-11-15 01:21:35,560 - src.core.base_agent - INFO - Registered agent content_generation_agent
+2025-11-15 01:21:35,560 - src.orchestration.agent_coordinator - INFO - Registered agent: content_generation_agent
+2025-11-15 01:21:35,560 - src.core.base_agent - INFO - Registered agent performance_optimization_agent
+2025-11-15 01:21:35,560 - src.orchestration.agent_coordinator - INFO - Registered agent: performance_optimization_agent
+2025-11-15 01:21:35,560 - src.core.base_agent - INFO - Registered agent metadata_management_agent
+2025-11-15 01:21:35,560 - src.orchestration.agent_coordinator - INFO - Registered agent: metadata_management_agent
+2025-11-15 01:21:35,560 - src.core.base_agent - INFO - Registered agent workflow_engine
+2025-11-15 01:21:35,560 - src.orchestration.agent_coordinator - INFO - Registered agent: workflow_engine
+2025-11-15 01:21:35,561 - src.core.message_bus - INFO - Message dispatcher started
+2025-11-15 01:21:35,561 - src.core.message_bus - INFO - Message bus started
+2025-11-15 01:21:35,562 - src.core.base_agent - INFO - [audio_enhancement_agent] Audio Enhancement Agent initialized successfully
+2025-11-15 01:21:35,562 - src.core.base_agent - INFO - Agent audio_enhancement_agent started
+2025-11-15 01:21:35,562 - src.orchestration.agent_coordinator - INFO - Started agent: audio_enhancement_agent
+2025-11-15 01:21:35,563 - src.core.base_agent - INFO - [content_generation_agent] Content Generation Agent initialized successfully
+2025-11-15 01:21:35,564 - src.core.base_agent - INFO - Agent content_generation_agent started
+2025-11-15 01:21:35,564 - src.orchestration.agent_coordinator - INFO - Started agent: content_generation_agent
+2025-11-15 01:21:35,565 - src.core.base_agent - INFO - [performance_optimization_agent] Performance Optimization Agent initialized successfully
+2025-11-15 01:21:35,566 - src.core.base_agent - INFO - Agent performance_optimization_agent started
+2025-11-15 01:21:35,566 - src.orchestration.agent_coordinator - INFO - Started agent: performance_optimization_agent
+2025-11-15 01:21:35,568 - src.core.base_agent - INFO - [metadata_management_agent] Metadata Management Agent initialized successfully
+2025-11-15 01:21:35,568 - src.core.base_agent - INFO - Agent metadata_management_agent started
+2025-11-15 01:21:35,568 - src.orchestration.agent_coordinator - INFO - Started agent: metadata_management_agent
+2025-11-15 01:21:35,570 - src.core.base_agent - INFO - [workflow_engine] Workflow Engine initialized successfully
+2025-11-15 01:21:35,570 - src.core.base_agent - INFO - Agent workflow_engine started
+2025-11-15 01:21:35,570 - src.orchestration.agent_coordinator - INFO - Started agent: workflow_engine
+2025-11-15 01:21:35,571 - src.orchestration.agent_coordinator - INFO - Health monitoring started
+2025-11-15 01:21:35,571 - src.orchestration.agent_coordinator - INFO - Multi-agent system initialized successfully
+2025-11-15 01:21:35,571 - src.system - INFO - Multi-agent system started successfully
+2025-11-15 01:21:40,220 - src.system - INFO - Stopping multi-agent system...
+2025-11-15 01:21:40,220 - src.orchestration.agent_coordinator - INFO - Shutting down multi-agent system...
+2025-11-15 01:21:40,572 - src.orchestration.agent_coordinator - INFO - Health monitoring stopped
+2025-11-15 01:21:40,573 - src.core.base_agent - INFO - [audio_enhancement_agent] Audio Enhancement Agent shutdown complete
+2025-11-15 01:21:40,574 - src.core.base_agent - INFO - Agent audio_enhancement_agent stopped
+2025-11-15 01:21:40,574 - src.core.base_agent - INFO - Unregistered agent audio_enhancement_agent
+2025-11-15 01:21:40,574 - src.orchestration.agent_coordinator - INFO - Stopped agent: audio_enhancement_agent
+2025-11-15 01:21:40,575 - src.core.base_agent - INFO - [content_generation_agent] Content Generation Agent shutdown complete
+2025-11-15 01:21:40,575 - src.core.base_agent - INFO - Agent content_generation_agent stopped
+2025-11-15 01:21:40,575 - src.core.base_agent - INFO - Unregistered agent content_generation_agent
+2025-11-15 01:21:40,575 - src.orchestration.agent_coordinator - INFO - Stopped agent: content_generation_agent
+2025-11-15 01:21:41,721 - src.core.base_agent - INFO - [performance_optimization_agent] Performance Optimization Agent shutdown complete
+2025-11-15 01:21:41,721 - src.core.base_agent - INFO - Agent performance_optimization_agent stopped
+2025-11-15 01:21:41,721 - src.core.base_agent - INFO - Unregistered agent performance_optimization_agent
+2025-11-15 01:21:41,721 - src.orchestration.agent_coordinator - INFO - Stopped agent: performance_optimization_agent
+2025-11-15 01:21:41,721 - src.core.base_agent - INFO - [metadata_management_agent] Metadata Management Agent shutdown complete
+2025-11-15 01:21:41,722 - src.core.base_agent - INFO - Agent metadata_management_agent stopped
+2025-11-15 01:21:41,722 - src.core.base_agent - INFO - Unregistered agent metadata_management_agent
+2025-11-15 01:21:41,722 - src.orchestration.agent_coordinator - INFO - Stopped agent: metadata_management_agent
+2025-11-15 01:21:41,722 - src.core.base_agent - INFO - [workflow_engine] Workflow Engine shutdown complete
+2025-11-15 01:21:41,723 - src.core.base_agent - INFO - Agent workflow_engine stopped
+2025-11-15 01:21:41,723 - src.core.base_agent - INFO - Unregistered agent workflow_engine
+2025-11-15 01:21:41,723 - src.orchestration.agent_coordinator - INFO - Stopped agent: workflow_engine
+2025-11-15 01:21:41,837 - src.core.message_bus - INFO - Message dispatcher stopped
+2025-11-15 01:21:41,837 - src.core.message_bus - INFO - Message bus stopped
+2025-11-15 01:21:41,837 - src.orchestration.agent_coordinator - INFO - Multi-agent system shutdown complete
+2025-11-15 01:21:41,837 - src.system - INFO - Multi-agent system stopped successfully
+2025-11-15 01:21:41,840 - src.system - INFO - Starting multi-agent audio processing system...
+2025-11-15 01:21:41,840 - src.orchestration.agent_coordinator - INFO - Initializing multi-agent system...
+2025-11-15 01:21:41,840 - src.core.base_agent - INFO - Agent audio_enhancement_agent (Audio Enhancement & Restoration Agent) created
+2025-11-15 01:21:41,840 - src.core.base_agent - INFO - Agent content_generation_agent (Content Generation & Gap Filling Agent) created
+2025-11-15 01:21:41,840 - src.core.base_agent - INFO - Agent performance_optimization_agent (Performance & Resource Optimization Agent) created
+2025-11-15 01:21:41,840 - src.core.base_agent - INFO - Agent metadata_management_agent (Intelligent Metadata & Project Management Agent) created
+2025-11-15 01:21:41,841 - src.core.base_agent - INFO - Agent workflow_engine (Workflow Orchestration Engine) created
+2025-11-15 01:21:41,841 - src.core.base_agent - INFO - Registered agent audio_enhancement_agent
+2025-11-15 01:21:41,841 - src.orchestration.agent_coordinator - INFO - Registered agent: audio_enhancement_agent
+2025-11-15 01:21:41,841 - src.core.base_agent - INFO - Registered agent content_generation_agent
+2025-11-15 01:21:41,841 - src.orchestration.agent_coordinator - INFO - Registered agent: content_generation_agent
+2025-11-15 01:21:41,841 - src.core.base_agent - INFO - Registered agent performance_optimization_agent
+2025-11-15 01:21:41,841 - src.orchestration.agent_coordinator - INFO - Registered agent: performance_optimization_agent
+2025-11-15 01:21:41,841 - src.core.base_agent - INFO - Registered agent metadata_management_agent
+2025-11-15 01:21:41,841 - src.orchestration.agent_coordinator - INFO - Registered agent: metadata_management_agent
+2025-11-15 01:21:41,841 - src.core.base_agent - INFO - Registered agent workflow_engine
+2025-11-15 01:21:41,842 - src.orchestration.agent_coordinator - INFO - Registered agent: workflow_engine
+2025-11-15 01:21:41,843 - src.core.message_bus - INFO - Message dispatcher started
+2025-11-15 01:21:41,843 - src.core.message_bus - INFO - Message bus started
+2025-11-15 01:21:41,845 - src.core.base_agent - INFO - [audio_enhancement_agent] Audio Enhancement Agent initialized successfully
+2025-11-15 01:21:41,846 - src.core.base_agent - INFO - Agent audio_enhancement_agent started
+2025-11-15 01:21:41,846 - src.orchestration.agent_coordinator - INFO - Started agent: audio_enhancement_agent
+2025-11-15 01:21:41,847 - src.core.base_agent - INFO - [content_generation_agent] Content Generation Agent initialized successfully
+2025-11-15 01:21:41,848 - src.core.base_agent - INFO - Agent content_generation_agent started
+2025-11-15 01:21:41,848 - src.orchestration.agent_coordinator - INFO - Started agent: content_generation_agent
+2025-11-15 01:21:41,849 - src.core.base_agent - INFO - [performance_optimization_agent] Performance Optimization Agent initialized successfully
+2025-11-15 01:21:41,850 - src.core.base_agent - INFO - Agent performance_optimization_agent started
+2025-11-15 01:21:41,850 - src.orchestration.agent_coordinator - INFO - Started agent: performance_optimization_agent
+2025-11-15 01:21:41,852 - src.core.base_agent - INFO - [metadata_management_agent] Metadata Management Agent initialized successfully
+2025-11-15 01:21:41,853 - src.core.base_agent - INFO - Agent metadata_management_agent started
+2025-11-15 01:21:41,853 - src.orchestration.agent_coordinator - INFO - Started agent: metadata_management_agent
+2025-11-15 01:21:41,853 - src.core.base_agent - INFO - [workflow_engine] Workflow Engine initialized successfully
+2025-11-15 01:21:41,854 - src.core.base_agent - INFO - Agent workflow_engine started
+2025-11-15 01:21:41,854 - src.orchestration.agent_coordinator - INFO - Started agent: workflow_engine
+2025-11-15 01:21:41,855 - src.orchestration.agent_coordinator - INFO - Health monitoring started
+2025-11-15 01:21:41,855 - src.orchestration.agent_coordinator - INFO - Multi-agent system initialized successfully
+2025-11-15 01:21:41,855 - src.system - INFO - Multi-agent system started successfully
+2025-11-15 01:21:43,980 - src.system - INFO - Stopping multi-agent system...
+2025-11-15 01:21:43,981 - src.orchestration.agent_coordinator - INFO - Shutting down multi-agent system...
+2025-11-15 01:21:45,989 - src.orchestration.agent_coordinator - INFO - Health monitoring stopped
+2025-11-15 01:21:45,989 - src.core.base_agent - INFO - [audio_enhancement_agent] Audio Enhancement Agent shutdown complete
+2025-11-15 01:21:45,990 - src.core.base_agent - INFO - Agent audio_enhancement_agent stopped
+2025-11-15 01:21:45,990 - src.core.base_agent - INFO - Unregistered agent audio_enhancement_agent
+2025-11-15 01:21:45,990 - src.orchestration.agent_coordinator - INFO - Stopped agent: audio_enhancement_agent
+2025-11-15 01:21:45,991 - src.core.base_agent - INFO - [content_generation_agent] Content Generation Agent shutdown complete
+2025-11-15 01:21:45,991 - src.core.base_agent - INFO - Agent content_generation_agent stopped
+2025-11-15 01:21:45,991 - src.core.base_agent - INFO - Unregistered agent content_generation_agent
+2025-11-15 01:21:45,991 - src.orchestration.agent_coordinator - INFO - Stopped agent: content_generation_agent
+2025-11-15 01:21:46,640 - src.core.base_agent - INFO - [performance_optimization_agent] Performance Optimization Agent shutdown complete
+2025-11-15 01:21:46,641 - src.core.base_agent - INFO - Agent performance_optimization_agent stopped
+2025-11-15 01:21:46,641 - src.core.base_agent - INFO - Unregistered agent performance_optimization_agent
+2025-11-15 01:21:46,641 - src.orchestration.agent_coordinator - INFO - Stopped agent: performance_optimization_agent
+2025-11-15 01:21:46,642 - src.core.base_agent - INFO - [metadata_management_agent] Metadata Management Agent shutdown complete
+2025-11-15 01:21:46,642 - src.core.base_agent - INFO - Agent metadata_management_agent stopped
+2025-11-15 01:21:46,642 - src.core.base_agent - INFO - Unregistered agent metadata_management_agent
+2025-11-15 01:21:46,642 - src.orchestration.agent_coordinator - INFO - Stopped agent: metadata_management_agent
+2025-11-15 01:21:46,642 - src.core.base_agent - INFO - [workflow_engine] Workflow Engine shutdown complete
+2025-11-15 01:21:46,642 - src.core.base_agent - INFO - Agent workflow_engine stopped
+2025-11-15 01:21:46,642 - src.core.base_agent - INFO - Unregistered agent workflow_engine
+2025-11-15 01:21:46,642 - src.orchestration.agent_coordinator - INFO - Stopped agent: workflow_engine
+2025-11-15 01:21:46,642 - src.core.message_bus - INFO - Message dispatcher stopped
+2025-11-15 01:21:46,643 - src.core.message_bus - INFO - Message bus stopped
+2025-11-15 01:21:46,643 - src.orchestration.agent_coordinator - INFO - Multi-agent system shutdown complete
+2025-11-15 01:21:46,643 - src.system - INFO - Multi-agent system stopped successfully
+2025-11-15 01:21:46,654 - src.system - INFO - Starting multi-agent audio processing system...
+2025-11-15 01:21:46,654 - src.orchestration.agent_coordinator - INFO - Initializing multi-agent system...
+2025-11-15 01:21:46,654 - src.core.base_agent - INFO - Agent audio_enhancement_agent (Audio Enhancement & Restoration Agent) created
+2025-11-15 01:21:46,654 - src.core.base_agent - INFO - Agent content_generation_agent (Content Generation & Gap Filling Agent) created
+2025-11-15 01:21:46,654 - src.core.base_agent - INFO - Agent performance_optimization_agent (Performance & Resource Optimization Agent) created
+2025-11-15 01:21:46,654 - src.core.base_agent - INFO - Agent metadata_management_agent (Intelligent Metadata & Project Management Agent) created
+2025-11-15 01:21:46,654 - src.core.base_agent - INFO - Agent workflow_engine (Workflow Orchestration Engine) created
+2025-11-15 01:21:46,655 - src.core.base_agent - INFO - Registered agent audio_enhancement_agent
+2025-11-15 01:21:46,655 - src.orchestration.agent_coordinator - INFO - Registered agent: audio_enhancement_agent
+2025-11-15 01:21:46,655 - src.core.base_agent - INFO - Registered agent content_generation_agent
+2025-11-15 01:21:46,655 - src.orchestration.agent_coordinator - INFO - Registered agent: content_generation_agent
+2025-11-15 01:21:46,655 - src.core.base_agent - INFO - Registered agent performance_optimization_agent
+2025-11-15 01:21:46,655 - src.orchestration.agent_coordinator - INFO - Registered agent: performance_optimization_agent
+2025-11-15 01:21:46,655 - src.core.base_agent - INFO - Registered agent metadata_management_agent
+2025-11-15 01:21:46,655 - src.orchestration.agent_coordinator - INFO - Registered agent: metadata_management_agent
+2025-11-15 01:21:46,655 - src.core.base_agent - INFO - Registered agent workflow_engine
+2025-11-15 01:21:46,655 - src.orchestration.agent_coordinator - INFO - Registered agent: workflow_engine
+2025-11-15 01:21:46,656 - src.core.message_bus - INFO - Message dispatcher started
+2025-11-15 01:21:46,656 - src.core.message_bus - INFO - Message bus started
+2025-11-15 01:21:46,657 - src.core.base_agent - INFO - [audio_enhancement_agent] Audio Enhancement Agent initialized successfully
+2025-11-15 01:21:46,657 - src.core.base_agent - INFO - Agent audio_enhancement_agent started
+2025-11-15 01:21:46,657 - src.orchestration.agent_coordinator - INFO - Started agent: audio_enhancement_agent
+2025-11-15 01:21:46,658 - src.core.base_agent - INFO - [content_generation_agent] Content Generation Agent initialized successfully
+2025-11-15 01:21:46,659 - src.core.base_agent - INFO - Agent content_generation_agent started
+2025-11-15 01:21:46,659 - src.orchestration.agent_coordinator - INFO - Started agent: content_generation_agent
+2025-11-15 01:21:46,660 - src.core.base_agent - INFO - [performance_optimization_agent] Performance Optimization Agent initialized successfully
+2025-11-15 01:21:46,661 - src.core.base_agent - INFO - Agent performance_optimization_agent started
+2025-11-15 01:21:46,661 - src.orchestration.agent_coordinator - INFO - Started agent: performance_optimization_agent
+2025-11-15 01:21:46,663 - src.core.base_agent - INFO - [metadata_management_agent] Metadata Management Agent initialized successfully
+2025-11-15 01:21:46,664 - src.core.base_agent - INFO - Agent metadata_management_agent started
+2025-11-15 01:21:46,664 - src.orchestration.agent_coordinator - INFO - Started agent: metadata_management_agent
+2025-11-15 01:21:46,665 - src.core.base_agent - INFO - [workflow_engine] Workflow Engine initialized successfully
+2025-11-15 01:21:46,665 - src.core.base_agent - INFO - Agent workflow_engine started
+2025-11-15 01:21:46,665 - src.orchestration.agent_coordinator - INFO - Started agent: workflow_engine
+2025-11-15 01:21:46,666 - src.orchestration.agent_coordinator - INFO - Health monitoring started
+2025-11-15 01:21:46,666 - src.orchestration.agent_coordinator - INFO - Multi-agent system initialized successfully
+2025-11-15 01:21:46,666 - src.system - INFO - Multi-agent system started successfully
+2025-11-15 01:21:53,450 - src.system - INFO - Stopping multi-agent system...
+2025-11-15 01:21:53,450 - src.orchestration.agent_coordinator - INFO - Shutting down multi-agent system...
+2025-11-15 01:21:55,456 - src.orchestration.agent_coordinator - INFO - Health monitoring stopped
+2025-11-15 01:21:55,457 - src.core.base_agent - INFO - [audio_enhancement_agent] Audio Enhancement Agent shutdown complete
+2025-11-15 01:21:55,457 - src.core.base_agent - INFO - Agent audio_enhancement_agent stopped
+2025-11-15 01:21:55,457 - src.core.base_agent - INFO - Unregistered agent audio_enhancement_agent
+2025-11-15 01:21:55,457 - src.orchestration.agent_coordinator - INFO - Stopped agent: audio_enhancement_agent
+2025-11-15 01:21:55,458 - src.core.base_agent - INFO - [content_generation_agent] Content Generation Agent shutdown complete
+2025-11-15 01:21:55,458 - src.core.base_agent - INFO - Agent content_generation_agent stopped
+2025-11-15 01:21:55,459 - src.core.base_agent - INFO - Unregistered agent content_generation_agent
+2025-11-15 01:21:55,459 - src.orchestration.agent_coordinator - INFO - Stopped agent: content_generation_agent
+2025-11-15 01:21:56,435 - src.core.base_agent - INFO - [performance_optimization_agent] Performance Optimization Agent shutdown complete
+2025-11-15 01:21:56,435 - src.core.base_agent - INFO - Agent performance_optimization_agent stopped
+2025-11-15 01:21:56,435 - src.core.base_agent - INFO - Unregistered agent performance_optimization_agent
+2025-11-15 01:21:56,435 - src.orchestration.agent_coordinator - INFO - Stopped agent: performance_optimization_agent
+2025-11-15 01:21:56,435 - src.core.base_agent - INFO - [metadata_management_agent] Metadata Management Agent shutdown complete
+2025-11-15 01:21:56,436 - src.core.base_agent - INFO - Agent metadata_management_agent stopped
+2025-11-15 01:21:56,436 - src.core.base_agent - INFO - Unregistered agent metadata_management_agent
+2025-11-15 01:21:56,436 - src.orchestration.agent_coordinator - INFO - Stopped agent: metadata_management_agent
+2025-11-15 01:21:56,436 - src.core.base_agent - INFO - [workflow_engine] Workflow Engine shutdown complete
+2025-11-15 01:21:56,436 - src.core.base_agent - INFO - Agent workflow_engine stopped
+2025-11-15 01:21:56,436 - src.core.base_agent - INFO - Unregistered agent workflow_engine
+2025-11-15 01:21:56,436 - src.orchestration.agent_coordinator - INFO - Stopped agent: workflow_engine
+2025-11-15 01:21:56,540 - src.core.message_bus - INFO - Message dispatcher stopped
+2025-11-15 01:21:56,541 - src.core.message_bus - INFO - Message bus stopped
+2025-11-15 01:21:56,541 - src.orchestration.agent_coordinator - INFO - Multi-agent system shutdown complete
+2025-11-15 01:21:56,541 - src.system - INFO - Multi-agent system stopped successfully
+2025-11-15 01:21:56,542 - src.system - INFO - Starting multi-agent audio processing system...
+2025-11-15 01:21:56,542 - src.orchestration.agent_coordinator - INFO - Initializing multi-agent system...
+2025-11-15 01:21:56,543 - src.core.base_agent - INFO - Agent audio_enhancement_agent (Audio Enhancement & Restoration Agent) created
+2025-11-15 01:21:56,543 - src.core.base_agent - INFO - Agent content_generation_agent (Content Generation & Gap Filling Agent) created
+2025-11-15 01:21:56,543 - src.core.base_agent - INFO - Agent performance_optimization_agent (Performance & Resource Optimization Agent) created
+2025-11-15 01:21:56,543 - src.core.base_agent - INFO - Agent metadata_management_agent (Intelligent Metadata & Project Management Agent) created
+2025-11-15 01:21:56,544 - src.core.base_agent - INFO - Agent workflow_engine (Workflow Orchestration Engine) created
+2025-11-15 01:21:56,544 - src.core.base_agent - INFO - Registered agent audio_enhancement_agent
+2025-11-15 01:21:56,544 - src.orchestration.agent_coordinator - INFO - Registered agent: audio_enhancement_agent
+2025-11-15 01:21:56,544 - src.core.base_agent - INFO - Registered agent content_generation_agent
+2025-11-15 01:21:56,544 - src.orchestration.agent_coordinator - INFO - Registered agent: content_generation_agent
+2025-11-15 01:21:56,544 - src.core.base_agent - INFO - Registered agent performance_optimization_agent
+2025-11-15 01:21:56,544 - src.orchestration.agent_coordinator - INFO - Registered agent: performance_optimization_agent
+2025-11-15 01:21:56,544 - src.core.base_agent - INFO - Registered agent metadata_management_agent
+2025-11-15 01:21:56,544 - src.orchestration.agent_coordinator - INFO - Registered agent: metadata_management_agent
+2025-11-15 01:21:56,545 - src.core.base_agent - INFO - Registered agent workflow_engine
+2025-11-15 01:21:56,545 - src.orchestration.agent_coordinator - INFO - Registered agent: workflow_engine
+2025-11-15 01:21:56,545 - src.core.message_bus - INFO - Message dispatcher started
+2025-11-15 01:21:56,545 - src.core.message_bus - INFO - Message bus started
+2025-11-15 01:21:56,547 - src.core.base_agent - INFO - [audio_enhancement_agent] Audio Enhancement Agent initialized successfully
+2025-11-15 01:21:56,548 - src.core.base_agent - INFO - Agent audio_enhancement_agent started
+2025-11-15 01:21:56,548 - src.orchestration.agent_coordinator - INFO - Started agent: audio_enhancement_agent
+2025-11-15 01:21:56,549 - src.core.base_agent - INFO - [content_generation_agent] Content Generation Agent initialized successfully
+2025-11-15 01:21:56,550 - src.core.base_agent - INFO - Agent content_generation_agent started
+2025-11-15 01:21:56,550 - src.orchestration.agent_coordinator - INFO - Started agent: content_generation_agent
+2025-11-15 01:21:56,551 - src.core.base_agent - INFO - [performance_optimization_agent] Performance Optimization Agent initialized successfully
+2025-11-15 01:21:56,552 - src.core.base_agent - INFO - Agent performance_optimization_agent started
+2025-11-15 01:21:56,552 - src.orchestration.agent_coordinator - INFO - Started agent: performance_optimization_agent
+2025-11-15 01:21:56,555 - src.core.base_agent - INFO - [metadata_management_agent] Metadata Management Agent initialized successfully
+2025-11-15 01:21:56,556 - src.core.base_agent - INFO - Agent metadata_management_agent started
+2025-11-15 01:21:56,556 - src.orchestration.agent_coordinator - INFO - Started agent: metadata_management_agent
+2025-11-15 01:21:56,557 - src.core.base_agent - INFO - [workflow_engine] Workflow Engine initialized successfully
+2025-11-15 01:21:56,558 - src.core.base_agent - INFO - Agent workflow_engine started
+2025-11-15 01:21:56,558 - src.orchestration.agent_coordinator - INFO - Started agent: workflow_engine
+2025-11-15 01:21:56,559 - src.orchestration.agent_coordinator - INFO - Health monitoring started
+2025-11-15 01:21:56,559 - src.orchestration.agent_coordinator - INFO - Multi-agent system initialized successfully
+2025-11-15 01:21:56,559 - src.system - INFO - Multi-agent system started successfully
+2025-11-15 01:21:59,692 - src.system - INFO - Stopping multi-agent system...
+2025-11-15 01:21:59,693 - src.orchestration.agent_coordinator - INFO - Shutting down multi-agent system...
+2025-11-15 01:22:01,559 - src.orchestration.agent_coordinator - INFO - Health monitoring stopped
+2025-11-15 01:22:01,560 - src.core.base_agent - INFO - [audio_enhancement_agent] Audio Enhancement Agent shutdown complete
+2025-11-15 01:22:01,561 - src.core.base_agent - INFO - Agent audio_enhancement_agent stopped
+2025-11-15 01:22:01,561 - src.core.base_agent - INFO - Unregistered agent audio_enhancement_agent
+2025-11-15 01:22:01,561 - src.orchestration.agent_coordinator - INFO - Stopped agent: audio_enhancement_agent
+2025-11-15 01:22:01,562 - src.core.base_agent - INFO - [content_generation_agent] Content Generation Agent shutdown complete
+2025-11-15 01:22:01,562 - src.core.base_agent - INFO - Agent content_generation_agent stopped
+2025-11-15 01:22:01,562 - src.core.base_agent - INFO - Unregistered agent content_generation_agent
+2025-11-15 01:22:01,562 - src.orchestration.agent_coordinator - INFO - Stopped agent: content_generation_agent
+2025-11-15 01:22:02,742 - src.core.base_agent - INFO - [performance_optimization_agent] Performance Optimization Agent shutdown complete
+2025-11-15 01:22:02,742 - src.core.base_agent - INFO - Agent performance_optimization_agent stopped
+2025-11-15 01:22:02,742 - src.core.base_agent - INFO - Unregistered agent performance_optimization_agent
+2025-11-15 01:22:02,744 - src.orchestration.agent_coordinator - INFO - Stopped agent: performance_optimization_agent
+2025-11-15 01:22:02,744 - src.core.base_agent - INFO - [metadata_management_agent] Metadata Management Agent shutdown complete
+2025-11-15 01:22:02,744 - src.core.base_agent - INFO - Agent metadata_management_agent stopped
+2025-11-15 01:22:02,745 - src.core.base_agent - INFO - Unregistered agent metadata_management_agent
+2025-11-15 01:22:02,745 - src.orchestration.agent_coordinator - INFO - Stopped agent: metadata_management_agent
+2025-11-15 01:22:02,745 - src.core.base_agent - INFO - [workflow_engine] Workflow Engine shutdown complete
+2025-11-15 01:22:02,745 - src.core.base_agent - INFO - Agent workflow_engine stopped
+2025-11-15 01:22:02,745 - src.core.base_agent - INFO - Unregistered agent workflow_engine
+2025-11-15 01:22:02,745 - src.orchestration.agent_coordinator - INFO - Stopped agent: workflow_engine
+2025-11-15 01:22:02,855 - src.core.message_bus - INFO - Message dispatcher stopped
+2025-11-15 01:22:02,855 - src.core.message_bus - INFO - Message bus stopped
+2025-11-15 01:22:02,855 - src.orchestration.agent_coordinator - INFO - Multi-agent system shutdown complete
+2025-11-15 01:22:02,856 - src.system - INFO - Multi-agent system stopped successfully
+Traceback (most recent call last):
+  File "F:\agents\examples\basic_usage.py", line 390, in main
+    example_func()
+  File "F:\agents\examples\basic_usage.py", line 310, in example_5_workflow_execution
+    total_steps = status['steps_total']
+                  ~~~~~~^^^^^^^^^^^^^^^
+KeyError: 'steps_total'
+2025-11-15 01:22:02,857 - src.system - INFO - Starting multi-agent audio processing system...
+2025-11-15 01:22:02,857 - src.orchestration.agent_coordinator - INFO - Initializing multi-agent system...
+2025-11-15 01:22:02,857 - src.core.base_agent - INFO - Agent audio_enhancement_agent (Audio Enhancement & Restoration Agent) created
+2025-11-15 01:22:02,857 - src.core.base_agent - INFO - Agent content_generation_agent (Content Generation & Gap Filling Agent) created
+2025-11-15 01:22:02,857 - src.core.base_agent - INFO - Agent performance_optimization_agent (Performance & Resource Optimization Agent) created
+2025-11-15 01:22:02,857 - src.core.base_agent - INFO - Agent metadata_management_agent (Intelligent Metadata & Project Management Agent) created
+2025-11-15 01:22:02,858 - src.core.base_agent - INFO - Agent workflow_engine (Workflow Orchestration Engine) created
+2025-11-15 01:22:02,858 - src.core.base_agent - INFO - Registered agent audio_enhancement_agent
+2025-11-15 01:22:02,858 - src.orchestration.agent_coordinator - INFO - Registered agent: audio_enhancement_agent
+2025-11-15 01:22:02,858 - src.core.base_agent - INFO - Registered agent content_generation_agent
+2025-11-15 01:22:02,858 - src.orchestration.agent_coordinator - INFO - Registered agent: content_generation_agent
+2025-11-15 01:22:02,858 - src.core.base_agent - INFO - Registered agent performance_optimization_agent
+2025-11-15 01:22:02,858 - src.orchestration.agent_coordinator - INFO - Registered agent: performance_optimization_agent
+2025-11-15 01:22:02,858 - src.core.base_agent - INFO - Registered agent metadata_management_agent
+2025-11-15 01:22:02,858 - src.orchestration.agent_coordinator - INFO - Registered agent: metadata_management_agent
+2025-11-15 01:22:02,860 - src.core.base_agent - INFO - Registered agent workflow_engine
+2025-11-15 01:22:02,860 - src.orchestration.agent_coordinator - INFO - Registered agent: workflow_engine
+2025-11-15 01:22:02,860 - src.core.message_bus - INFO - Message dispatcher started
+2025-11-15 01:22:02,861 - src.core.message_bus - INFO - Message bus started
+2025-11-15 01:22:02,862 - src.core.base_agent - INFO - [audio_enhancement_agent] Audio Enhancement Agent initialized successfully
+2025-11-15 01:22:02,862 - src.core.base_agent - INFO - Agent audio_enhancement_agent started
+2025-11-15 01:22:02,863 - src.orchestration.agent_coordinator - INFO - Started agent: audio_enhancement_agent
+2025-11-15 01:22:02,863 - src.core.base_agent - INFO - [content_generation_agent] Content Generation Agent initialized successfully
+2025-11-15 01:22:02,864 - src.core.base_agent - INFO - Agent content_generation_agent started
+2025-11-15 01:22:02,864 - src.orchestration.agent_coordinator - INFO - Started agent: content_generation_agent
+2025-11-15 01:22:02,866 - src.core.base_agent - INFO - [performance_optimization_agent] Performance Optimization Agent initialized successfully
+2025-11-15 01:22:02,867 - src.core.base_agent - INFO - Agent performance_optimization_agent started
+2025-11-15 01:22:02,867 - src.orchestration.agent_coordinator - INFO - Started agent: performance_optimization_agent
+2025-11-15 01:22:02,870 - src.core.base_agent - INFO - [metadata_management_agent] Metadata Management Agent initialized successfully
+2025-11-15 01:22:02,872 - src.core.base_agent - INFO - Agent metadata_management_agent started
+2025-11-15 01:22:02,872 - src.orchestration.agent_coordinator - INFO - Started agent: metadata_management_agent
+2025-11-15 01:22:02,873 - src.core.base_agent - INFO - [workflow_engine] Workflow Engine initialized successfully
+2025-11-15 01:22:02,874 - src.core.base_agent - INFO - Agent workflow_engine started
+2025-11-15 01:22:02,874 - src.orchestration.agent_coordinator - INFO - Started agent: workflow_engine
+2025-11-15 01:22:02,874 - src.orchestration.agent_coordinator - INFO - Health monitoring started
+2025-11-15 01:22:02,875 - src.orchestration.agent_coordinator - INFO - Multi-agent system initialized successfully
+2025-11-15 01:22:02,875 - src.system - INFO - Multi-agent system started successfully
+2025-11-15 01:22:04,947 - src.system - INFO - Stopping multi-agent system...
+2025-11-15 01:22:04,947 - src.orchestration.agent_coordinator - INFO - Shutting down multi-agent system...
+2025-11-15 01:22:06,955 - src.orchestration.agent_coordinator - INFO - Health monitoring stopped
+2025-11-15 01:22:06,956 - src.core.base_agent - INFO - [audio_enhancement_agent] Audio Enhancement Agent shutdown complete
+2025-11-15 01:22:06,956 - src.core.base_agent - INFO - Agent audio_enhancement_agent stopped
+2025-11-15 01:22:06,957 - src.core.base_agent - INFO - Unregistered agent audio_enhancement_agent
+2025-11-15 01:22:06,957 - src.orchestration.agent_coordinator - INFO - Stopped agent: audio_enhancement_agent
+2025-11-15 01:22:06,958 - src.core.base_agent - INFO - [content_generation_agent] Content Generation Agent shutdown complete
+2025-11-15 01:22:06,959 - src.core.base_agent - INFO - Agent content_generation_agent stopped
+2025-11-15 01:22:06,960 - src.core.base_agent - INFO - Unregistered agent content_generation_agent
+2025-11-15 01:22:06,960 - src.orchestration.agent_coordinator - INFO - Stopped agent: content_generation_agent
+2025-11-15 01:22:07,730 - src.core.base_agent - INFO - [performance_optimization_agent] Performance Optimization Agent shutdown complete
+2025-11-15 01:22:07,730 - src.core.base_agent - INFO - Agent performance_optimization_agent stopped
+2025-11-15 01:22:07,731 - src.core.base_agent - INFO - Unregistered agent performance_optimization_agent
+2025-11-15 01:22:07,731 - src.orchestration.agent_coordinator - INFO - Stopped agent: performance_optimization_agent
+2025-11-15 01:22:07,731 - src.core.base_agent - INFO - [metadata_management_agent] Metadata Management Agent shutdown complete
+2025-11-15 01:22:07,731 - src.core.base_agent - INFO - Agent metadata_management_agent stopped
+2025-11-15 01:22:07,731 - src.core.base_agent - INFO - Unregistered agent metadata_management_agent
+2025-11-15 01:22:07,731 - src.orchestration.agent_coordinator - INFO - Stopped agent: metadata_management_agent
+2025-11-15 01:22:07,731 - src.core.base_agent - INFO - [workflow_engine] Workflow Engine shutdown complete
+2025-11-15 01:22:07,732 - src.core.base_agent - INFO - Agent workflow_engine stopped
+2025-11-15 01:22:07,732 - src.core.base_agent - INFO - Unregistered agent workflow_engine
+2025-11-15 01:22:07,732 - src.orchestration.agent_coordinator - INFO - Stopped agent: workflow_engine
+2025-11-15 01:22:07,836 - src.core.message_bus - INFO - Message dispatcher stopped
+2025-11-15 01:22:07,837 - src.core.message_bus - INFO - Message bus stopped
+2025-11-15 01:22:07,837 - src.orchestration.agent_coordinator - INFO - Multi-agent system shutdown complete
+2025-11-15 01:22:07,837 - src.system - INFO - Multi-agent system stopped successfully
+
+============================================================
+Multi-Agent Audio Processing System - Examples
+============================================================
+
+
+Running Example 1: Basic System Startup
+
+============================================================
+Example 1: Basic System Startup and Health Check
+============================================================
+
+[OK] System started successfully
+
+[OK] System Health:
+  - Health Score: 100.0%
+  - Total Agents: 5
+  - Healthy Agents: 5
+  - Uptime: 2.0 seconds
+
+[OK] Agent Statuses:
+  - Audio Enhancement & Restoration Agent: running
+  - Content Generation & Gap Filling Agent: running
+  - Performance & Resource Optimization Agent: running
+  - Intelligent Metadata & Project Management Agent: running
+  - Workflow Orchestration Engine: running
+
+[OK] Example 1 completed successfully!
+
+[OK] System stopped
+
+
+Running Example 2: Audio Enhancement
+
+============================================================
+Example 2: Audio Enhancement
+============================================================
+
+[OK] Created test audio: 2.0s @ 44100Hz with added noise
+
+... Enhancing audio...
+[OK] Audio enhancement completed!
+
+  Quality Improvements:
+  - SNR Improvement: -0.06 dB
+  - Dynamic Range: 1.24 dB
+
+  Processing Chain: noise_reduction, declicking, declipping
+  Processing Time: 2.61s
+
+[OK] Example 2 completed successfully!
+
+
+Running Example 3: AI Music Generation
+
+============================================================
+Example 3: AI Music Generation
+============================================================
+
+[OK] Musical Context:
+  - Key: C major
+  - Tempo: 120.0 BPM
+  - Chord Progression: C, Am, F, G
+
+... Generating melody...
+[OK] Melody generated!
+  - Number of notes: 64
+  - Processing time: 0.08s
+
+... Generating drum pattern...
+[OK] Drum pattern generated!
+  - Kick hits: 16
+  - Snare hits: 16
+  - Hi-hat hits: 64
+  - Processing time: 0.00s
+
+... Generating bass line...
+[OK] Bass line generated!
+  - Number of notes: 4
+  - Processing time: 0.00s
+
+[OK] Example 3 completed successfully!
+
+
+Running Example 4: Metadata Management
+
+============================================================
+Example 4: Metadata Management
+============================================================
+
+[OK] Created test audio for metadata extraction
+
+... Extracting metadata...
+[OK] Metadata extracted!
+
+  Basic Info:
+  - Duration: 3.00s
+  - Sample Rate: 44100Hz
+  - Channels: 1
+  - Checksum: 60f1d8d3479ae0af...
+
+... Searching metadata...
+[OK] Search completed!
+  - Found 1 results
+
+[OK] Example 4 completed successfully!
+
+
+Running Example 5: Workflow Execution
+
+============================================================
+Example 5: Workflow Execution
+============================================================
+
+[OK] Created workflow definition:
+  - Name: Comprehensive Audio Enhancement
+  - Steps: 4
+
+... Creating workflow...
+[OK] Workflow created: f6e11e94-1daf-4a3f-8cc4-23f8e3f007fe
+
+... Executing workflow...
+[OK] Workflow queued for execution
+
+... Monitoring workflow progress...
+
+[FAIL] Example 5 failed with error: 'steps_total'
+
+
+Running Example 6: Resource Monitoring
+
+============================================================
+Example 6: Resource Monitoring
+============================================================
+
+... Getting resource metrics...
+[OK] Resource Metrics:
+  - CPU Usage: 20.4%
+  - Memory Usage: 70.2%
+  - GPU Usage: 100.0%
+  - GPU Memory: 96.6%
+
+[OK] Message Bus Metrics:
+  - Messages Published: 199
+  - Messages Delivered: 14
+  - Messages Failed: 0
+  - Avg Latency: 0.22ms
+
+[OK] Example 6 completed successfully!
+
+============================================================
+All Examples Completed!
+============================================================
+

@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: maaps-config
+data:
+  MESSAGE_BUS_MAX_QUEUE_SIZE: "50000"
+  MESSAGE_BUS_DISPATCHER_THREADS: "8"
+  MAX_CPU_USAGE_PERCENT: "80.0"
+  MAX_MEMORY_USAGE_PERCENT: "85.0"
+  ENABLE_HEALTH_MONITORING: "true"
+  HEALTH_CHECK_INTERVAL: "10.0"
+  METRICS_COLLECTION_INTERVAL: "5.0"
+  LOG_TO_FILE: "true"
+  LOG_FILE_PATH: "./logs/production.log"
+  MAX_CONCURRENT_WORKFLOWS: "50"
+  WORKFLOW_DEFAULT_TIMEOUT_SECONDS: "600"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: maaps-app-config
+data:
+  config.json: |
+    {
+      "system": {
+        "name": "MAAPS",
+        "version": "1.0.0",
+        "environment": "production"
+      },
+      "agents": {
+        "audio_enhancement": {
+          "enabled": true,
+          "processing_threads": 4
+        },
+        "content_generation": {
+          "enabled": true
+        },
+        "performance_optimization": {
+          "enabled": true,
+          "cache": {
+            "max_size_mb": 2000
+          }
+        },
+        "metadata_management": {
+          "enabled": true
+        }
+      }
+    }

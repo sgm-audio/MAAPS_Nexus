@@ -1,0 +1,16 @@
+# Performance Testing Dependencies
+
+# Load testing
+locust==2.31.8
+
+# Memory profiling
+memory-profiler==0.61.0
+
+# Advanced profiling visualization
+snakeviz==2.2.0
+
+# Line profiling
+line-profiler==4.1.3
+
+# System monitoring
+py-cpuinfo==9.0.0

@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: maaps
+  labels:
+    app: maaps
+    version: v1.0.0
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: maaps
+  template:
+    metadata:
+      labels:
+        app: maaps
+        version: v1.0.0
+    spec:
+      containers:
+      - name: maaps
+        image: ghcr.io/your-org/maaps:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: AGENT_LOG_LEVEL
+          value: "INFO"
+        - name: MAX_WORKER_THREADS
+          value: "16"
+        - name: CACHE_MAX_SIZE_MB
+          value: "2000"
+        envFrom:
+        - configMapRef:
+            name: maaps-config
+        - secretRef:
+            name: maaps-secrets
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2000m"
+          limits:
+            memory: "8Gi"
+            cpu: "4000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 20
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        volumeMounts:
+        - name: data
+          mountPath: /app/data
+        - name: logs
+          mountPath: /app/logs
+        - name: config
+          mountPath: /app/config.json
+          subPath: config.json
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: maaps-data-pvc
+      - name: logs
+        persistentVolumeClaim:
+          claimName: maaps-logs-pvc
+      - name: config
+        configMap:
+          name: maaps-app-config
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 60
