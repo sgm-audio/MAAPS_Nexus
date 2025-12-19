@@ -1,0 +1,40 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+ENV/
+
+# Environment & secrets
+.env
+.env.*
+metadata.db
+
+# Logs and caches
+logs/
+.pytest_cache/
+.snapshots/
+.mypy_cache/
+.ruff_cache/
+
+# Node / frontend
+node_modules/
+dist/
+build/
+.parcel-cache/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+Thumbs.db
+
+# Data & temp
+data/
+tmp/
+*.bak
+*.swp
+*.swo
