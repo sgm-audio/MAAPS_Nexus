@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 import jwt
 import logging
+from .user_db import user_db
 
 logger = logging.getLogger(__name__)
 
@@ -87,12 +88,18 @@ async def login(request: LoginRequest):
     """
     Login endpoint
 
-    Note: This is a basic implementation.
-    In production, validate against a real user database with hashed passwords.
+    Validates credentials against the user database with hashed passwords.
     """
-    # TODO: Validate against real user database
-    # For demo purposes, accept any username/password
+    # Validate credentials
     if not request.username or not request.password:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials"
+        )
+
+    # Authenticate user against database
+    user = user_db.authenticate(request.username, request.password)
+    if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials"
@@ -104,6 +111,8 @@ async def login(request: LoginRequest):
         data={"sub": request.username},
         expires_delta=access_token_expires
     )
+
+    logger.info(f"User '{request.username}' logged in successfully")
 
     return TokenResponse(
         token=access_token,
