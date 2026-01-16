@@ -21,11 +21,15 @@ GPUtil==1.4.0
 # Database
 # SQLite is included with Python
 
-# Optional Advanced Features
-# Uncomment if using ML models
-# torch>=2.0.0
-# torchaudio>=2.0.0
-# transformers>=4.25.0
+# Machine Learning and Reinforcement Learning
+torch>=2.0.0
+torchaudio>=2.0.0
+
+# Distributed Computing
+ray[default]>=2.0.0
+
+# Data Science
+pandas>=2.0.0
 
 # For noise reduction (optional)
 # noisereduce>=2.0.0
