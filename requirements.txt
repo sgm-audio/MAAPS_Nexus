@@ -21,17 +21,40 @@ GPUtil==1.4.0
 # Database
 # SQLite is included with Python
 
-# Optional Advanced Features
-# Uncomment if using ML models
-# torch>=2.0.0
-# torchaudio>=2.0.0
-# transformers>=4.25.0
+# ===== Multi-Agent RL System Dependencies =====
+
+# Ray - Distributed Computing Framework
+ray[default]==2.9.0
+
+# PyTorch - Deep Learning Framework (REQUIRED for RL agents)
+torch>=2.0.0
+torchaudio>=2.0.0
+
+# Reinforcement Learning
+# gym>=0.26.0  # Optional, if using gym environments
+
+# Shared Memory (POSIX systems)
+# posix-ipc>=1.1.1  # Uncomment on Linux/macOS
 
 # For noise reduction (optional)
 # noisereduce>=2.0.0
 
 # For additional audio analysis
 # essentia>=2.1b6
+
+# ===== AI/LLM Integration =====
+
+# Vertex AI - Claude and Gemini via Google Cloud
+anthropic[vertex]>=0.40.0
+google-cloud-aiplatform>=1.71.1
+
+# Alternative LLM providers (optional)
+# anthropic>=0.40.0  # Direct Anthropic API
+# openai>=1.0.0      # OpenAI GPT models
+# requests>=2.31.0   # For Ollama local models
+
+# Environment variables
+python-dotenv>=1.0.0
 
 # Development Dependencies
 pytest==9.0.1

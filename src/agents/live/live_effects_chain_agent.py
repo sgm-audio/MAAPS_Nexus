@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 import logging
 import copy
+import uuid
 
 from ...core import BaseAgent, Message, Topics, Priority
 from .effects_processors import (
@@ -235,7 +236,7 @@ class LiveEffectsChainAgent(BaseAgent):
         payload = message.payload
 
         chain = EffectChain(
-            chain_id=payload.get('chain_id', f"chain_{time.time()}"),
+            chain_id=payload.get('chain_id', f"chain_{uuid.uuid4()}"),
             chain_name=payload['chain_name'],
             effects=[],
             routing=payload.get('routing', 'series'),
@@ -247,7 +248,7 @@ class LiveEffectsChainAgent(BaseAgent):
         # Add effects to chain
         for effect_data in payload.get('effects', []):
             effect = Effect(
-                effect_id=effect_data.get('effect_id', f"effect_{time.time()}_{len(chain.effects)}"),
+                effect_id=effect_data.get('effect_id', f"effect_{uuid.uuid4()}"),
                 effect_type=EffectType(effect_data['type']),
                 parameters=effect_data.get('parameters', {}),
                 bypassed=effect_data.get('bypassed', False),
@@ -364,7 +365,7 @@ class LiveEffectsChainAgent(BaseAgent):
             chain_states = copy.deepcopy(self.effect_chains)
 
         preset = Preset(
-            preset_id=f"preset_{time.time()}",
+            preset_id=f"preset_{uuid.uuid4()}",
             preset_name=preset_name,
             chain_states=chain_states,
             description=payload.get('description', ''),
@@ -402,7 +403,7 @@ class LiveEffectsChainAgent(BaseAgent):
         else:
             # Animated change
             automation = ParameterAutomation(
-                automation_id=f"auto_{time.time()}",
+                automation_id=f"auto_{uuid.uuid4()}",
                 effect_id=effect_id,
                 parameter=parameter,
                 target_value=value,
@@ -493,7 +494,7 @@ class LiveEffectsChainAgent(BaseAgent):
                     }
 
         scene = Scene(
-            scene_id=payload.get('scene_id', f"scene_{time.time()}"),
+            scene_id=payload.get('scene_id', f"scene_{uuid.uuid4()}"),
             scene_name=payload['scene_name'],
             effect_states=payload.get('effect_states', effect_states),
             transitions=payload.get('transitions', {}),
@@ -718,7 +719,7 @@ class LiveEffectsChainAgent(BaseAgent):
                     for param, value in state.get('parameters', {}).items():
                         ramp_time = scene.transitions.get(param, transition_time)
                         automation = ParameterAutomation(
-                            automation_id=f"scene_auto_{time.time()}_{param}",
+                            automation_id=f"scene_auto_{uuid.uuid4()}",
                             effect_id=effect_id,
                             parameter=param,
                             target_value=value,
@@ -738,7 +739,7 @@ class LiveEffectsChainAgent(BaseAgent):
                     if current_effect:
                         for param, value in effect.parameters.items():
                             automation = ParameterAutomation(
-                                automation_id=f"preset_auto_{time.time()}_{param}",
+                                automation_id=f"preset_auto_{uuid.uuid4()}",
                                 effect_id=effect.effect_id,
                                 parameter=param,
                                 target_value=value,

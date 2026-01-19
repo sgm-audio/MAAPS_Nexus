@@ -82,9 +82,12 @@ class TestSynchronizationClockAgent(unittest.TestCase):
     def test_tap_tempo_multiple_taps(self):
         """Test tap tempo with multiple taps"""
         # Tap at 120 BPM (500ms intervals)
-        for _ in range(4):
-            response = self.agent.request("sync.tap.tempo", {}, timeout=1.0)
-            time.sleep(0.5)
+        start_time = time.time()
+        for i in range(4):
+            # Send precise timestamps
+            timestamp = start_time + (i * 0.5)
+            response = self.agent.request("sync.tap.tempo", {'timestamp': timestamp}, timeout=1.0)
+            time.sleep(0.1) # Small delay to ensure order, but timestamp controls logic
 
         self.assertIsNotNone(response)
         self.assertTrue(response.payload['success'])
@@ -93,8 +96,8 @@ class TestSynchronizationClockAgent(unittest.TestCase):
         # Should calculate ~120 BPM (with tolerance for timing)
         calculated_bpm = response.payload.get('bpm', 0)
         if calculated_bpm > 0:
-            self.assertGreater(calculated_bpm, 100.0)
-            self.assertLess(calculated_bpm, 140.0)
+            self.assertGreater(calculated_bpm, 115.0)
+            self.assertLess(calculated_bpm, 125.0)
 
     def test_transport_play(self):
         """Test transport play"""
