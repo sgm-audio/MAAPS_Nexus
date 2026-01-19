@@ -129,7 +129,8 @@ class SynchronizationClockAgent(BaseAgent):
 
     def _handle_tap_tempo(self, message: Message):
         """Handle tap tempo input"""
-        current_time = time.time()
+        payload = message.payload
+        current_time = payload.get('timestamp', time.time())
         self.tap_times.append(current_time)
 
         if len(self.tap_times) >= 2:

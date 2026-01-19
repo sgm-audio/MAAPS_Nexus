@@ -1,105 +1,104 @@
 """
-Ray Cluster Infrastructure for Multi-Agent Audio System
+Ray Cluster Infrastructure for Multi-Agent Audio Processing System (MAAPS)
 
-This module provides Ray cluster management for distributed agent execution,
-including single-machine and multi-node cluster support.
+This module sets up and manages a Ray cluster for distributed agent execution,
+even on a single machine. Ray provides actor-based concurrency, task scheduling,
+and resource management for our multi-agent system.
 """
 
-import os
 import ray
-from ray import serve
-from typing import Dict, Any, Optional, List
 import logging
-from dataclasses import dataclass
+from typing import Optional, Dict, Any, List
 import psutil
+import os
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class RayClusterConfig:
-    """Configuration for Ray cluster setup"""
-    num_cpus: Optional[int] = None  # Auto-detect if None
-    num_gpus: Optional[int] = 0
-    memory: Optional[int] = None  # MB, auto-detect if None
-    object_store_memory: Optional[int] = None  # MB
-    dashboard_host: str = "127.0.0.1"
-    dashboard_port: int = 8265
-    include_dashboard: bool = True
-    log_to_driver: bool = True
-    namespace: str = "maaps_nexus"
-    _temp_dir: Optional[str] = None
-
-
 class RayClusterManager:
     """
-    Manages Ray cluster lifecycle for MAAPS Nexus multi-agent system.
-
-    Supports:
-    - Single-machine clusters for development
-    - Multi-node clusters for production
-    - Resource management and monitoring
-    - Actor and task deployment
+    Manages Ray cluster initialization, health monitoring, and shutdown.
+    Optimized for both single-machine and distributed deployment.
     """
 
-    def __init__(self, config: Optional[RayClusterConfig] = None):
-        self.config = config or RayClusterConfig()
-        self._initialized = False
-        self._cluster_resources: Dict[str, Any] = {}
-
-    def initialize_cluster(self, head_node: bool = True) -> bool:
+    def __init__(
+        self,
+        num_cpus: Optional[int] = None,
+        num_gpus: Optional[int] = None,
+        memory: Optional[int] = None,
+        object_store_memory: Optional[int] = None,
+        dashboard_host: str = "127.0.0.1",
+        dashboard_port: int = 8265,
+        enable_logging: bool = True
+    ):
         """
-        Initialize Ray cluster (single-machine or head node).
+        Initialize Ray cluster manager.
 
         Args:
-            head_node: If True, start as head node (default for single-machine)
+            num_cpus: Number of CPUs to allocate (defaults to system CPUs - 1)
+            num_gpus: Number of GPUs to allocate (defaults to 0)
+            memory: Memory in bytes (defaults to 80% of system memory)
+            object_store_memory: Object store memory (defaults to 30% of system memory)
+            dashboard_host: Ray dashboard host
+            dashboard_port: Ray dashboard port
+            enable_logging: Enable detailed logging
+        """
+        self.num_cpus = num_cpus or max(1, psutil.cpu_count() - 1)
+        self.num_gpus = num_gpus or 0
+
+        # Calculate memory defaults
+        total_memory = psutil.virtual_memory().total
+        self.memory = memory or int(total_memory * 0.8)
+        self.object_store_memory = object_store_memory or int(total_memory * 0.3)
+
+        self.dashboard_host = dashboard_host
+        self.dashboard_port = dashboard_port
+        self.enable_logging = enable_logging
+        self.is_initialized = False
+
+    def initialize(self, address: Optional[str] = None) -> bool:
+        """
+        Initialize Ray cluster.
+
+        Args:
+            address: Ray cluster address (None for local cluster, "auto" for existing cluster)
 
         Returns:
-            True if initialization successful
+            bool: True if initialization successful
         """
+        if self.is_initialized:
+            logger.warning("Ray cluster already initialized")
+            return True
+
         try:
-            if ray.is_initialized():
-                logger.warning("Ray already initialized, shutting down first")
-                ray.shutdown()
-
-            # Auto-detect resources if not specified
-            if self.config.num_cpus is None:
-                self.config.num_cpus = psutil.cpu_count(logical=True)
-
-            if self.config.memory is None:
-                # Use 80% of available memory
-                total_memory_mb = psutil.virtual_memory().total // (1024 * 1024)
-                self.config.memory = int(total_memory_mb * 0.8)
-
-            if self.config.object_store_memory is None:
-                # Use 30% of total memory for object store
-                self.config.object_store_memory = int(self.config.memory * 0.3)
-
-            init_kwargs = {
-                "num_cpus": self.config.num_cpus,
-                "num_gpus": self.config.num_gpus,
-                "memory": self.config.memory * 1024 * 1024,  # Convert to bytes
-                "object_store_memory": self.config.object_store_memory * 1024 * 1024,
-                "include_dashboard": self.config.include_dashboard,
-                "dashboard_host": self.config.dashboard_host,
-                "dashboard_port": self.config.dashboard_port,
-                "log_to_driver": self.config.log_to_driver,
-                "namespace": self.config.namespace,
+            ray_init_kwargs = {
                 "ignore_reinit_error": True,
+                "logging_level": logging.INFO if self.enable_logging else logging.WARNING,
+                "dashboard_host": self.dashboard_host,
+                "dashboard_port": self.dashboard_port,
             }
 
-            if self.config._temp_dir:
-                init_kwargs["_temp_dir"] = self.config._temp_dir
+            if address is None:
+                # Start local cluster
+                ray_init_kwargs.update({
+                    "num_cpus": self.num_cpus,
+                    "num_gpus": self.num_gpus,
+                    "object_store_memory": self.object_store_memory,
+                    "_memory": self.memory,
+                })
+                logger.info(f"Starting local Ray cluster: {self.num_cpus} CPUs, {self.num_gpus} GPUs")
+            else:
+                # Connect to existing cluster
+                ray_init_kwargs["address"] = address
+                logger.info(f"Connecting to Ray cluster at {address}")
 
-            # Initialize Ray
-            ray.init(**init_kwargs)
+            ray.init(**ray_init_kwargs)
+            self.is_initialized = True
 
-            self._initialized = True
-            self._cluster_resources = ray.cluster_resources()
-
+            # Log cluster resources
+            resources = ray.cluster_resources()
             logger.info(f"Ray cluster initialized successfully")
-            logger.info(f"Available resources: {self._cluster_resources}")
-            logger.info(f"Dashboard: http://{self.config.dashboard_host}:{self.config.dashboard_port}")
+            logger.info(f"Available resources: {resources}")
 
             return True
 
@@ -107,252 +106,137 @@ class RayClusterManager:
             logger.error(f"Failed to initialize Ray cluster: {e}")
             return False
 
-    def connect_to_cluster(self, address: str) -> bool:
-        """
-        Connect to existing Ray cluster as worker node.
-
-        Args:
-            address: Address of the head node (e.g., "ray://192.168.1.100:10001")
-
-        Returns:
-            True if connection successful
-        """
-        try:
-            if ray.is_initialized():
-                logger.warning("Ray already initialized, shutting down first")
-                ray.shutdown()
-
-            ray.init(
-                address=address,
-                namespace=self.config.namespace,
-                log_to_driver=self.config.log_to_driver,
-            )
-
-            self._initialized = True
-            self._cluster_resources = ray.cluster_resources()
-
-            logger.info(f"Connected to Ray cluster at {address}")
-            logger.info(f"Available resources: {self._cluster_resources}")
-
-            return True
-
-        except Exception as e:
-            logger.error(f"Failed to connect to Ray cluster: {e}")
-            return False
-
-    def shutdown_cluster(self):
-        """Shutdown Ray cluster gracefully"""
-        if self._initialized:
-            try:
-                ray.shutdown()
-                self._initialized = False
-                logger.info("Ray cluster shutdown successfully")
-            except Exception as e:
-                logger.error(f"Error during cluster shutdown: {e}")
-
-    def get_cluster_resources(self) -> Dict[str, Any]:
-        """Get current cluster resources"""
-        if not self._initialized:
-            return {}
-        return ray.cluster_resources()
-
-    def get_available_resources(self) -> Dict[str, Any]:
-        """Get currently available (not allocated) resources"""
-        if not self._initialized:
-            return {}
-        return ray.available_resources()
-
-    def get_cluster_status(self) -> Dict[str, Any]:
-        """Get comprehensive cluster status"""
-        if not self._initialized:
-            return {"status": "not_initialized"}
+    def get_cluster_info(self) -> Dict[str, Any]:
+        """Get current cluster resource information."""
+        if not self.is_initialized:
+            return {"error": "Cluster not initialized"}
 
         return {
-            "status": "running",
-            "total_resources": ray.cluster_resources(),
+            "cluster_resources": ray.cluster_resources(),
             "available_resources": ray.available_resources(),
             "nodes": ray.nodes(),
-            "namespace": self.config.namespace,
-            "dashboard_url": f"http://{self.config.dashboard_host}:{self.config.dashboard_port}",
+            "dashboard_url": f"http://{self.dashboard_host}:{self.dashboard_port}"
         }
 
-    def is_initialized(self) -> bool:
-        """Check if cluster is initialized"""
-        return self._initialized and ray.is_initialized()
+    def health_check(self) -> bool:
+        """Check if Ray cluster is healthy."""
+        try:
+            return self.is_initialized and ray.is_initialized()
+        except Exception:
+            return False
+
+    def shutdown(self):
+        """Shutdown Ray cluster gracefully."""
+        if self.is_initialized:
+            logger.info("Shutting down Ray cluster...")
+            ray.shutdown()
+            self.is_initialized = False
+            logger.info("Ray cluster shutdown complete")
+
+    def __enter__(self):
+        """Context manager entry."""
+        self.initialize()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit."""
+        self.shutdown()
 
 
 @ray.remote
-class RayAgent:
+class ResourceMonitor:
     """
-    Base Ray Actor for distributed agent execution.
-
-    This wraps MAAPS agents for distributed execution in Ray cluster.
+    Ray actor for monitoring cluster resource usage in real-time.
+    Useful for load balancing and preventing resource exhaustion.
     """
 
-    def __init__(self, agent_class, *args, **kwargs):
-        """
-        Initialize Ray agent actor.
+    def __init__(self):
+        self.monitoring = False
 
-        Args:
-            agent_class: The agent class to instantiate
-            *args, **kwargs: Arguments for agent initialization
-        """
-        self.agent = agent_class(*args, **kwargs)
-        self.agent_id = kwargs.get('agent_id', 'unknown')
-
-    def start(self):
-        """Start the agent"""
-        return self.agent.start()
-
-    def stop(self):
-        """Stop the agent"""
-        return self.agent.stop()
-
-    def process_message(self, message: Dict[str, Any]) -> Any:
-        """Process a message through the agent"""
-        return self.agent.handle_message(message)
-
-    def get_status(self) -> Dict[str, Any]:
-        """Get agent status"""
+    def get_resources(self) -> Dict[str, Any]:
+        """Get current resource utilization."""
         return {
-            "agent_id": self.agent_id,
-            "status": getattr(self.agent, 'status', 'unknown'),
-            "metrics": getattr(self.agent, 'get_metrics', lambda: {})(),
+            "cpu_percent": psutil.cpu_percent(interval=0.1),
+            "memory_percent": psutil.virtual_memory().percent,
+            "ray_cluster": ray.cluster_resources(),
+            "ray_available": ray.available_resources()
         }
 
+    def is_resource_available(self, required_cpus: float = 1.0) -> bool:
+        """Check if sufficient resources are available for new task."""
+        available = ray.available_resources()
+        return available.get("CPU", 0) >= required_cpus
 
-class DistributedAgentPool:
+
+def get_or_create_cluster(
+    num_cpus: Optional[int] = None,
+    num_gpus: Optional[int] = None,
+    address: Optional[str] = None
+) -> RayClusterManager:
     """
-    Pool of distributed agents running as Ray actors.
-
-    Provides load balancing and fault tolerance for agent execution.
-    """
-
-    def __init__(self, cluster_manager: RayClusterManager):
-        self.cluster_manager = cluster_manager
-        self.agents: Dict[str, List] = {}  # agent_type -> [actor_refs]
-
-    def create_agent_pool(
-        self,
-        agent_class,
-        agent_type: str,
-        num_replicas: int = 2,
-        num_cpus: float = 1.0,
-        num_gpus: float = 0.0,
-        **agent_kwargs
-    ) -> bool:
-        """
-        Create a pool of agent actors for load balancing.
-
-        Args:
-            agent_class: The agent class to replicate
-            agent_type: Type identifier for the agent
-            num_replicas: Number of replicas to create
-            num_cpus: CPUs per replica
-            num_gpus: GPUs per replica
-            **agent_kwargs: Arguments for agent initialization
-
-        Returns:
-            True if pool created successfully
-        """
-        try:
-            if not self.cluster_manager.is_initialized():
-                logger.error("Cluster not initialized")
-                return False
-
-            actors = []
-            for i in range(num_replicas):
-                agent_id = f"{agent_type}_replica_{i}"
-                actor = RayAgent.options(
-                    num_cpus=num_cpus,
-                    num_gpus=num_gpus,
-                    name=agent_id,
-                ).remote(agent_class, agent_id=agent_id, **agent_kwargs)
-                actors.append(actor)
-
-                # Start the agent
-                ray.get(actor.start.remote())
-
-            self.agents[agent_type] = actors
-            logger.info(f"Created agent pool '{agent_type}' with {num_replicas} replicas")
-
-            return True
-
-        except Exception as e:
-            logger.error(f"Failed to create agent pool: {e}")
-            return False
-
-    def submit_task(self, agent_type: str, message: Dict[str, Any]) -> Any:
-        """
-        Submit task to agent pool (round-robin load balancing).
-
-        Args:
-            agent_type: Type of agent to submit to
-            message: Message/task to process
-
-        Returns:
-            Result from agent processing
-        """
-        if agent_type not in self.agents or not self.agents[agent_type]:
-            raise ValueError(f"No agents available for type: {agent_type}")
-
-        # Simple round-robin (Ray handles load balancing internally for actors)
-        actor = self.agents[agent_type][0]  # Ray will distribute automatically
-
-        return ray.get(actor.process_message.remote(message))
-
-    def get_pool_status(self, agent_type: str) -> List[Dict[str, Any]]:
-        """Get status of all agents in pool"""
-        if agent_type not in self.agents:
-            return []
-
-        status_futures = [actor.get_status.remote() for actor in self.agents[agent_type]]
-        return ray.get(status_futures)
-
-    def shutdown_pool(self, agent_type: str):
-        """Shutdown specific agent pool"""
-        if agent_type in self.agents:
-            for actor in self.agents[agent_type]:
-                ray.get(actor.stop.remote())
-                ray.kill(actor)
-            del self.agents[agent_type]
-            logger.info(f"Shutdown agent pool: {agent_type}")
-
-    def shutdown_all_pools(self):
-        """Shutdown all agent pools"""
-        for agent_type in list(self.agents.keys()):
-            self.shutdown_pool(agent_type)
-
-
-# Global cluster manager instance
-_cluster_manager: Optional[RayClusterManager] = None
-
-
-def get_cluster_manager(config: Optional[RayClusterConfig] = None) -> RayClusterManager:
-    """Get or create global cluster manager instance"""
-    global _cluster_manager
-    if _cluster_manager is None:
-        _cluster_manager = RayClusterManager(config)
-    return _cluster_manager
-
-
-def initialize_ray_cluster(config: Optional[RayClusterConfig] = None) -> RayClusterManager:
-    """
-    Initialize Ray cluster for MAAPS Nexus.
-
-    This is the main entry point for setting up distributed execution.
+    Convenience function to get or create Ray cluster.
 
     Args:
-        config: Optional cluster configuration
+        num_cpus: Number of CPUs
+        num_gpus: Number of GPUs
+        address: Cluster address (None for local)
 
     Returns:
-        Initialized cluster manager
-
-    Example:
-        >>> config = RayClusterConfig(num_cpus=8, num_gpus=1)
-        >>> cluster = initialize_ray_cluster(config)
-        >>> cluster.get_cluster_status()
+        RayClusterManager instance
     """
-    cluster_manager = get_cluster_manager(config)
-    cluster_manager.initialize_cluster()
-    return cluster_manager
+    manager = RayClusterManager(num_cpus=num_cpus, num_gpus=num_gpus)
+    manager.initialize(address=address)
+    return manager
+
+
+def create_actor_pool(actor_class, num_actors: int, *args, **kwargs) -> List:
+    """
+    Create a pool of Ray actors for parallel processing.
+
+    Args:
+        actor_class: Ray actor class
+        num_actors: Number of actors to create
+        *args, **kwargs: Arguments for actor constructor
+
+    Returns:
+        List of actor handles
+    """
+    return [actor_class.remote(*args, **kwargs) for _ in range(num_actors)]
+
+
+# Singleton instance for global access
+_cluster_instance: Optional[RayClusterManager] = None
+
+
+def get_cluster() -> Optional[RayClusterManager]:
+    """Get the global cluster instance."""
+    return _cluster_instance
+
+
+def set_cluster(cluster: RayClusterManager):
+    """Set the global cluster instance."""
+    global _cluster_instance
+    _cluster_instance = cluster
+
+
+if __name__ == "__main__":
+    # Example usage
+    logging.basicConfig(level=logging.INFO)
+
+    # Create and initialize cluster
+    with RayClusterManager(num_cpus=4, num_gpus=0) as cluster:
+        print("Cluster Info:", cluster.get_cluster_info())
+
+        # Create resource monitor
+        monitor = ResourceMonitor.remote()
+        resources = ray.get(monitor.get_resources.remote())
+        print("Resources:", resources)
+
+        # Simple test task
+        @ray.remote
+        def test_task(x):
+            return x * x
+
+        # Run parallel tasks
+        results = ray.get([test_task.remote(i) for i in range(10)])
+        print("Test results:", results)

@@ -1,41 +1,47 @@
-#!/usr/bin/env python3
 """
 MAAPS Nexus - Multi-Agent Audio Processing System
-Main Integration Script
+Main Integration and Orchestration
 
-This script:
-1. Initializes Ray cluster for distributed execution
-2. Sets up all agents (Critic, EQ, Dynamics, HGO Coordinator)
-3. Launches VST3 backend for DAW integration
-4. Provides training and inference modes
+This is the main entry point that brings together:
+1. Ray Cluster
+2. Audio Ontology
+3. Critic Agent
+4. EQ RL Agent
+5. Dynamics RL Agent
+6. HGO Coordinator
+7. VST3 Integration
+
+Run this to start the complete system.
 """
 
-import argparse
+import ray
+import numpy as np
 import logging
-import signal
-import sys
 import time
-from typing import Optional
+import argparse
+from typing import Dict, List, Optional
+import sys
+import asyncio
 
-from src.infrastructure.ray_cluster import (
-    RayClusterConfig,
-    initialize_ray_cluster,
-    RayClusterManager,
-    DistributedAgentPool
+# Import MAAPS components
+from src.infrastructure.ray_cluster import RayClusterManager, get_or_create_cluster
+from src.core.audio_ontology import (
+    AudioState,
+    AudioAttribute,
+    AudioOntologyManager,
+    create_clarity_goal,
+    create_warmth_goal,
+    create_reduce_mud_goal,
+    create_punch_goal,
+    create_balanced_mix_goals
 )
-from src.core.message_bus import MessageBus
-from src.core.audio_ontology import get_audio_ontology
-from src.agents.critic_agent import CriticAgent
+from src.agents.critic_agent import CriticAgent, CriticEvaluation
 from src.agents.eq_rl_agent import EQRLAgent
 from src.agents.dynamics_rl_agent import DynamicsRLAgent
-from src.agents.hgo_coordinator import HGOCoordinator, OptimizationGoal, GoalPriority
-from src.daw_integration.vst3_wrapper import (
-    VST3Backend,
-    SharedMemoryConfig,
-    create_vst3_backend_for_hgo
-)
+from src.agents.hgo_coordinator import HGOCoordinator, AgentProposal
+from src.daw_integration.vst3_wrapper import VST3Communicator
 
-# Configure logging
+# Setup logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -46,409 +52,376 @@ logger = logging.getLogger(__name__)
 class MAAPSNexusSystem:
     """
     Main MAAPS Nexus system orchestrator.
-
-    Manages all components and provides unified interface.
+    Coordinates all components and manages the audio processing pipeline.
     """
 
-    def __init__(self, config: Optional[dict] = None):
-        self.config = config or {}
-
-        # Core components
-        self.ray_cluster: Optional[RayClusterManager] = None
-        self.message_bus: Optional[MessageBus] = None
-        self.agent_pool: Optional[DistributedAgentPool] = None
-
-        # Agents
-        self.critic_agent: Optional[CriticAgent] = None
-        self.eq_agent: Optional[EQRLAgent] = None
-        self.dynamics_agent: Optional[DynamicsRLAgent] = None
-        self.hgo_coordinator: Optional[HGOCoordinator] = None
-
-        # VST3 Backend
-        self.vst3_backend: Optional[VST3Backend] = None
-
-        # System state
-        self.initialized = False
-        self.running = False
-
-        # Setup signal handlers
-        signal.signal(signal.SIGINT, self._signal_handler)
-        signal.signal(signal.SIGTERM, self._signal_handler)
-
-    def initialize(self):
-        """Initialize all system components"""
-        try:
-            logger.info("="*60)
-            logger.info("MAAPS NEXUS - Multi-Agent Audio Processing System")
-            logger.info("="*60)
-
-            # Step 1: Initialize Ray cluster
-            logger.info("Step 1/7: Initializing Ray cluster...")
-            ray_config = RayClusterConfig(
-                num_cpus=self.config.get('num_cpus'),
-                num_gpus=self.config.get('num_gpus', 0),
-                include_dashboard=True,
-                namespace="maaps_nexus",
-            )
-            self.ray_cluster = initialize_ray_cluster(ray_config)
-            logger.info(f"✓ Ray cluster initialized: {self.ray_cluster.get_cluster_status()}")
-
-            # Step 2: Initialize audio ontology
-            logger.info("Step 2/7: Loading audio ontology...")
-            ontology = get_audio_ontology()
-            logger.info(f"✓ Ontology loaded with {len(ontology.concepts)} concepts")
-
-            # Step 3: Initialize message bus
-            logger.info("Step 3/7: Initializing message bus...")
-            self.message_bus = MessageBus()
-            self.message_bus.start()
-            logger.info("✓ Message bus started")
-
-            # Step 4: Initialize agents
-            logger.info("Step 4/7: Initializing agents...")
-
-            # Critic Agent
-            self.critic_agent = CriticAgent(
-                agent_id="critic_agent_main",
-                message_bus=self.message_bus,
-                config=self.config.get('critic', {})
-            )
-            self.critic_agent.start()
-            logger.info("  ✓ Critic agent started")
-
-            # EQ RL Agent
-            self.eq_agent = EQRLAgent(
-                agent_id="eq_rl_agent_main",
-                message_bus=self.message_bus,
-                critic_agent_id=self.critic_agent.agent_id,
-                config=self.config.get('eq', {})
-            )
-            self.eq_agent.start()
-            logger.info("  ✓ EQ RL agent started")
-
-            # Dynamics RL Agent
-            self.dynamics_agent = DynamicsRLAgent(
-                agent_id="dynamics_rl_agent_main",
-                message_bus=self.message_bus,
-                critic_agent_id=self.critic_agent.agent_id,
-                config=self.config.get('dynamics', {})
-            )
-            self.dynamics_agent.start()
-            logger.info("  ✓ Dynamics RL agent started")
-
-            # HGO Coordinator
-            self.hgo_coordinator = HGOCoordinator(
-                agent_id="hgo_coordinator_main",
-                message_bus=self.message_bus,
-                eq_agent_id=self.eq_agent.agent_id,
-                dynamics_agent_id=self.dynamics_agent.agent_id,
-                critic_agent_id=self.critic_agent.agent_id,
-                config=self.config.get('hgo', {})
-            )
-            self.hgo_coordinator.start()
-            logger.info("  ✓ HGO Coordinator started")
-
-            # Set default optimization goals
-            self._set_default_goals()
-
-            # Step 5: Create distributed agent pool (optional)
-            if self.config.get('use_distributed_agents', False):
-                logger.info("Step 5/7: Creating distributed agent pool...")
-                self.agent_pool = DistributedAgentPool(self.ray_cluster)
-                # Add agent pools as needed
-                logger.info("✓ Distributed agent pool created")
-            else:
-                logger.info("Step 5/7: Skipping distributed agent pool (not enabled)")
-
-            # Step 6: Initialize VST3 backend
-            if self.config.get('enable_vst3', True):
-                logger.info("Step 6/7: Initializing VST3 backend...")
-                self.vst3_backend = create_vst3_backend_for_hgo(
-                    self.hgo_coordinator.agent_id,
-                    self.message_bus
-                )
-                self.vst3_backend.start()
-                logger.info("✓ VST3 backend started")
-                logger.info(f"  Shared memory: {self.vst3_backend.config.shm_name}")
-                logger.info(f"  Control socket: {self.vst3_backend.config.socket_path}")
-            else:
-                logger.info("Step 6/7: Skipping VST3 backend (not enabled)")
-
-            # Step 7: System ready
-            logger.info("Step 7/7: System initialization complete")
-            self.initialized = True
-            self.running = True
-
-            logger.info("="*60)
-            logger.info("MAAPS NEXUS IS READY")
-            logger.info("="*60)
-            logger.info("")
-            logger.info("System Status:")
-            logger.info(f"  Ray Dashboard: http://127.0.0.1:8265")
-            logger.info(f"  Agents Running: 4 (Critic, EQ, Dynamics, HGO)")
-            logger.info(f"  VST3 Backend: {'Active' if self.vst3_backend else 'Disabled'}")
-            logger.info("")
-            logger.info("Ready to process audio!")
-            logger.info("")
-
-        except Exception as e:
-            logger.error(f"Failed to initialize system: {e}")
-            self.shutdown()
-            raise
-
-    def _set_default_goals(self):
-        """Set default optimization goals"""
-        goals = [
-            OptimizationGoal(
-                name="clarity_and_presence",
-                description="Maximize clarity and presence",
-                target_concepts=["clarity", "presence", "brightness"],
-                avoid_concepts=["mud", "dullness"],
-                priority=GoalPriority.HIGH,
-                weight=1.0,
-            ),
-            OptimizationGoal(
-                name="controlled_dynamics",
-                description="Control dynamics while preserving punch",
-                target_concepts=["punch", "tightness", "controlled"],
-                avoid_concepts=["squashed", "flat"],
-                priority=GoalPriority.MEDIUM,
-                weight=0.8,
-            ),
-        ]
-
-        self.hgo_coordinator.set_goals(goals)
-        logger.info(f"  ✓ Set {len(goals)} default optimization goals")
-
-    def train_mode(self, audio_file: str, episodes: int = 10):
+    def __init__(
+        self,
+        num_cpus: Optional[int] = None,
+        num_gpus: Optional[int] = None,
+        buffer_size: int = 512,
+        sample_rate: int = 44100,
+        enable_vst3: bool = True,
+        use_pretrained: bool = False,
+        model_dir: str = "./models"
+    ):
         """
-        Run training mode on audio file.
+        Initialize MAAPS Nexus system.
 
         Args:
-            audio_file: Path to audio file
-            episodes: Number of training episodes
+            num_cpus: Number of CPUs for Ray cluster
+            num_gpus: Number of GPUs
+            buffer_size: Audio buffer size
+            sample_rate: Sample rate
+            enable_vst3: Enable VST3 integration
+            use_pretrained: Load pre-trained models
+            model_dir: Directory for model checkpoints
         """
-        import librosa
-        import numpy as np
+        self.buffer_size = buffer_size
+        self.sample_rate = sample_rate
+        self.enable_vst3 = enable_vst3
+        self.use_pretrained = use_pretrained
+        self.model_dir = model_dir
 
-        if not self.initialized:
-            raise RuntimeError("System not initialized")
+        # Initialize Ray cluster
+        logger.info("Initializing Ray cluster...")
+        self.cluster = RayClusterManager(num_cpus=num_cpus, num_gpus=num_gpus)
+        self.cluster.initialize()
 
-        logger.info(f"Starting training mode: {episodes} episodes")
+        # Initialize ontology
+        logger.info("Initializing audio ontology...")
+        self.ontology = AudioOntologyManager()
 
-        # Load audio
-        audio, sr = librosa.load(audio_file, sr=44100, mono=False)
-        if audio.ndim == 1:
-            audio = np.stack([audio, audio])  # Stereo
+        # Define goals
+        self.goals = create_balanced_mix_goals()
 
-        logger.info(f"Loaded audio: {audio.shape}, sr={sr}")
+        # Initialize agents
+        logger.info("Initializing agents...")
+        self.critic_agent = None
+        self.eq_agent = None
+        self.dynamics_agent = None
+        self.coordinator = None
+        self._initialize_agents()
 
-        # Run training episodes
-        for episode in range(episodes):
-            logger.info(f"\n--- Episode {episode + 1}/{episodes} ---")
+        # Initialize VST3 communicator
+        self.vst3_comm = None
+        if self.enable_vst3:
+            logger.info("Initializing VST3 communicator...")
+            self._initialize_vst3()
 
-            # Coordinate agents in training mode
-            result = self.hgo_coordinator.coordinate_agents(
-                audio[0],  # Use first channel
-                training=True,
-                max_steps=5
-            )
+        # Stats
+        self.total_frames_processed = 0
+        self.total_training_steps = 0
 
-            logger.info(f"Episode {episode + 1} results:")
-            logger.info(f"  Initial reward: {result['initial_reward']:.3f}")
-            logger.info(f"  Final reward: {result['final_reward']:.3f}")
-            logger.info(f"  Improvement: {result['improvement']:.3f}")
-            logger.info(f"  Cooperation score: {result['cooperation_score']:.3f}")
-            logger.info(f"  Conflicts: {result['conflicts_detected']}")
+        logger.info("MAAPS Nexus system initialized successfully!")
 
-        logger.info("\nTraining complete!")
-
-    def inference_mode(self, audio_file: str, output_file: str):
-        """
-        Run inference mode on audio file.
-
-        Args:
-            audio_file: Path to input audio
-            output_file: Path to output audio
-        """
-        import librosa
-        import soundfile as sf
-        import numpy as np
-
-        if not self.initialized:
-            raise RuntimeError("System not initialized")
-
-        logger.info(f"Processing audio: {audio_file}")
-
-        # Load audio
-        audio, sr = librosa.load(audio_file, sr=44100, mono=False)
-        if audio.ndim == 1:
-            audio = np.stack([audio, audio])
-
-        logger.info(f"Loaded audio: {audio.shape}, sr={sr}")
-
-        # Process through HGO coordinator
-        result = self.hgo_coordinator.coordinate_agents(
-            audio[0],
-            training=False,
-            max_steps=1  # Single pass for inference
+    def _initialize_agents(self):
+        """Initialize all Ray agents."""
+        # Critic agent
+        critic_model_path = f"{self.model_dir}/critic.pth" if self.use_pretrained else None
+        self.critic_agent = CriticAgent.remote(
+            model_path=critic_model_path,
+            ontology=self.ontology
         )
 
-        processed_audio = result['processed_audio']
+        # EQ agent
+        eq_model_path = f"{self.model_dir}/eq_rl.pth" if self.use_pretrained else None
+        self.eq_agent = EQRLAgent.remote(
+            num_bands=8,
+            sample_rate=self.sample_rate
+        )
+        if eq_model_path:
+            ray.get(self.eq_agent.load_model.remote(eq_model_path))
 
-        # Save output
-        sf.write(output_file, processed_audio, sr)
+        # Dynamics agent
+        dynamics_model_path = f"{self.model_dir}/dynamics_rl.pth" if self.use_pretrained else None
+        self.dynamics_agent = DynamicsRLAgent.remote(
+            sample_rate=self.sample_rate
+        )
+        if dynamics_model_path:
+            ray.get(self.dynamics_agent.load_model.remote(dynamics_model_path))
 
-        logger.info(f"Processed audio saved to: {output_file}")
-        logger.info(f"  Initial quality: {result['initial_reward']:.3f}")
-        logger.info(f"  Final quality: {result['final_reward']:.3f}")
-        logger.info(f"  Improvement: {result['improvement']:.3f}")
+        # HGO Coordinator
+        self.coordinator = HGOCoordinator.remote(
+            goal_hierarchy=self.goals,
+            ontology=self.ontology
+        )
 
-    def run_forever(self):
-        """Run system forever (for VST3 mode)"""
-        if not self.initialized:
-            raise RuntimeError("System not initialized")
+        # Register agents with coordinator
+        ray.get(self.coordinator.register_agent.remote("eq_agent", self.eq_agent, priority=0.8))
+        ray.get(self.coordinator.register_agent.remote("dynamics_agent", self.dynamics_agent, priority=0.7))
 
-        logger.info("Running in daemon mode (press Ctrl+C to stop)...")
+        logger.info("All agents initialized")
+
+    def _initialize_vst3(self):
+        """Initialize VST3 communication."""
+        self.vst3_comm = VST3Communicator(
+            buffer_size=self.buffer_size,
+            num_channels=2,
+            sample_rate=self.sample_rate
+        )
+        self.vst3_comm.start()
+        logger.info("VST3 communication started")
+
+    def process_audio_frame(
+        self,
+        audio: np.ndarray,
+        current_state: AudioState
+    ) -> tuple[np.ndarray, AudioState]:
+        """
+        Process one audio frame through the multi-agent system.
+
+        Args:
+            audio: Input audio (num_samples, num_channels)
+            current_state: Current ontology state
+
+        Returns:
+            processed_audio: Output audio
+            new_state: Updated state
+        """
+        # Convert stereo to mono for analysis (average channels)
+        if audio.shape[1] == 2:
+            audio_mono = np.mean(audio, axis=1)
+        else:
+            audio_mono = audio[:, 0]
+
+        # Step 1: Get proposals from agents
+        eq_processed_ref = self.eq_agent.process_audio.remote(audio_mono, current_state)
+        dynamics_processed_ref = self.dynamics_agent.process_audio.remote(audio_mono, current_state)
+
+        # Wait for agent processing
+        eq_processed, eq_action = ray.get(eq_processed_ref)
+        dynamics_processed, dynamics_action = ray.get(dynamics_processed_ref)
+
+        # Create proposals
+        eq_proposal = AgentProposal(
+            agent_id="eq_agent",
+            action=eq_action,
+            predicted_impact={AudioAttribute.CLARITY: 0.1},  # Simplified
+            predicted_satisfaction=0.7,
+            confidence=0.8
+        )
+
+        dynamics_proposal = AgentProposal(
+            agent_id="dynamics_agent",
+            action=dynamics_action,
+            predicted_impact={AudioAttribute.PUNCH: 0.1},  # Simplified
+            predicted_satisfaction=0.75,
+            confidence=0.85
+        )
+
+        # Step 2: Coordinate between agents
+        decision = ray.get(
+            self.coordinator.coordinate.remote(
+                [eq_proposal, dynamics_proposal],
+                current_state
+            )
+        )
+
+        # Step 3: Execute approved actions
+        processed_audio = audio_mono.copy()
+
+        for proposal in decision.approved_proposals:
+            if proposal.agent_id == "eq_agent":
+                processed_audio = eq_processed
+            elif proposal.agent_id == "dynamics_agent":
+                processed_audio = dynamics_processed
+
+        # Step 4: Evaluate result with Critic
+        new_state = AudioState()
+        # Simple state update (in real system, would extract features)
+        for attr in AudioAttribute:
+            new_state.set_attribute(attr, np.random.rand() * 0.5 + 0.5)  # Placeholder
+
+        evaluation: CriticEvaluation = ray.get(
+            self.critic_agent.evaluate.remote(
+                processed_audio,
+                new_state,
+                self.goals,
+                self.sample_rate
+            )
+        )
+
+        # Step 5: Update agents with reward (RL training)
+        reward = evaluation.reward
+
+        # Store experiences for training
+        ray.get([
+            self.eq_agent.store_experience.remote(
+                current_state,
+                np.zeros(24),  # Placeholder action vector
+                reward,
+                new_state,
+                False
+            ),
+            self.dynamics_agent.store_experience.remote(
+                current_state,
+                np.zeros(7),  # Placeholder action vector
+                reward,
+                new_state,
+                False
+            )
+        ])
+
+        # Periodic training
+        if self.total_frames_processed % 100 == 0:
+            ray.get([
+                self.eq_agent.train_step.remote(batch_size=32),
+                self.dynamics_agent.train_step.remote(batch_size=32)
+            ])
+            self.total_training_steps += 1
+
+        # Convert mono back to stereo
+        if audio.shape[1] == 2:
+            processed_audio_stereo = np.stack([processed_audio, processed_audio], axis=1)
+        else:
+            processed_audio_stereo = processed_audio.reshape(-1, 1)
+
+        self.total_frames_processed += 1
+
+        return processed_audio_stereo, new_state
+
+    def run_vst3_processing_loop(self):
+        """Main processing loop for VST3 integration."""
+        logger.info("Starting VST3 processing loop...")
+
+        current_state = AudioState()
+        # Initialize state
+        for attr in AudioAttribute:
+            current_state.set_attribute(attr, 0.5)
 
         try:
-            while self.running:
-                time.sleep(1.0)
+            while True:
+                # Get audio from VST3
+                audio = self.vst3_comm.get_audio_for_processing(timeout=0.1)
 
-                # Print statistics every 10 seconds
-                if int(time.time()) % 10 == 0:
-                    if self.vst3_backend:
+                if audio is not None:
+                    # Process
+                    processed, new_state = self.process_audio_frame(audio, current_state)
+
+                    # Send back to VST3
+                    self.vst3_comm.send_processed_audio(processed)
+
+                    current_state = new_state
+
+                    # Log stats periodically
+                    if self.total_frames_processed % 1000 == 0:
+                        latency_info = self.vst3_comm.get_latency_info()
                         logger.info(
-                            f"VST3 Stats: {self.vst3_backend.blocks_processed} blocks, "
-                            f"avg latency: {self.vst3_backend.total_latency / max(1, self.vst3_backend.blocks_processed):.2f}ms"
+                            f"Processed {self.total_frames_processed} frames, "
+                            f"latency: {latency_info['latency_ms']:.2f}ms, "
+                            f"training steps: {self.total_training_steps}"
                         )
 
+                        # Get coordinator stats
+                        stats = ray.get(self.coordinator.get_statistics.remote())
+                        logger.info(f"Coordinator stats: {stats}")
+
+                time.sleep(0.0001)  # Small sleep to prevent CPU spinning
+
         except KeyboardInterrupt:
-            logger.info("Shutting down...")
+            logger.info("Stopping processing loop...")
+        finally:
+            self.shutdown()
+
+    def run_standalone_test(self, duration_seconds: float = 10.0):
+        """Run standalone test without VST3."""
+        logger.info(f"Running standalone test for {duration_seconds} seconds...")
+
+        current_state = AudioState()
+        for attr in AudioAttribute:
+            current_state.set_attribute(attr, 0.5)
+
+        num_frames = int(duration_seconds * self.sample_rate / self.buffer_size)
+
+        for i in range(num_frames):
+            # Generate test audio (white noise)
+            audio = np.random.randn(self.buffer_size, 2) * 0.1
+
+            # Process
+            processed, new_state = self.process_audio_frame(audio, current_state)
+            current_state = new_state
+
+            if i % 10 == 0:
+                logger.info(f"Frame {i}/{num_frames}, satisfaction: {current_state.get_attribute(AudioAttribute.CLARITY):.2f}")
+
+        logger.info("Test complete!")
+        self.print_statistics()
+
+    def print_statistics(self):
+        """Print system statistics."""
+        logger.info("=== MAAPS Nexus Statistics ===")
+        logger.info(f"Total frames processed: {self.total_frames_processed}")
+        logger.info(f"Total training steps: {self.total_training_steps}")
+
+        # Get agent stats
+        stats = ray.get(self.coordinator.get_statistics.remote())
+        logger.info(f"Coordinator stats: {stats}")
+
+        # Get cluster info
+        cluster_info = self.cluster.get_cluster_info()
+        logger.info(f"Cluster resources: {cluster_info['available_resources']}")
+
+    def save_models(self, output_dir: str = "./models"):
+        """Save all trained models."""
+        import os
+        os.makedirs(output_dir, exist_ok=True)
+
+        logger.info(f"Saving models to {output_dir}...")
+        ray.get([
+            self.critic_agent.save_model.remote(f"{output_dir}/critic.pth"),
+            self.eq_agent.save_model.remote(f"{output_dir}/eq_rl.pth"),
+            self.dynamics_agent.save_model.remote(f"{output_dir}/dynamics_rl.pth")
+        ])
+        logger.info("Models saved successfully")
 
     def shutdown(self):
-        """Shutdown all system components"""
+        """Shutdown the system gracefully."""
         logger.info("Shutting down MAAPS Nexus system...")
 
-        self.running = False
+        if self.vst3_comm:
+            self.vst3_comm.close()
 
-        # Stop VST3 backend
-        if self.vst3_backend:
-            self.vst3_backend.stop()
-            logger.info("✓ VST3 backend stopped")
-
-        # Stop agents
-        if self.hgo_coordinator:
-            self.hgo_coordinator.stop()
-        if self.dynamics_agent:
-            self.dynamics_agent.stop()
-        if self.eq_agent:
-            self.eq_agent.stop()
-        if self.critic_agent:
-            self.critic_agent.stop()
-        logger.info("✓ Agents stopped")
-
-        # Stop message bus
-        if self.message_bus:
-            self.message_bus.stop()
-            logger.info("✓ Message bus stopped")
-
-        # Shutdown Ray cluster
-        if self.ray_cluster:
-            self.ray_cluster.shutdown_cluster()
-            logger.info("✓ Ray cluster shutdown")
-
-        logger.info("System shutdown complete")
-
-    def _signal_handler(self, signum, frame):
-        """Handle shutdown signals"""
-        logger.info(f"Received signal {signum}, shutting down...")
-        self.shutdown()
-        sys.exit(0)
+        self.cluster.shutdown()
+        logger.info("Shutdown complete")
 
 
 def main():
-    """Main entry point"""
-    parser = argparse.ArgumentParser(description="MAAPS Nexus Multi-Agent Audio Processing System")
-
-    parser.add_argument(
-        "--mode",
-        choices=["vst3", "train", "inference"],
-        default="vst3",
-        help="Operating mode (default: vst3)"
-    )
-
-    parser.add_argument(
-        "--audio-file",
-        type=str,
-        help="Audio file for training or inference"
-    )
-
-    parser.add_argument(
-        "--output-file",
-        type=str,
-        help="Output file for inference mode"
-    )
-
-    parser.add_argument(
-        "--episodes",
-        type=int,
-        default=10,
-        help="Number of training episodes (default: 10)"
-    )
-
-    parser.add_argument(
-        "--num-cpus",
-        type=int,
-        help="Number of CPUs for Ray cluster (auto-detect if not specified)"
-    )
-
-    parser.add_argument(
-        "--num-gpus",
-        type=int,
-        default=0,
-        help="Number of GPUs for Ray cluster (default: 0)"
-    )
-
-    parser.add_argument(
-        "--no-vst3",
-        action="store_true",
-        help="Disable VST3 backend"
-    )
+    """Main entry point."""
+    parser = argparse.ArgumentParser(description="MAAPS Nexus - Multi-Agent Audio Processing System")
+    parser.add_argument("--mode", choices=["vst3", "test"], default="vst3",
+                        help="Run mode: vst3 (DAW integration) or test (standalone)")
+    parser.add_argument("--buffer-size", type=int, default=512,
+                        help="Audio buffer size")
+    parser.add_argument("--sample-rate", type=int, default=44100,
+                        help="Sample rate")
+    parser.add_argument("--num-cpus", type=int, default=None,
+                        help="Number of CPUs for Ray cluster")
+    parser.add_argument("--test-duration", type=float, default=10.0,
+                        help="Test duration in seconds (test mode only)")
+    parser.add_argument("--model-dir", type=str, default="./models",
+                        help="Directory for model checkpoints")
+    parser.add_argument("--use-pretrained", action="store_true",
+                        help="Load pre-trained models")
 
     args = parser.parse_args()
 
-    # Validate arguments
-    if args.mode in ["train", "inference"] and not args.audio_file:
-        parser.error(f"{args.mode} mode requires --audio-file")
-
-    if args.mode == "inference" and not args.output_file:
-        parser.error("inference mode requires --output-file")
-
-    # Create system configuration
-    config = {
-        'num_cpus': args.num_cpus,
-        'num_gpus': args.num_gpus,
-        'enable_vst3': not args.no_vst3 and args.mode == "vst3",
-    }
-
     # Initialize system
-    system = MAAPSNexusSystem(config)
-    system.initialize()
+    system = MAAPSNexusSystem(
+        num_cpus=args.num_cpus,
+        buffer_size=args.buffer_size,
+        sample_rate=args.sample_rate,
+        enable_vst3=(args.mode == "vst3"),
+        use_pretrained=args.use_pretrained,
+        model_dir=args.model_dir
+    )
 
-    try:
-        # Run in specified mode
-        if args.mode == "vst3":
-            system.run_forever()
-
-        elif args.mode == "train":
-            system.train_mode(args.audio_file, args.episodes)
-
-        elif args.mode == "inference":
-            system.inference_mode(args.audio_file, args.output_file)
-
-    finally:
-        system.shutdown()
+    # Run based on mode
+    if args.mode == "vst3":
+        system.run_vst3_processing_loop()
+    else:
+        system.run_standalone_test(duration_seconds=args.test_duration)
+        system.save_models(args.model_dir)
 
 
 if __name__ == "__main__":

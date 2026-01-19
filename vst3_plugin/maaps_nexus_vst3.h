@@ -1,319 +1,385 @@
-/*
- * MAAPS Nexus VST3 Plugin Header
+/**
+ * MAAPS Nexus VST3 Plugin
  *
- * VST3 plugin wrapper that communicates with Python backend via shared memory
- * for ultra-low latency multi-agent audio processing.
+ * VST3 plugin that communicates with Python multi-agent system via shared memory.
+ * Designed for <10ms latency audio processing.
  *
- * Build instructions:
- * - Requires VST3 SDK from Steinberg
- * - CMake build system
- * - C++17 or later
+ * Architecture:
+ * - VST3 plugin receives audio from DAW
+ * - Writes to shared memory ring buffer
+ * - Python agents process audio
+ * - Reads processed audio from shared memory
+ * - Returns to DAW
  */
 
 #pragma once
 
 #include "public.sdk/source/vst/vstaudioeffect.h"
 #include "pluginterfaces/vst/ivstparameterchanges.h"
-#include "pluginterfaces/base/ibstream.h"
+#include "pluginterfaces/vst/ivstprocesscontext.h"
 
 #include <atomic>
 #include <memory>
 #include <string>
 #include <cstring>
+
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
+#endif
 
 namespace Steinberg {
 namespace Vst {
 
-//-----------------------------------------------------------------------------
-// Shared Memory Header Structure (must match Python implementation)
-//-----------------------------------------------------------------------------
-struct SharedMemoryHeader {
-    uint32_t magic;          // 0x4D415053 ('MAPS')
-    uint32_t version;        // 1
-    uint64_t write_offset;   // Offset for writing
-    uint64_t read_offset;    // Offset for reading
-    uint32_t block_size;     // Number of samples per block
-    uint32_t sample_rate;    // Sample rate
-    uint32_t num_channels;   // Number of channels
-    uint64_t block_id;       // Current block ID
-    uint64_t status;         // Status flags (0=no data, 1=data available)
-};
-
-//-----------------------------------------------------------------------------
-// Shared Memory Audio Buffer Manager
-//-----------------------------------------------------------------------------
-class SharedMemoryAudioBuffer {
+//------------------------------------------------------------------------
+// Shared Memory Ring Buffer
+//------------------------------------------------------------------------
+class SharedMemoryBuffer
+{
 public:
-    SharedMemoryAudioBuffer(const std::string& shm_name, size_t shm_size);
-    ~SharedMemoryAudioBuffer();
+    SharedMemoryBuffer(const char* name, size_t bufferSize, int numChannels)
+        : bufferName(name)
+        , bufferSize(bufferSize)
+        , numChannels(numChannels)
+        , shm(nullptr)
+        , shmHandle(nullptr)
+    {
+        headerSize = 20;  // read_pos(8) + write_pos(8) + processing_flag(4)
+        audioDataSize = bufferSize * numChannels * sizeof(float);
+        totalSize = headerSize + audioDataSize;
 
-    bool open();
-    void close();
-
-    bool writeAudio(const float** audio, int32 numChannels, int32 numSamples);
-    bool readAudio(float** audio, int32 numChannels, int32 numSamples);
-
-    bool isConnected() const { return m_connected; }
-
-private:
-    std::string m_shmName;
-    size_t m_shmSize;
-    int m_shmFd;
-    void* m_shmPtr;
-    bool m_connected;
-
-    static constexpr size_t HEADER_SIZE = 64;
-    static constexpr uint32_t MAGIC_NUMBER = 0x4D415053;
-    static constexpr uint32_t VERSION = 1;
-
-    SharedMemoryHeader* getHeader();
-    void updateHeader(const SharedMemoryHeader& header);
-};
-
-//-----------------------------------------------------------------------------
-// Parameter IDs
-//-----------------------------------------------------------------------------
-enum MAAPSParams : ParamID {
-    kBypassParam = 0,
-    kEQBand1Gain,
-    kEQBand2Gain,
-    kEQBand3Gain,
-    kEQBand4Gain,
-    kEQBand5Gain,
-    kEQBand6Gain,
-    kEQBand7Gain,
-    kCompThreshold,
-    kCompRatio,
-    kCompAttack,
-    kCompRelease,
-    kCompMakeup,
-    kAIMode,          // 0=off, 1=inference, 2=training
-    kCooperationScore,  // Read-only
-    kNumParams
-};
-
-//-----------------------------------------------------------------------------
-// MAAPS Nexus Processor (Audio Processing)
-//-----------------------------------------------------------------------------
-class MAAPSNexusProcessor : public AudioEffect {
-public:
-    MAAPSNexusProcessor();
-    ~MAAPSNexusProcessor() override;
-
-    // AudioEffect overrides
-    tresult PLUGIN_API initialize(FUnknown* context) override;
-    tresult PLUGIN_API terminate() override;
-    tresult PLUGIN_API setActive(TBool state) override;
-    tresult PLUGIN_API process(ProcessData& data) override;
-    tresult PLUGIN_API setState(IBStream* state) override;
-    tresult PLUGIN_API getState(IBStream* state) override;
-    tresult PLUGIN_API setupProcessing(ProcessSetup& newSetup) override;
-    tresult PLUGIN_API canProcessSampleSize(int32 symbolicSampleSize) override;
-
-    static FUnknown* createInstance(void*) { return (IAudioProcessor*)new MAAPSNexusProcessor; }
-
-private:
-    // Shared memory for Python backend communication
-    std::unique_ptr<SharedMemoryAudioBuffer> m_shmBuffer;
-
-    // Parameters
-    float m_bypass;
-    float m_eqGains[7];
-    float m_compThreshold;
-    float m_compRatio;
-    float m_compAttack;
-    float m_compRelease;
-    float m_compMakeup;
-    float m_aiMode;
-    float m_cooperationScore;
-
-    // Processing state
-    bool m_backendConnected;
-    std::atomic<uint64_t> m_processedBlocks;
-    double m_sampleRate;
-
-    // Latency tracking
-    std::atomic<double> m_avgLatencyMs;
-    std::atomic<double> m_maxLatencyMs;
-
-    // Methods
-    bool connectToBackend();
-    void disconnectFromBackend();
-    void updateParameters(IParameterChanges* paramChanges);
-    bool processAudioWithBackend(ProcessData& data);
-    void processBypass(ProcessData& data);
-};
-
-//-----------------------------------------------------------------------------
-// MAAPS Nexus Controller (UI and Parameters)
-//-----------------------------------------------------------------------------
-class MAAPSNexusController : public EditController {
-public:
-    MAAPSNexusController();
-    ~MAAPSNexusController() override;
-
-    // EditController overrides
-    tresult PLUGIN_API initialize(FUnknown* context) override;
-    tresult PLUGIN_API terminate() override;
-    tresult PLUGIN_API setComponentState(IBStream* state) override;
-
-    static FUnknown* createInstance(void*) { return (IEditController*)new MAAPSNexusController; }
-
-private:
-    // Add parameters to the controller
-    void addParameters();
-};
-
-//-----------------------------------------------------------------------------
-// SharedMemoryAudioBuffer Implementation
-//-----------------------------------------------------------------------------
-
-inline SharedMemoryAudioBuffer::SharedMemoryAudioBuffer(const std::string& shm_name, size_t shm_size)
-    : m_shmName(shm_name)
-    , m_shmSize(shm_size)
-    , m_shmFd(-1)
-    , m_shmPtr(nullptr)
-    , m_connected(false)
-{
-}
-
-inline SharedMemoryAudioBuffer::~SharedMemoryAudioBuffer()
-{
-    close();
-}
-
-inline bool SharedMemoryAudioBuffer::open()
-{
-    // Open POSIX shared memory
-    m_shmFd = shm_open(m_shmName.c_str(), O_RDWR, 0666);
-    if (m_shmFd == -1) {
-        return false;
+        initializeSharedMemory();
     }
 
-    // Map shared memory
-    m_shmPtr = mmap(nullptr, m_shmSize, PROT_READ | PROT_WRITE, MAP_SHARED, m_shmFd, 0);
-    if (m_shmPtr == MAP_FAILED) {
-        ::close(m_shmFd);
-        m_shmFd = -1;
-        return false;
+    ~SharedMemoryBuffer()
+    {
+        cleanup();
     }
 
-    // Verify magic number
-    SharedMemoryHeader* header = getHeader();
-    if (header->magic != MAGIC_NUMBER) {
-        close();
-        return false;
+    bool isValid() const { return shm != nullptr; }
+
+    // Read header
+    void readHeader(uint64_t& readPos, uint64_t& writePos, uint32_t& flag)
+    {
+        if (!shm) return;
+
+        memcpy(&readPos, shm, 8);
+        memcpy(&writePos, (char*)shm + 8, 8);
+        memcpy(&flag, (char*)shm + 16, 4);
     }
 
-    m_connected = true;
-    return true;
-}
+    // Write header
+    void writeHeader(uint64_t readPos, uint64_t writePos, uint32_t flag)
+    {
+        if (!shm) return;
 
-inline void SharedMemoryAudioBuffer::close()
-{
-    if (m_shmPtr && m_shmPtr != MAP_FAILED) {
-        munmap(m_shmPtr, m_shmSize);
-        m_shmPtr = nullptr;
+        memcpy(shm, &readPos, 8);
+        memcpy((char*)shm + 8, &writePos, 8);
+        memcpy((char*)shm + 16, &flag, 4);
     }
 
-    if (m_shmFd != -1) {
-        ::close(m_shmFd);
-        m_shmFd = -1;
-    }
+    // Write audio samples
+    bool writeAudio(const float** audio, int numSamples)
+    {
+        if (!shm) return false;
 
-    m_connected = false;
-}
+        uint64_t readPos, writePos, tempFlag;
+        readHeader(readPos, writePos, tempFlag);
 
-inline SharedMemoryHeader* SharedMemoryAudioBuffer::getHeader()
-{
-    return static_cast<SharedMemoryHeader*>(m_shmPtr);
-}
-
-inline void SharedMemoryAudioBuffer::updateHeader(const SharedMemoryHeader& header)
-{
-    std::memcpy(m_shmPtr, &header, sizeof(SharedMemoryHeader));
-}
-
-inline bool SharedMemoryAudioBuffer::writeAudio(const float** audio, int32 numChannels, int32 numSamples)
-{
-    if (!m_connected) return false;
-
-    SharedMemoryHeader* header = getHeader();
-
-    // Calculate size needed
-    size_t audioSize = numChannels * numSamples * sizeof(float);
-
-    // Check if there's space
-    size_t availableSize = m_shmSize - HEADER_SIZE;
-    if (audioSize > availableSize) {
-        return false;
-    }
-
-    // Get write offset
-    uint64_t writeOffset = header->write_offset;
-
-    // Wrap around if necessary
-    if (writeOffset + audioSize > m_shmSize) {
-        writeOffset = HEADER_SIZE;
-    }
-
-    // Write audio data (interleaved)
-    float* dest = reinterpret_cast<float*>(static_cast<char*>(m_shmPtr) + writeOffset);
-    for (int32 sample = 0; sample < numSamples; ++sample) {
-        for (int32 channel = 0; channel < numChannels; ++channel) {
-            *dest++ = audio[channel][sample];
+        // Calculate available space
+        uint64_t available;
+        if (writePos >= readPos) {
+            available = bufferSize - (writePos - readPos);
+        } else {
+            available = readPos - writePos;
         }
-    }
 
-    // Update header
-    header->write_offset = writeOffset + audioSize;
-    header->block_size = numSamples;
-    header->num_channels = numChannels;
-    header->block_id++;
-    header->status = 1; // Data available
-
-    return true;
-}
-
-inline bool SharedMemoryAudioBuffer::readAudio(float** audio, int32 numChannels, int32 numSamples)
-{
-    if (!m_connected) return false;
-
-    SharedMemoryHeader* header = getHeader();
-
-    // Check if data is available
-    if (header->status == 0) {
-        return false;
-    }
-
-    // Get read offset
-    uint64_t readOffset = header->read_offset;
-
-    // Calculate size
-    size_t audioSize = numChannels * numSamples * sizeof(float);
-
-    // Read audio data (deinterleave)
-    const float* src = reinterpret_cast<const float*>(static_cast<const char*>(m_shmPtr) + readOffset);
-    for (int32 sample = 0; sample < numSamples; ++sample) {
-        for (int32 channel = 0; channel < numChannels; ++channel) {
-            audio[channel][sample] = *src++;
+        if (available < (uint64_t)numSamples) {
+            return false;  // Buffer full
         }
+
+        // Write audio data
+        for (int i = 0; i < numSamples; i++) {
+            uint64_t pos = (writePos + i) % bufferSize;
+            size_t offset = headerSize + pos * numChannels * sizeof(float);
+
+            for (int ch = 0; ch < numChannels; ch++) {
+                float sample = audio[ch][i];
+                memcpy((char*)shm + offset + ch * sizeof(float), &sample, sizeof(float));
+            }
+        }
+
+        // Update write position
+        uint64_t newWritePos = (writePos + numSamples) % bufferSize;
+        writeHeader(readPos, newWritePos, 0);
+
+        return true;
     }
 
-    // Update read offset
-    uint64_t newReadOffset = readOffset + audioSize;
-    if (newReadOffset >= m_shmSize) {
-        newReadOffset = HEADER_SIZE;
+    // Read audio samples
+    bool readAudio(float** audio, int numSamples)
+    {
+        if (!shm) return false;
+
+        uint64_t readPos, writePos, tempFlag;
+        readHeader(readPos, writePos, tempFlag);
+
+        // Calculate available samples
+        uint64_t available;
+        if (writePos >= readPos) {
+            available = writePos - readPos;
+        } else {
+            available = bufferSize - readPos + writePos;
+        }
+
+        if (available < (uint64_t)numSamples) {
+            return false;  // Not enough data
+        }
+
+        // Read audio data
+        for (int i = 0; i < numSamples; i++) {
+            uint64_t pos = (readPos + i) % bufferSize;
+            size_t offset = headerSize + pos * numChannels * sizeof(float);
+
+            for (int ch = 0; ch < numChannels; ch++) {
+                memcpy(&audio[ch][i], (char*)shm + offset + ch * sizeof(float), sizeof(float));
+            }
+        }
+
+        // Update read position
+        uint64_t newReadPos = (readPos + numSamples) % bufferSize;
+        writeHeader(newReadPos, writePos, 0);
+
+        return true;
     }
 
-    header->read_offset = newReadOffset;
-    header->status = 0; // Data consumed
+private:
+    void initializeSharedMemory()
+    {
+#ifdef _WIN32
+        // Windows implementation
+        shmHandle = CreateFileMappingA(
+            INVALID_HANDLE_VALUE,
+            NULL,
+            PAGE_READWRITE,
+            0,
+            (DWORD)totalSize,
+            bufferName.c_str()
+        );
 
-    return true;
-}
+        if (shmHandle == NULL) {
+            return;
+        }
 
+        shm = MapViewOfFile(
+            shmHandle,
+            FILE_MAP_ALL_ACCESS,
+            0,
+            0,
+            totalSize
+        );
+
+        if (shm) {
+            // Initialize header to zeros if newly created
+            uint64_t readPos = 0, writePos = 0;
+            uint32_t flag = 0;
+            writeHeader(readPos, writePos, flag);
+        }
+#else
+        // POSIX implementation
+        int fd = shm_open(bufferName.c_str(), O_CREAT | O_RDWR, 0666);
+        if (fd == -1) {
+            return;
+        }
+
+        ftruncate(fd, totalSize);
+
+        shm = mmap(NULL, totalSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+        close(fd);
+
+        if (shm == MAP_FAILED) {
+            shm = nullptr;
+            return;
+        }
+
+        // Initialize header
+        uint64_t readPos = 0, writePos = 0;
+        uint32_t flag = 0;
+        writeHeader(readPos, writePos, flag);
+#endif
+    }
+
+    void cleanup()
+    {
+#ifdef _WIN32
+        if (shm) {
+            UnmapViewOfFile(shm);
+            shm = nullptr;
+        }
+        if (shmHandle) {
+            CloseHandle(shmHandle);
+            shmHandle = nullptr;
+        }
+#else
+        if (shm) {
+            munmap(shm, totalSize);
+            shm = nullptr;
+        }
+#endif
+    }
+
+    std::string bufferName;
+    size_t bufferSize;
+    int numChannels;
+    size_t headerSize;
+    size_t audioDataSize;
+    size_t totalSize;
+
+    void* shm;
+
+#ifdef _WIN32
+    HANDLE shmHandle;
+#endif
+};
+
+//------------------------------------------------------------------------
+// MAAPS Nexus VST3 Processor
+//------------------------------------------------------------------------
+class MAAPSNexusProcessor : public AudioEffect
+{
+public:
+    MAAPSNexusProcessor()
+        : inputBuffer(nullptr)
+        , outputBuffer(nullptr)
+        , bypass(false)
+    {
+    }
+
+    ~MAAPSNexusProcessor()
+    {
+    }
+
+    static FUnknown* createInstance(void* /*context*/)
+    {
+        return (IAudioProcessor*)new MAAPSNexusProcessor;
+    }
+
+    tresult PLUGIN_API initialize(FUnknown* context) SMTG_OVERRIDE
+    {
+        tresult result = AudioEffect::initialize(context);
+        if (result != kResultOk) {
+            return result;
+        }
+
+        // Add audio input/output
+        addAudioInput(STR16("Stereo In"), SpeakerArr::kStereo);
+        addAudioOutput(STR16("Stereo Out"), SpeakerArr::kStereo);
+
+        // Initialize shared memory buffers
+        inputBuffer = std::make_unique<SharedMemoryBuffer>(
+            "maaps_nexus_buffer_input",
+            8192,  // Buffer size
+            2      // Stereo
+        );
+
+        outputBuffer = std::make_unique<SharedMemoryBuffer>(
+            "maaps_nexus_buffer_output",
+            8192,
+            2
+        );
+
+        return kResultOk;
+    }
+
+    tresult PLUGIN_API terminate() SMTG_OVERRIDE
+    {
+        inputBuffer.reset();
+        outputBuffer.reset();
+
+        return AudioEffect::terminate();
+    }
+
+    tresult PLUGIN_API setActive(TBool state) SMTG_OVERRIDE
+    {
+        return AudioEffect::setActive(state);
+    }
+
+    tresult PLUGIN_API process(ProcessData& data) SMTG_OVERRIDE
+    {
+        // Check if bypass
+        if (bypass || !inputBuffer || !outputBuffer) {
+            // Bypass: copy input to output
+            if (data.numInputs > 0 && data.numOutputs > 0) {
+                int32 numChannels = data.inputs[0].numChannels;
+                for (int32 ch = 0; ch < numChannels; ch++) {
+                    if (data.inputs[0].channelBuffers32[ch] && data.outputs[0].channelBuffers32[ch]) {
+                        memcpy(
+                            data.outputs[0].channelBuffers32[ch],
+                            data.inputs[0].channelBuffers32[ch],
+                            data.numSamples * sizeof(float)
+                        );
+                    }
+                }
+            }
+            return kResultOk;
+        }
+
+        // Process audio through shared memory
+        int32 numSamples = data.numSamples;
+        int32 numChannels = data.inputs[0].numChannels;
+
+        // Write input to shared memory
+        const float* inputChannels[2] = {
+            data.inputs[0].channelBuffers32[0],
+            numChannels > 1 ? data.inputs[0].channelBuffers32[1] : data.inputs[0].channelBuffers32[0]
+        };
+
+        bool writeSuccess = inputBuffer->writeAudio(inputChannels, numSamples);
+
+        // Read processed audio from shared memory
+        float* outputChannels[2] = {
+            data.outputs[0].channelBuffers32[0],
+            numChannels > 1 ? data.outputs[0].channelBuffers32[1] : data.outputs[0].channelBuffers32[0]
+        };
+
+        bool readSuccess = outputBuffer->readAudio(outputChannels, numSamples);
+
+        // If read failed (no processed audio yet), use input as output
+        if (!readSuccess || !writeSuccess) {
+            for (int32 ch = 0; ch < numChannels; ch++) {
+                memcpy(
+                    data.outputs[0].channelBuffers32[ch],
+                    data.inputs[0].channelBuffers32[ch],
+                    numSamples * sizeof(float)
+                );
+            }
+        }
+
+        return kResultOk;
+    }
+
+    tresult PLUGIN_API setupProcessing(ProcessSetup& newSetup) SMTG_OVERRIDE
+    {
+        return AudioEffect::setupProcessing(newSetup);
+    }
+
+    tresult PLUGIN_API canProcessSampleSize(int32 symbolicSampleSize) SMTG_OVERRIDE
+    {
+        if (symbolicSampleSize == kSample32) {
+            return kResultTrue;
+        }
+        return kResultFalse;
+    }
+
+protected:
+    std::unique_ptr<SharedMemoryBuffer> inputBuffer;
+    std::unique_ptr<SharedMemoryBuffer> outputBuffer;
+    bool bypass;
+};
+
+//------------------------------------------------------------------------
 } // namespace Vst
 } // namespace Steinberg
