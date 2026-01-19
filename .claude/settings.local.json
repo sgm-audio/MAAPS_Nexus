@@ -5,7 +5,8 @@
       "mcp__kluster-verify__kluster_code_review_auto",
       "Bash(python -m pytest:*)",
       "Bash(python:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(wc:*)"
     ],
     "deny": [],
     "ask": []
