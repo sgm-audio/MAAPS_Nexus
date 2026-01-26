@@ -6,7 +6,12 @@
       "Bash(python -m pytest:*)",
       "Bash(python:*)",
       "WebSearch",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(gh repo clone:*)",
+      "Bash(gh repo create:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nInitial commit: MAAPS Multi-Agent Audio Production System v0.8 Alpha\n\n- Complete RL system with Ray cluster orchestration\n- Multi-agent architecture \\(Critic, EQ RL, Dynamics RL, HGO Coordinator\\)\n- Legacy message bus system with audio enhancement and content generation\n- VST3 plugin integration for DAW connectivity\n- Comprehensive test suite and documentation\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

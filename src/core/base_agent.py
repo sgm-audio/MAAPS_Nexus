@@ -101,6 +101,35 @@ class BaseAgent(ABC):
         """
         pass
 
+    def _set_state(self, new_state: AgentState, error: Optional[Exception] = None):
+        """
+        Update agent state and notify observers.
+        """
+        with self._state_lock:
+            old_state = self._state
+            self._state = new_state
+        
+        # Publish status change event
+        payload = {
+            "agent_id": self.agent_id,
+            "agent_name": self.agent_name,
+            "old_state": old_state.value,
+            "new_state": new_state.value,
+            "timestamp": time.time()
+        }
+        
+        if error:
+            payload["error"] = str(error)
+            
+        # Use a generic status topic that the Coordinator subscribes to
+        topic = "system.agent.status"
+        
+        # Determine priority based on state
+        priority = Priority.HIGH if new_state == AgentState.ERROR else Priority.MEDIUM
+        
+        self.publish(topic, payload, priority=priority)
+        logger.debug(f"Agent {self.agent_id} state changed: {old_state.value} -> {new_state.value}")
+
     def start(self):
         """Start the agent"""
         with self._state_lock:
@@ -108,7 +137,7 @@ class BaseAgent(ABC):
                 logger.warning(f"Agent {self.agent_id} already started or in invalid state")
                 return
 
-            self._state = AgentState.STARTING
+        self._set_state(AgentState.STARTING)
 
         try:
             # Record start time
@@ -122,21 +151,12 @@ class BaseAgent(ABC):
             self._start_heartbeat()
 
             # Update state
-            with self._state_lock:
-                self._state = AgentState.RUNNING
-
-            # Publish agent started event
-            self._publish_system_event(
-                Topics.SYSTEM_AGENT_STARTED,
-                {"agent_id": self.agent_id, "agent_name": self.agent_name}
-            )
+            self._set_state(AgentState.RUNNING)
 
             logger.info(f"Agent {self.agent_id} started")
 
         except Exception as e:
-            with self._state_lock:
-                self._state = AgentState.ERROR
-
+            self._set_state(AgentState.ERROR, error=e)
             logger.error(f"Error starting agent {self.agent_id}: {e}")
             raise
 
@@ -146,7 +166,7 @@ class BaseAgent(ABC):
             if self._state not in [AgentState.RUNNING, AgentState.ERROR]:
                 return
 
-            self._state = AgentState.STOPPING
+        self._set_state(AgentState.STOPPING)
 
         try:
             # Stop heartbeat
@@ -160,21 +180,13 @@ class BaseAgent(ABC):
             self.teardown()
 
             # Update state
-            with self._state_lock:
-                self._state = AgentState.STOPPED
-
-            # Publish agent stopped event
-            self._publish_system_event(
-                Topics.SYSTEM_AGENT_STOPPED,
-                {"agent_id": self.agent_id, "agent_name": self.agent_name}
-            )
+            self._set_state(AgentState.STOPPED)
 
             logger.info(f"Agent {self.agent_id} stopped")
 
         except Exception as e:
             logger.error(f"Error stopping agent {self.agent_id}: {e}")
-            with self._state_lock:
-                self._state = AgentState.ERROR
+            self._set_state(AgentState.ERROR, error=e)
             raise
 
     def subscribe(self, topic: str):

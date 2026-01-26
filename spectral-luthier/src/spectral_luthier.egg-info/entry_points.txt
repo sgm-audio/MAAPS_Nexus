@@ -1,0 +1,2 @@
+[console_scripts]
+spectral-luthier = spectral_luthier.cli:app

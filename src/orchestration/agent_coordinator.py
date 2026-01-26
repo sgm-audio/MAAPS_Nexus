@@ -10,14 +10,7 @@ import time
 from typing import Dict, List, Optional
 import logging
 
-from ..core import BaseAgent, get_agent_registry, get_message_bus, AgentState
-from ..agents import (
-    AudioEnhancementAgent,
-    ContentGenerationAgent,
-    PerformanceOptimizationAgent,
-    MetadataManagementAgent
-)
-from .workflow_engine import WorkflowEngine
+from ..core import BaseAgent, get_agent_registry, get_message_bus, AgentState, AgentFactory
 
 logger = logging.getLogger(__name__)
 
@@ -66,11 +59,14 @@ class AgentCoordinator:
             # Start message bus
             if not self.message_bus._running:
                 self.message_bus.start()
+                
+            # Subscribe to agent status updates (Observer Pattern)
+            self.message_bus.subscribe("system.agent.status", "coordinator", self._on_agent_status_changed)
 
             # Start all agents
             self.start_all_agents()
 
-            # Start health monitoring
+            # Start health monitoring (Watchdog)
             self._start_health_monitoring()
 
             self.stats['system_start_time'] = time.time()
@@ -80,6 +76,29 @@ class AgentCoordinator:
         except Exception as e:
             logger.error(f"Error initializing system: {e}")
             raise
+
+    def _on_agent_status_changed(self, message):
+        """
+        Handle agent status change events (Reactive Health Monitoring).
+        """
+        payload = message.payload
+        agent_id = payload.get('agent_id')
+        new_state = payload.get('new_state')
+        old_state = payload.get('old_state')
+        
+        logger.info(f"Coordinator received status change for {agent_id}: {old_state} -> {new_state}")
+        
+        if new_state == 'error':
+            logger.warning(f"Agent {agent_id} reported ERROR state. Initiating recovery...")
+            self.stats['total_agent_errors'] += 1
+            # Reactive recovery
+            threading.Thread(target=self.restart_agent, args=(agent_id,), daemon=True).start()
+            
+        elif new_state == 'stopped' and self.monitoring_active:
+             # Check if this stop was intentional (initiated by coordinator) or unexpected
+             # For now, we assume if the system is running, agents shouldn't stop unless asked.
+             # In a real implementation, we'd check a 'desired_state' flag.
+             pass
 
     def shutdown_system(self):
         """Shutdown the complete agent system"""
@@ -103,21 +122,25 @@ class AgentCoordinator:
             raise
 
     def _create_core_agents(self):
-        """Create and register core system agents"""
-        # Create agents
-        agents_to_create = [
-            AudioEnhancementAgent(),
-            ContentGenerationAgent(),
-            PerformanceOptimizationAgent(),
-            MetadataManagementAgent(),
-            WorkflowEngine()
+        """Create and register core system agents using AgentFactory"""
+        agent_types = [
+            "audio_enhancement",
+            "content_generation",
+            "performance_optimization",
+            "metadata_management",
+            "workflow_engine"
         ]
 
         with self.lock:
-            for agent in agents_to_create:
-                self.agents[agent.agent_id] = agent
-                self.registry.register(agent)
-                logger.info(f"Registered agent: {agent.agent_id}")
+            for agent_type in agent_types:
+                try:
+                    agent = AgentFactory.create_agent(agent_type)
+                    self.agents[agent.agent_id] = agent
+                    self.registry.register(agent)
+                    logger.info(f"Registered agent: {agent.agent_id} (type: {agent_type})")
+                except ValueError as e:
+                    logger.error(f"Failed to create agent of type {agent_type}: {e}")
+                    raise
 
     def start_all_agents(self):
         """Start all registered agents"""

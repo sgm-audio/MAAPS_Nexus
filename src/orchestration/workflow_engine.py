@@ -475,6 +475,61 @@ class WorkflowEngine(BaseAgent):
 
         return executable
 
+    def _resolve_payload(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Resolve payload placeholders using workflow context.
+        Supports syntax: {{step_id.key}}
+        """
+        resolved_payload = payload.copy()
+
+        for key, value in resolved_payload.items():
+            if isinstance(value, str) and value.startswith('{{') and value.endswith('}}'):
+                # Extract path: {{step_id.result.key}} -> step_id.result.key
+                path = value[2:-2].strip()
+                parts = path.split('.')
+                
+                # Navigate context
+                current = context
+                found = True
+                for part in parts:
+                    if isinstance(current, dict) and part in current:
+                        current = current[part]
+                    else:
+                        found = False
+                        break
+                
+                if found:
+                    resolved_payload[key] = current
+            elif isinstance(value, dict):
+                resolved_payload[key] = self._resolve_payload(value, context)
+            elif isinstance(value, list):
+                # Handle lists of dicts or strings
+                resolved_list = []
+                for item in value:
+                    if isinstance(item, dict):
+                        resolved_list.append(self._resolve_payload(item, context))
+                    elif isinstance(item, str) and item.startswith('{{') and item.endswith('}}'):
+                         # Same logic as above for list items
+                        path = item[2:-2].strip()
+                        parts = path.split('.')
+                        current = context
+                        found = True
+                        for part in parts:
+                            if isinstance(current, dict) and part in current:
+                                current = current[part]
+                            else:
+                                found = False
+                                break
+                        if found:
+                            resolved_list.append(current)
+                        else:
+                            resolved_list.append(item)
+                    else:
+                        resolved_list.append(item)
+                resolved_payload[key] = resolved_list
+
+        return resolved_payload
+
     def _execute_step(self, workflow: Workflow, step: WorkflowStep):
         """Execute a single workflow step"""
         step.status = StepStatus.RUNNING
@@ -492,11 +547,14 @@ class WorkflowEngine(BaseAgent):
         )
 
         try:
+            # Resolve payload with context data
+            resolved_payload = self._resolve_payload(step.payload, workflow.context)
+
             # Send request to agent
             response = self.request(
                 step.topic,
                 {
-                    **step.payload,
+                    **resolved_payload,
                     'workflow_id': workflow.workflow_id,
                     'step_id': step.step_id
                 },
@@ -509,6 +567,11 @@ class WorkflowEngine(BaseAgent):
                 if response.payload.get('success', False):
                     step.status = StepStatus.COMPLETED
                     step.result = response.payload
+                    
+                    # Update workflow context with result
+                    with self.workflows_lock:
+                        workflow.context[step.step_id] = step.result
+                        
                 else:
                     step.status = StepStatus.FAILED
                     step.error = response.payload.get('error', 'Unknown error')

@@ -12,6 +12,7 @@ import uuid
 
 class Priority(Enum):
     """Message priority levels"""
+    CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
@@ -259,3 +260,30 @@ class Topics:
     LOG_EVENT_ERROR = "log.event.error"
     LOG_METRICS_PERFORMANCE = "log.metrics.performance"
     LOG_AUDIT_ACTION = "log.audit.action"
+
+    # Workflow topics
+    WORKFLOW_CREATE = "workflow.create"
+    WORKFLOW_EXECUTE = "workflow.execute"
+    WORKFLOW_STATUS = "workflow.status"
+
+    # Enhancement & Generation topics
+    AUDIO_ENHANCEMENT_REQUEST = "audio.enhancement.request"
+    MUSIC_GEN_MELODY_REQ = "music.generation.melody.request"
+    MUSIC_GEN_HARMONY_REQ = "music.generation.harmony.request"
+    MUSIC_GEN_DRUMS_REQ = "music.generation.drums.request"
+    MUSIC_GEN_BASS_REQ = "music.generation.bass.request"
+
+    # Metadata topics
+    METADATA_EXTRACT_REQ = "metadata.extract.request"
+    METADATA_SEARCH_REQ = "metadata.search.request"
+
+    # Resource topics
+    SYSTEM_RESOURCE_REQ = "system.resource.request"
+
+
+class Timeouts:
+    """Standardized timeout values in seconds"""
+    SHORT = 5.0
+    MEDIUM = 30.0
+    LONG = 60.0
+    VERY_LONG = 120.0
