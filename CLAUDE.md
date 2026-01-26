@@ -69,14 +69,21 @@ pytest tests/
 
 # Run specific test file
 python tests/test_system.py
-
-# Run with pytest
 pytest tests/test_system.py
 
 # Run live performance tests
 pytest tests/test_live_effects_chain.py
 pytest tests/test_live_looping.py
 pytest tests/test_synchronization_clock.py
+
+# Run integration tests with synthetic data
+pytest tests/test_synthetic_integration.py
+
+# Run adaptive latency protection tests
+pytest tests/test_adaptive_latency.py
+
+# Run tests with coverage report
+pytest tests/ --cov=src --cov-report=html
 ```
 
 ### VST3 Plugin Build (Optional)
@@ -338,6 +345,9 @@ MAAPS_Nexus/
 ├── tests/
 │   ├── test_system.py                   # Basic system tests
 │   ├── test_live_*.py                   # Live performance tests
+│   ├── test_adaptive_latency.py         # Latency protection tests
+│   ├── test_synthetic_integration.py    # Synthetic data stress tests
+│   ├── utils/                           # Test utilities (synthetic data generators)
 │   └── performance/                     # Benchmarking tools
 ├── examples/
 │   └── basic_usage.py                   # Legacy system examples
@@ -351,9 +361,12 @@ MAAPS_Nexus/
 
 - Unit tests for individual agents (see `tests/test_system.py`)
 - Integration tests for multi-agent workflows (limited)
+- Synthetic data integration tests: `test_synthetic_integration.py` - Stress tests with randomized inputs
+- Adaptive latency protection tests: `test_adaptive_latency.py` - Real-time performance validation
 - Performance benchmarks in `tests/performance/`
 - Live performance tests: `test_live_effects_chain.py`, `test_live_looping.py`, `test_synchronization_clock.py`
 - Run tests: `pytest tests/` or `python tests/test_system.py`
+- Coverage reports: `pytest tests/ --cov=src --cov-report=html`
 
 **Testing Priority**: The legacy system needs extensive test coverage expansion (see `LEGACY_SYSTEM_COMPLETION_FRAMEWORK.md` for details).
 

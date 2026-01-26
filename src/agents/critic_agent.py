@@ -22,7 +22,7 @@ from ..core.audio_ontology import (
     AudioState,
     AudioGoal,
     AudioAttribute,
-    AudioOntologyManager
+    AudioOntologyManager,
 )
 
 logger = logging.getLogger(__name__)
@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class CriticEvaluation:
     """Result of critic evaluation."""
+
     satisfaction_score: float  # Overall score 0-1
     attribute_scores: Dict[AudioAttribute, float]  # Individual attribute scores
     reward: float  # RL reward signal (-1 to 1)
@@ -49,7 +50,7 @@ class CriticNetwork(nn.Module):
         audio_feature_dim: int = 128,
         ontology_dim: int = 20,
         hidden_dim: int = 256,
-        num_layers: int = 3
+        num_layers: int = 3,
     ):
         super().__init__()
 
@@ -83,24 +84,24 @@ class CriticNetwork(nn.Module):
             nn.Linear(hidden_dim, hidden_dim // 2),
             nn.ReLU(),
             nn.Linear(hidden_dim // 2, 1),
-            nn.Sigmoid()  # Output 0-1 satisfaction score
+            nn.Sigmoid(),  # Output 0-1 satisfaction score
         )
 
         # Attribute-specific heads (optional, for detailed feedback)
-        self.attribute_heads = nn.ModuleDict({
-            attr.name: nn.Sequential(
-                nn.Linear(combined_dim, 64),
-                nn.ReLU(),
-                nn.Linear(64, 1),
-                nn.Sigmoid()
-            )
-            for attr in AudioAttribute
-        })
+        self.attribute_heads = nn.ModuleDict(
+            {
+                attr.name: nn.Sequential(
+                    nn.Linear(combined_dim, 64),
+                    nn.ReLU(),
+                    nn.Linear(64, 1),
+                    nn.Sigmoid(),
+                )
+                for attr in AudioAttribute
+            }
+        )
 
     def forward(
-        self,
-        audio_features: torch.Tensor,
-        ontology_state: torch.Tensor
+        self, audio_features: torch.Tensor, ontology_state: torch.Tensor
     ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         """
         Forward pass.
@@ -127,8 +128,7 @@ class CriticNetwork(nn.Module):
 
         # Attribute-specific scores
         attribute_scores = {
-            name: head(combined)
-            for name, head in self.attribute_heads.items()
+            name: head(combined) for name, head in self.attribute_heads.items()
         }
 
         return satisfaction, attribute_scores
@@ -146,7 +146,7 @@ class CriticAgent:
         model_path: Optional[str] = None,
         device: str = "cpu",
         learning_rate: float = 1e-4,
-        ontology: Optional[AudioOntologyManager] = None
+        ontology: Optional[AudioOntologyManager] = None,
     ):
         """
         Initialize Critic agent.
@@ -201,26 +201,28 @@ class CriticAgent:
         rms = librosa.feature.rms(y=audio)[0]
 
         # Aggregate features
-        features = np.concatenate([
-            np.mean(spectral_centroid, keepdims=True),
-            np.std(spectral_centroid, keepdims=True),
-            np.mean(spectral_rolloff, keepdims=True),
-            np.std(spectral_rolloff, keepdims=True),
-            np.mean(spectral_bandwidth, keepdims=True),
-            np.std(spectral_bandwidth, keepdims=True),
-            np.mean(zero_crossing_rate, keepdims=True),
-            np.std(zero_crossing_rate, keepdims=True),
-            np.mean(mfccs, axis=1),  # 20 dims
-            np.std(mfccs, axis=1),   # 20 dims
-            np.mean(chroma, axis=1),  # 12 dims
-            np.std(chroma, axis=1),   # 12 dims
-            np.mean(rms, keepdims=True),
-            np.std(rms, keepdims=True),
-        ])
+        features = np.concatenate(
+            [
+                np.mean(spectral_centroid, keepdims=True),
+                np.std(spectral_centroid, keepdims=True),
+                np.mean(spectral_rolloff, keepdims=True),
+                np.std(spectral_rolloff, keepdims=True),
+                np.mean(spectral_bandwidth, keepdims=True),
+                np.std(spectral_bandwidth, keepdims=True),
+                np.mean(zero_crossing_rate, keepdims=True),
+                np.std(zero_crossing_rate, keepdims=True),
+                np.mean(mfccs, axis=1),  # 20 dims
+                np.std(mfccs, axis=1),  # 20 dims
+                np.mean(chroma, axis=1),  # 12 dims
+                np.std(chroma, axis=1),  # 12 dims
+                np.mean(rms, keepdims=True),
+                np.std(rms, keepdims=True),
+            ]
+        )
 
         # Pad to 128 dims if needed
         if len(features) < 128:
-            features = np.pad(features, (0, 128 - len(features)), mode='constant')
+            features = np.pad(features, (0, 128 - len(features)), mode="constant")
         else:
             features = features[:128]
 
@@ -231,7 +233,7 @@ class CriticAgent:
         audio: np.ndarray,
         current_state: AudioState,
         goals: List[AudioGoal],
-        sr: int = 44100
+        sr: int = 44100,
     ) -> CriticEvaluation:
         """
         Evaluate audio quality.
@@ -251,43 +253,53 @@ class CriticAgent:
 
         # Prepare tensors
         audio_tensor = torch.FloatTensor(audio_features).unsqueeze(0).to(self.device)
-        ontology_tensor = torch.FloatTensor(ontology_vector).unsqueeze(0).to(self.device)
+        ontology_tensor = (
+            torch.FloatTensor(ontology_vector).unsqueeze(0).to(self.device)
+        )
 
         # Get prediction
         self.model.eval()
         with torch.no_grad():
-            satisfaction_pred, attribute_preds = self.model(audio_tensor, ontology_tensor)
+            satisfaction_pred, attribute_preds = self.model(
+                audio_tensor, ontology_tensor
+            )
 
         satisfaction_score = satisfaction_pred.item()
 
         # Convert attribute predictions
         attribute_scores = {
-            AudioAttribute[name]: pred.item()
-            for name, pred in attribute_preds.items()
+            AudioAttribute[name]: pred.item() for name, pred in attribute_preds.items()
         }
 
         # Calculate reward signal for RL
         # Reward is based on satisfaction improvement and goal achievement
-        goal_satisfaction = self.ontology.estimate_satisfaction_score(current_state, goals)
+        goal_satisfaction = self.ontology.estimate_satisfaction_score(
+            current_state, goals
+        )
         reward = (satisfaction_score + goal_satisfaction) / 2.0
         reward = (reward - 0.5) * 2.0  # Scale to [-1, 1]
 
         # Generate feedback
         feedback = self._generate_feedback(satisfaction_score, attribute_scores, goals)
 
+        # Calculate confidence based on evaluation consistency
+        confidence = self._calculate_confidence(
+            satisfaction_score, attribute_scores, goals
+        )
+
         return CriticEvaluation(
             satisfaction_score=satisfaction_score,
             attribute_scores=attribute_scores,
             reward=reward,
-            confidence=0.8,  # TODO: Implement confidence estimation
-            feedback=feedback
+            confidence=confidence,
+            feedback=feedback,
         )
 
     def _generate_feedback(
         self,
         satisfaction: float,
         attribute_scores: Dict[AudioAttribute, float],
-        goals: List[AudioGoal]
+        goals: List[AudioGoal],
     ) -> str:
         """Generate human-readable feedback."""
         feedback_parts = [f"Satisfaction: {satisfaction:.2f}"]
@@ -307,12 +319,63 @@ class CriticAgent:
 
         return " | ".join(feedback_parts)
 
+    def _calculate_confidence(
+        self,
+        satisfaction_score: float,
+        attribute_scores: Dict[AudioAttribute, float],
+        goals: List[AudioGoal],
+    ) -> float:
+        """
+        Calculate confidence based on evaluation consistency and goal alignment.
+
+        Args:
+            satisfaction_score: Overall satisfaction score
+            attribute_scores: Individual attribute scores
+            goals: List of audio goals
+
+        Returns:
+            Confidence score between 0.0 and 1.0
+        """
+        # Base confidence from score consistency
+        if not attribute_scores:
+            return 0.5
+
+        # Calculate variance in attribute scores
+        score_values = list(attribute_scores.values())
+        score_variance = np.var(score_values)
+        consistency_confidence = max(0.0, 1.0 - score_variance * 2.0)
+
+        # Calculate goal alignment confidence
+        if goals:
+            goal_confidence = 0.0
+            for goal in goals:
+                attr_score = attribute_scores.get(goal.attribute, 0.5)
+                # Higher confidence when scores are closer to goals
+                distance = abs(attr_score - goal.target_value)
+                if distance <= goal.tolerance:
+                    goal_confidence += 1.0 - (distance / goal.tolerance)
+                else:
+                    goal_confidence += max(0.0, 0.5 - (distance - goal.tolerance))
+
+            goal_confidence = min(1.0, goal_confidence / len(goals))
+        else:
+            goal_confidence = 0.7  # Default if no goals
+
+        # Weighted combination
+        final_confidence = consistency_confidence * 0.4 + goal_confidence * 0.6
+
+        # Add satisfaction score influence
+        final_confidence = final_confidence * 0.8 + satisfaction_score * 0.2
+
+        # Ensure bounds
+        return max(0.1, min(1.0, final_confidence))
+
     def train_step(
         self,
         audio_batch: List[np.ndarray],
         ontology_batch: List[AudioState],
         satisfaction_labels: List[float],
-        sr: int = 44100
+        sr: int = 44100,
     ) -> float:
         """
         Perform one training step.
@@ -327,14 +390,10 @@ class CriticAgent:
             Loss value
         """
         # Extract features
-        audio_features = np.stack([
-            self.extract_audio_features(audio, sr)
-            for audio in audio_batch
-        ])
-        ontology_vectors = np.stack([
-            state.to_vector()
-            for state in ontology_batch
-        ])
+        audio_features = np.stack(
+            [self.extract_audio_features(audio, sr) for audio in audio_batch]
+        )
+        ontology_vectors = np.stack([state.to_vector() for state in ontology_batch])
 
         # Prepare tensors
         audio_tensor = torch.FloatTensor(audio_features).to(self.device)
@@ -360,19 +419,22 @@ class CriticAgent:
 
     def save_model(self, path: str):
         """Save model checkpoint."""
-        torch.save({
-            'model_state_dict': self.model.state_dict(),
-            'optimizer_state_dict': self.optimizer.state_dict(),
-            'training_history': self.training_history,
-        }, path)
+        torch.save(
+            {
+                "model_state_dict": self.model.state_dict(),
+                "optimizer_state_dict": self.optimizer.state_dict(),
+                "training_history": self.training_history,
+            },
+            path,
+        )
         logger.info(f"Saved critic model to {path}")
 
     def load_model(self, path: str):
         """Load model checkpoint."""
         checkpoint = torch.load(path, map_location=self.device)
-        self.model.load_state_dict(checkpoint['model_state_dict'])
-        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        self.training_history = checkpoint.get('training_history', [])
+        self.model.load_state_dict(checkpoint["model_state_dict"])
+        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        self.training_history = checkpoint.get("training_history", [])
         logger.info(f"Loaded critic model from {path}")
 
     def get_training_stats(self) -> Dict:
@@ -410,11 +472,7 @@ if __name__ == "__main__":
     dummy_goals = [create_clarity_goal(), create_reduce_mud_goal()]
 
     # Evaluate
-    evaluation = ray.get(critic.evaluate.remote(
-        dummy_audio,
-        dummy_state,
-        dummy_goals
-    ))
+    evaluation = ray.get(critic.evaluate.remote(dummy_audio, dummy_state, dummy_goals))
 
     print("Evaluation:", evaluation)
 

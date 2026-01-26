@@ -10,6 +10,8 @@ from typing import Dict, Set, Any
 from datetime import datetime
 import uuid
 import json
+import jwt
+from .auth import SECRET_KEY, ALGORITHM
 
 logger = logging.getLogger(__name__)
 
@@ -114,11 +116,14 @@ class WebSocketManager:
         logger.debug(f"Client {client_id} subscribed to {len(topics)} topics")
 
         # Send confirmation
-        await self.send_to_client(client_id, {
-            "type": "subscribed",
-            "topics": topics,
-            "timestamp": datetime.now().isoformat()
-        })
+        await self.send_to_client(
+            client_id,
+            {
+                "type": "subscribed",
+                "topics": topics,
+                "timestamp": datetime.now().isoformat(),
+            },
+        )
 
     async def unsubscribe(self, client_id: str, topics: list):
         """
@@ -138,11 +143,14 @@ class WebSocketManager:
         logger.debug(f"Client {client_id} unsubscribed from {len(topics)} topics")
 
         # Send confirmation
-        await self.send_to_client(client_id, {
-            "type": "unsubscribed",
-            "topics": topics,
-            "timestamp": datetime.now().isoformat()
-        })
+        await self.send_to_client(
+            client_id,
+            {
+                "type": "unsubscribed",
+                "topics": topics,
+                "timestamp": datetime.now().isoformat(),
+            },
+        )
 
     async def handle_message(self, client_id: str, data: dict):
         """
@@ -163,23 +171,82 @@ class WebSocketManager:
             await self.unsubscribe(client_id, topics)
 
         elif message_type == "ping":
-            await self.send_to_client(client_id, {
-                "type": "pong",
-                "timestamp": datetime.now().isoformat()
-            })
+            await self.send_to_client(
+                client_id, {"type": "pong", "timestamp": datetime.now().isoformat()}
+            )
 
         elif message_type == "auth":
             # Handle authentication
             token = data.get("token")
-            # TODO: Validate token
-            await self.send_to_client(client_id, {
-                "type": "authenticated",
-                "success": True,
-                "timestamp": datetime.now().isoformat()
-            })
+
+            if not token:
+                await self.send_to_client(
+                    client_id,
+                    {
+                        "type": "authenticated",
+                        "success": False,
+                        "error": "No token provided",
+                        "timestamp": datetime.now().isoformat(),
+                    },
+                )
+                return
+
+            # Validate token using auth module
+            auth_success = await self._validate_token(token)
+
+            await self.send_to_client(
+                client_id,
+                {
+                    "type": "authenticated",
+                    "success": auth_success["valid"],
+                    "user": auth_success.get("username"),
+                    "timestamp": datetime.now().isoformat(),
+                },
+            )
+
+            if auth_success["valid"]:
+                logger.info(
+                    f"WebSocket client {client_id} authenticated as {auth_success['username']}"
+                )
+            else:
+                logger.warning(
+                    f"WebSocket client {client_id} authentication failed: {auth_success.get('error')}"
+                )
 
         else:
             logger.warning(f"Unknown message type from {client_id}: {message_type}")
+
+    async def _validate_token(self, token: str) -> Dict[str, Any]:
+        """
+        Validate JWT token for WebSocket authentication.
+
+        Args:
+            token: JWT token string
+
+        Returns:
+            Dict with validation results: {'valid': bool, 'username': str|None, 'error': str|None}
+        """
+        if not token:
+            return {"valid": False, "error": "No token provided"}
+
+        try:
+            # Decode and validate token
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            username = payload.get("sub")
+
+            if username is None:
+                return {"valid": False, "error": "Invalid token payload"}
+
+            # Additional validation could be added here (e.g., check against user database)
+
+            return {"valid": True, "username": username}
+
+        except jwt.ExpiredSignatureError:
+            return {"valid": False, "error": "Token has expired"}
+        except jwt.InvalidTokenError as e:
+            return {"valid": False, "error": f"Invalid token: {str(e)}"}
+        except Exception as e:
+            return {"valid": False, "error": f"Token validation error: {str(e)}"}
 
     async def broadcast_event(self, topic: str, data: Any):
         """
@@ -196,7 +263,7 @@ class WebSocketManager:
             "type": "event",
             "topic": topic,
             "timestamp": datetime.now().isoformat(),
-            "data": data
+            "data": data,
         }
 
         # Get subscribers for this topic
@@ -235,8 +302,10 @@ class WebSocketManager:
         """Get WebSocket manager statistics"""
         return {
             "active_connections": len(self.active_connections),
-            "total_subscriptions": sum(len(subs) for subs in self.subscriptions.values()),
-            "topics": len(self.subscriptions)
+            "total_subscriptions": sum(
+                len(subs) for subs in self.subscriptions.values()
+            ),
+            "topics": len(self.subscriptions),
         }
 
 

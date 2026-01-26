@@ -388,6 +388,15 @@ class PerformanceMonitoringAgent(BaseAgent):
                         'message': f"{alert.metric} exceeded threshold: {metric_value:.2f} > {alert.threshold:.2f}"
                     }, priority=Priority.CRITICAL)
 
+                    # Adaptive Latency Protection: Throttling
+                    if alert.metric in ['cpu_usage_percent', 'audio_latency_ms']:
+                        throttle_factor = 0.5 if alert.metric == 'audio_latency_ms' else 0.25
+                        self.publish("system.throttle", {
+                            'reason': f"High {alert.metric}: {metric_value:.2f}",
+                            'throttle_factor': throttle_factor,
+                            'duration': 5.0  # Throttle for 5 seconds
+                        }, priority=Priority.CRITICAL)
+
                 elif not should_trigger:
                     alert.triggered = False
 
