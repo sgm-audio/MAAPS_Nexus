@@ -18,6 +18,31 @@ from .message_types import (
     LogEntry,
 )
 from .base_agent import BaseAgent, AgentState, AgentRegistry, get_agent_registry
+from .di_container import (
+    DIContainer,
+    get_container,
+    register_component,
+    resolve_component,
+)
+from .common import (
+    ThreadSafeMetrics,
+    ProcessingWorker,
+    ProcessingJob,
+    Configuration,
+    AgentLogger,
+    timing_context,
+    safe_json_serialize,
+)
+from .exceptions import (
+    MAAPSException,
+    AgentException,
+    AgentNotFoundError,
+    AgentStateError,
+    MessageBusException,
+    WorkflowException,
+    AudioProcessingException,
+    ErrorSeverity,
+)
 
 __all__ = [
     # Message Bus
@@ -40,4 +65,26 @@ __all__ = [
     "AgentState",
     "AgentRegistry",
     "get_agent_registry",
+    # Dependency Injection
+    "DIContainer",
+    "get_container",
+    "register_component",
+    "resolve_component",
+    # Common Utilities
+    "ThreadSafeMetrics",
+    "ProcessingWorker",
+    "ProcessingJob",
+    "Configuration",
+    "AgentLogger",
+    "timing_context",
+    "safe_json_serialize",
+    # Exceptions
+    "MAAPSException",
+    "AgentException",
+    "AgentNotFoundError",
+    "AgentStateError",
+    "MessageBusException",
+    "WorkflowException",
+    "AudioProcessingException",
+    "ErrorSeverity",
 ]

@@ -18,7 +18,7 @@ import logging
 from dataclasses import dataclass
 import librosa
 
-from ..core.audio_ontology import (
+from src.core.audio_ontology import (
     AudioState,
     AudioGoal,
     AudioAttribute,

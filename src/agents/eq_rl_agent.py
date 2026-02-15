@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from scipy import signal
 import copy
 
-from ..core.audio_ontology import (
+from src.core.audio_ontology import (
     AudioState,
     AudioGoal,
     AudioAttribute,

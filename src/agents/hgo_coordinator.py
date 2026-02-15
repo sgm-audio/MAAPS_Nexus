@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 import asyncio
 
-from ..core.audio_ontology import (
+from src.core.audio_ontology import (
     AudioState,
     AudioGoal,
     AudioAttribute,

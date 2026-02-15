@@ -1,15 +1,15 @@
 """
-VST3 Wrapper for MAAPS - DAW Integration
+Streaming Plugin Wrapper for MAAPS - DAW Integration
 
-This module provides the bridge between DAW (via VST3 plugin) and the Python
+This module provides the bridge between DAW (via VST3/CLAP plugin) and the Python
 multi-agent system. Uses shared memory for <10ms latency audio processing.
 
 Communication flow:
-1. VST3 plugin writes audio buffer to shared memory
+1. Plugin writes audio buffer to shared memory
 2. Python reads from shared memory
 3. Agents process audio (fast, using Ray)
 4. Python writes result to shared memory
-5. VST3 plugin reads processed audio
+5. Plugin reads processed audio
 
 Uses Unix sockets (Linux/Mac) or Named Pipes (Windows) for control signals.
 """
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 class SharedMemoryAudioBuffer:
     """
-    Shared memory buffer for audio exchange with VST3 plugin.
+    Shared memory buffer for audio exchange with Plugin.
     Lock-free ring buffer for real-time audio.
     """
 
@@ -205,9 +205,9 @@ class SharedMemoryAudioBuffer:
         logger.info(f"Closed shared memory: {self.buffer_name}")
 
 
-class VST3Communicator:
+class StreamingPluginCommunicator:
     """
-    Communicates with VST3 plugin via shared memory and control pipe.
+    Communicates with VST3/CLAP plugin via shared memory and control pipe.
     Runs in separate thread to meet real-time constraints.
     """
 
@@ -218,9 +218,10 @@ class VST3Communicator:
         buffer_size: int = 2048,
         num_channels: int = 2,
         sample_rate: int = 44100,
+        plugin_format: str = "vst3",  # "vst3" or "clap"
     ):
         """
-        Initialize VST3 communicator.
+        Initialize Streaming Plugin communicator.
 
         Args:
             buffer_name: Shared memory buffer name
@@ -228,12 +229,14 @@ class VST3Communicator:
             buffer_size: Audio buffer size
             num_channels: Number of channels
             sample_rate: Sample rate
+            plugin_format: "vst3" or "clap"
         """
         self.buffer_name = buffer_name
         self.control_pipe_name = control_pipe_name
         self.buffer_size = buffer_size
         self.num_channels = num_channels
         self.sample_rate = sample_rate
+        self.plugin_format = plugin_format
 
         # Initialize shared memory
         self.input_buffer = SharedMemoryAudioBuffer(
@@ -256,7 +259,7 @@ class VST3Communicator:
         self.latency_samples = 0
         self.latency_ms = 0.0
 
-        logger.info("VST3 Communicator initialized")
+        logger.info(f"{plugin_format.upper()} Communicator initialized")
 
     def start(self):
         """Start processing thread."""
@@ -345,7 +348,7 @@ class VST3Communicator:
 
     def send_processed_audio(self, audio: np.ndarray):
         """
-        Send processed audio back to VST3.
+        Send processed audio back to Plugin.
 
         Args:
             audio: Processed audio array
@@ -362,6 +365,7 @@ class VST3Communicator:
             "latency_ms": self.latency_ms,
             "buffer_size": self.buffer_size,
             "sample_rate": self.sample_rate,
+            "plugin_format": self.plugin_format,
         }
 
     def close(self):
@@ -369,14 +373,18 @@ class VST3Communicator:
         self.stop()
         self.input_buffer.close()
         self.output_buffer.close()
-        logger.info("VST3 Communicator closed")
+        logger.info(f"{self.plugin_format.upper()} Communicator closed")
+
+
+# Backward compatibility
+VST3Communicator = StreamingPluginCommunicator
 
 
 if __name__ == "__main__":
     # Test shared memory communication
     logging.basicConfig(level=logging.INFO)
 
-    communicator = VST3Communicator(buffer_size=512)
+    communicator = StreamingPluginCommunicator(buffer_size=512)
     communicator.start()
 
     # Simulate processing
