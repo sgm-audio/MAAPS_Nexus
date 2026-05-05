@@ -151,7 +151,9 @@ class CameraCapture:
 
                     # Try to reconnect if too many drops
                     if self._dropped_frames > 30:
-                        logger.warning(f"[{self.camera_id}] Too many dropped frames, attempting reconnect")
+                        logger.warning(
+                            f"[{self.camera_id}] Too many dropped frames, attempting reconnect"
+                        )
                         self._reconnect()
 
             except Exception as e:

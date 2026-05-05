@@ -93,9 +93,7 @@ class DirectorStateMachine:
         # Transition target
         self._transition_target: Optional[str] = None
 
-    def process(
-        self, detections: Dict[str, DetectionResult]
-    ) -> DirectorDecision:
+    def process(self, detections: Dict[str, DetectionResult]) -> DirectorDecision:
         """
         Process detections and make switching decision
 
@@ -188,7 +186,10 @@ class DirectorStateMachine:
         """
         # Check if max dwell time exceeded (force variety)
         if time_in_state >= self.rules.max_dwell_time:
-            if best_camera != self.current_camera and best_score >= self.rules.switch_threshold * 0.7:
+            if (
+                best_camera != self.current_camera
+                and best_score >= self.rules.switch_threshold * 0.7
+            ):
                 # Force switch for variety
                 return self._execute_switch(
                     best_camera, "max_dwell_time_variety", best_score, now
@@ -253,9 +254,7 @@ class DirectorStateMachine:
 
             if best_score >= effective_threshold:
                 # Switch to new speaker
-                return self._execute_switch(
-                    best_camera, "new_speaker", best_score, now
-                )
+                return self._execute_switch(best_camera, "new_speaker", best_score, now)
 
         # Stay on current camera
         return DirectorDecision(
@@ -343,12 +342,14 @@ class DirectorStateMachine:
             DirectorDecision indicating switch
         """
         # Record switch in history
-        self.switch_history.append({
-            "from": self.current_camera,
-            "to": target,
-            "time": now,
-            "reason": reason,
-        })
+        self.switch_history.append(
+            {
+                "from": self.current_camera,
+                "to": target,
+                "time": now,
+                "reason": reason,
+            }
+        )
 
         # Update camera usage
         self.camera_usage[target] = now

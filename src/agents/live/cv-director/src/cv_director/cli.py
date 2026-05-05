@@ -86,7 +86,9 @@ def direct(
         level=log_level,
     )
 
-    console.print("\n[bold cyan]CV Director - Semantic Multi-Camera Switching[/bold cyan]\n")
+    console.print(
+        "\n[bold cyan]CV Director - Semantic Multi-Camera Switching[/bold cyan]\n"
+    )
 
     # Display configuration
     table = Table(title="Configuration")
@@ -122,11 +124,14 @@ def direct(
 
         logger.info("Starting director pipeline...")
         import asyncio
+
         asyncio.run(director.start())
 
     except ImportError:
         console.print("[bold red]Error:[/bold red] CVDirector not yet implemented")
-        console.print("[yellow]The director_main.py module needs to be created[/yellow]")
+        console.print(
+            "[yellow]The director_main.py module needs to be created[/yellow]"
+        )
         raise typer.Exit(1)
     except KeyboardInterrupt:
         console.print("\n[yellow]Stopping CV Director...[/yellow]")
@@ -162,7 +167,9 @@ def profiles():
             table.add_row("[bold]Detection[/bold]", "")
             table.add_row("  Audio Weight", f"{profile.detector.audio_weight:.2f}")
             table.add_row("  Visual Weight", f"{profile.detector.visual_weight:.2f}")
-            table.add_row("  VAD Aggressiveness", str(profile.detector.vad_aggressiveness))
+            table.add_row(
+                "  VAD Aggressiveness", str(profile.detector.vad_aggressiveness)
+            )
             table.add_row("", "")
             table.add_row("[bold]Switching Rules[/bold]", "")
             table.add_row("  Min Dwell Time", f"{profile.rules.min_dwell_time:.1f}s")
@@ -193,11 +200,13 @@ def info():
 
     # Python version
     import platform
+
     table.add_row("Python", platform.python_version())
 
     # OpenCV
     try:
         import cv2
+
         table.add_row("OpenCV", cv2.__version__)
     except ImportError:
         table.add_row("OpenCV", "[red]Not installed[/red]")
@@ -205,6 +214,7 @@ def info():
     # MediaPipe
     try:
         import mediapipe as mp
+
         table.add_row("MediaPipe", mp.__version__)
     except ImportError:
         table.add_row("MediaPipe", "[red]Not installed[/red]")
@@ -212,6 +222,7 @@ def info():
     # webrtcvad
     try:
         import webrtcvad
+
         table.add_row("webrtcvad", "Installed")
     except ImportError:
         table.add_row("webrtcvad", "[red]Not installed[/red]")
@@ -219,7 +230,8 @@ def info():
     # OBS WebSocket
     try:
         import obswebsocket
-        version = getattr(obswebsocket, '__version__', 'Installed')
+
+        version = getattr(obswebsocket, "__version__", "Installed")
         table.add_row("obs-websocket-py", version)
     except ImportError:
         table.add_row("obs-websocket-py", "[red]Not installed[/red]")
@@ -227,9 +239,13 @@ def info():
     # CUDA availability (if applicable)
     try:
         import cv2
+
         cuda_available = cv2.cuda.getCudaEnabledDeviceCount() > 0
         if cuda_available:
-            table.add_row("CUDA", f"[green]Available ({cv2.cuda.getCudaEnabledDeviceCount()} devices)[/green]")
+            table.add_row(
+                "CUDA",
+                f"[green]Available ({cv2.cuda.getCudaEnabledDeviceCount()} devices)[/green]",
+            )
         else:
             table.add_row("CUDA", "[yellow]Not available (CPU only)[/yellow]")
     except:
