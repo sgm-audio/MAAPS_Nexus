@@ -488,7 +488,7 @@ class MetadataManagementAgent(BaseAgent):
                 # Normalize to 0-1 score
                 quality_score = min(1.0, dynamic_range / 60.0)
                 return float(quality_score)
-        except:
+        except Exception:
             pass
 
         return 0.5  # Default medium quality

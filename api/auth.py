@@ -25,12 +25,14 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 class LoginRequest(BaseModel):
     """Login request model"""
+
     username: str
     password: str
 
 
 class TokenResponse(BaseModel):
     """Token response model"""
+
     token: str
     token_type: str = "bearer"
     expires_in: int
@@ -93,37 +95,30 @@ async def login(request: LoginRequest):
     # Validate credentials
     if not request.username or not request.password:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
         )
 
     # Authenticate user against database
     user = user_db.authenticate(request.username, request.password)
     if user is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
         )
 
     # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": request.username},
-        expires_delta=access_token_expires
+        data={"sub": request.username}, expires_delta=access_token_expires
     )
 
     logger.info(f"User '{request.username}' logged in successfully")
 
     return TokenResponse(
-        token=access_token,
-        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60  # in seconds
+        token=access_token, expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60  # in seconds
     )
 
 
 @router.get("/verify")
 async def verify(username: str = Depends(verify_token)):
     """Verify token validity"""
-    return {
-        "status": "valid",
-        "username": username
-    }
+    return {"status": "valid", "username": username}
