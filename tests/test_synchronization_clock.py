@@ -12,6 +12,7 @@ from typing import List, Dict, Any
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.core import Message, Priority, AgentState
@@ -47,26 +48,24 @@ class TestSynchronizationClockAgent(unittest.TestCase):
 
     def test_set_tempo(self):
         """Test setting tempo"""
-        response = self.agent.request("sync.tempo.set", {
-            'bpm': 140.0,
-            'time_signature': '4/4'
-        }, timeout=1.0)
+        response = self.agent.request(
+            "sync.tempo.set", {"bpm": 140.0, "time_signature": "4/4"}, timeout=1.0
+        )
 
         self.assertIsNotNone(response)
-        self.assertTrue(response.payload['success'])
-        self.assertEqual(response.payload['bpm'], 140.0)
+        self.assertTrue(response.payload["success"])
+        self.assertEqual(response.payload["bpm"], 140.0)
         self.assertEqual(self.agent.clock_state.bpm, 140.0)
-        self.assertEqual(self.agent.stats['tempo_changes'], 1)
+        self.assertEqual(self.agent.stats["tempo_changes"], 1)
 
     def test_set_tempo_with_time_signature(self):
         """Test setting tempo with different time signature"""
-        response = self.agent.request("sync.tempo.set", {
-            'bpm': 90.0,
-            'time_signature': '3/4'
-        }, timeout=1.0)
+        response = self.agent.request(
+            "sync.tempo.set", {"bpm": 90.0, "time_signature": "3/4"}, timeout=1.0
+        )
 
         self.assertIsNotNone(response)
-        self.assertTrue(response.payload['success'])
+        self.assertTrue(response.payload["success"])
         self.assertEqual(self.agent.clock_state.bpm, 90.0)
         self.assertEqual(self.agent.clock_state.time_signature_numerator, 3)
         self.assertEqual(self.agent.clock_state.time_signature_denominator, 4)
@@ -76,8 +75,8 @@ class TestSynchronizationClockAgent(unittest.TestCase):
         response = self.agent.request("sync.tap.tempo", {}, timeout=1.0)
 
         self.assertIsNotNone(response)
-        self.assertTrue(response.payload['success'])
-        self.assertEqual(response.payload['taps'], 1)
+        self.assertTrue(response.payload["success"])
+        self.assertEqual(response.payload["taps"], 1)
 
     def test_tap_tempo_multiple_taps(self):
         """Test tap tempo with multiple taps"""
@@ -86,15 +85,17 @@ class TestSynchronizationClockAgent(unittest.TestCase):
         for i in range(4):
             # Send precise timestamps
             timestamp = start_time + (i * 0.5)
-            response = self.agent.request("sync.tap.tempo", {'timestamp': timestamp}, timeout=1.0)
-            time.sleep(0.1) # Small delay to ensure order, but timestamp controls logic
+            response = self.agent.request(
+                "sync.tap.tempo", {"timestamp": timestamp}, timeout=1.0
+            )
+            time.sleep(0.1)  # Small delay to ensure order, but timestamp controls logic
 
         self.assertIsNotNone(response)
-        self.assertTrue(response.payload['success'])
-        self.assertEqual(response.payload['taps'], 4)
+        self.assertTrue(response.payload["success"])
+        self.assertEqual(response.payload["taps"], 4)
 
         # Should calculate ~120 BPM (with tolerance for timing)
-        calculated_bpm = response.payload.get('bpm', 0)
+        calculated_bpm = response.payload.get("bpm", 0)
         if calculated_bpm > 0:
             self.assertGreater(calculated_bpm, 115.0)
             self.assertLess(calculated_bpm, 125.0)
@@ -104,8 +105,8 @@ class TestSynchronizationClockAgent(unittest.TestCase):
         response = self.agent.request("sync.transport.play", {}, timeout=1.0)
 
         self.assertIsNotNone(response)
-        self.assertTrue(response.payload['success'])
-        self.assertEqual(response.payload['state'], 'playing')
+        self.assertTrue(response.payload["success"])
+        self.assertEqual(response.payload["state"], "playing")
         self.assertTrue(self.agent.clock_state.is_playing)
 
     def test_transport_stop(self):
@@ -118,8 +119,8 @@ class TestSynchronizationClockAgent(unittest.TestCase):
         response = self.agent.request("sync.transport.stop", {}, timeout=1.0)
 
         self.assertIsNotNone(response)
-        self.assertTrue(response.payload['success'])
-        self.assertEqual(response.payload['state'], 'stopped')
+        self.assertTrue(response.payload["success"])
+        self.assertEqual(response.payload["state"], "stopped")
         self.assertFalse(self.agent.clock_state.is_playing)
         self.assertEqual(self.agent.clock_state.current_beat, 0.0)
         self.assertEqual(self.agent.clock_state.current_bar, 0)
@@ -135,8 +136,8 @@ class TestSynchronizationClockAgent(unittest.TestCase):
         response = self.agent.request("sync.transport.pause", {}, timeout=1.0)
 
         self.assertIsNotNone(response)
-        self.assertTrue(response.payload['success'])
-        self.assertEqual(response.payload['state'], 'paused')
+        self.assertTrue(response.payload["success"])
+        self.assertEqual(response.payload["state"], "paused")
         self.assertFalse(self.agent.clock_state.is_playing)
         # Position should be preserved (not reset to 0)
         self.assertGreater(self.agent.clock_state.song_position, 0.0)
@@ -144,7 +145,7 @@ class TestSynchronizationClockAgent(unittest.TestCase):
     def test_clock_position_tracking(self):
         """Test clock position advances during playback"""
         # Set known tempo
-        self.agent.request("sync.tempo.set", {'bpm': 120.0}, timeout=1.0)
+        self.agent.request("sync.tempo.set", {"bpm": 120.0}, timeout=1.0)
 
         # Start playback
         self.agent.request("sync.transport.play", {}, timeout=1.0)
@@ -169,10 +170,11 @@ class TestSynchronizationClockAgent(unittest.TestCase):
     def test_beat_to_bar_progression(self):
         """Test beat advances to next bar correctly"""
         # Set tempo and start
-        self.agent.request("sync.tempo.set", {
-            'bpm': 240.0,  # Fast tempo for quicker test
-            'time_signature': '4/4'
-        }, timeout=1.0)
+        self.agent.request(
+            "sync.tempo.set",
+            {"bpm": 240.0, "time_signature": "4/4"},  # Fast tempo for quicker test
+            timeout=1.0,
+        )
 
         self.agent.request("sync.transport.play", {}, timeout=1.0)
 
@@ -193,10 +195,11 @@ class TestSynchronizationClockAgent(unittest.TestCase):
     def test_time_signature_affects_bar_length(self):
         """Test different time signatures affect bar progression"""
         # Set 3/4 time
-        self.agent.request("sync.tempo.set", {
-            'bpm': 180.0,  # 3 beats per second
-            'time_signature': '3/4'
-        }, timeout=1.0)
+        self.agent.request(
+            "sync.tempo.set",
+            {"bpm": 180.0, "time_signature": "3/4"},  # 3 beats per second
+            timeout=1.0,
+        )
 
         self.agent.request("sync.transport.play", {}, timeout=1.0)
 
@@ -211,43 +214,40 @@ class TestSynchronizationClockAgent(unittest.TestCase):
 
     def test_midi_clock_enable(self):
         """Test MIDI clock enable/disable"""
-        response = self.agent.request("sync.midi.clock.enable", {
-            'enable': True,
-            'midi_port': 'MIDI_OUT_1'
-        }, timeout=1.0)
+        response = self.agent.request(
+            "sync.midi.clock.enable",
+            {"enable": True, "midi_port": "MIDI_OUT_1"},
+            timeout=1.0,
+        )
 
         self.assertIsNotNone(response)
-        self.assertTrue(response.payload['success'])
-        self.assertTrue(response.payload['midi_clock_enabled'])
+        self.assertTrue(response.payload["success"])
+        self.assertTrue(response.payload["midi_clock_enabled"])
         self.assertTrue(self.agent.midi_clock_enabled)
-        self.assertIn('MIDI_OUT_1', self.agent.midi_clock_outputs)
+        self.assertIn("MIDI_OUT_1", self.agent.midi_clock_outputs)
 
     def test_midi_clock_disable(self):
         """Test disabling MIDI clock"""
         # Enable first
-        self.agent.request("sync.midi.clock.enable", {
-            'enable': True
-        }, timeout=1.0)
+        self.agent.request("sync.midi.clock.enable", {"enable": True}, timeout=1.0)
 
         # Disable
-        response = self.agent.request("sync.midi.clock.enable", {
-            'enable': False
-        }, timeout=1.0)
+        response = self.agent.request(
+            "sync.midi.clock.enable", {"enable": False}, timeout=1.0
+        )
 
         self.assertIsNotNone(response)
-        self.assertTrue(response.payload['success'])
-        self.assertFalse(response.payload['midi_clock_enabled'])
+        self.assertTrue(response.payload["success"])
+        self.assertFalse(response.payload["midi_clock_enabled"])
         self.assertFalse(self.agent.midi_clock_enabled)
 
     def test_midi_clock_pulse_generation(self):
         """Test MIDI clock pulses are generated during playback"""
         # Enable MIDI clock
-        self.agent.request("sync.midi.clock.enable", {
-            'enable': True
-        }, timeout=1.0)
+        self.agent.request("sync.midi.clock.enable", {"enable": True}, timeout=1.0)
 
         # Record initial pulse count
-        initial_pulses = self.agent.stats['midi_clock_pulses']
+        initial_pulses = self.agent.stats["midi_clock_pulses"]
 
         # Start playback
         self.agent.request("sync.transport.play", {}, timeout=1.0)
@@ -255,64 +255,63 @@ class TestSynchronizationClockAgent(unittest.TestCase):
         self.agent.request("sync.transport.stop", {}, timeout=1.0)
 
         # Check pulses were generated
-        final_pulses = self.agent.stats['midi_clock_pulses']
+        final_pulses = self.agent.stats["midi_clock_pulses"]
         self.assertGreater(final_pulses, initial_pulses)
 
     def test_ableton_link_enable(self):
         """Test Ableton Link enable"""
-        response = self.agent.request("sync.link.enable", {
-            'enable': True,
-            'set_tempo': False
-        }, timeout=1.0)
+        response = self.agent.request(
+            "sync.link.enable", {"enable": True, "set_tempo": False}, timeout=1.0
+        )
 
         self.assertIsNotNone(response)
-        self.assertTrue(response.payload['success'])
-        self.assertTrue(response.payload['link_enabled'])
+        self.assertTrue(response.payload["success"])
+        self.assertTrue(response.payload["link_enabled"])
         self.assertTrue(self.agent.link_enabled)
-        self.assertIn('session_peers', response.payload)
+        self.assertIn("session_peers", response.payload)
 
     def test_ableton_link_disable(self):
         """Test Ableton Link disable"""
         # Enable first
-        self.agent.request("sync.link.enable", {'enable': True}, timeout=1.0)
+        self.agent.request("sync.link.enable", {"enable": True}, timeout=1.0)
 
         # Disable
-        response = self.agent.request("sync.link.enable", {
-            'enable': False
-        }, timeout=1.0)
+        response = self.agent.request(
+            "sync.link.enable", {"enable": False}, timeout=1.0
+        )
 
         self.assertIsNotNone(response)
-        self.assertTrue(response.payload['success'])
-        self.assertFalse(response.payload['link_enabled'])
+        self.assertTrue(response.payload["success"])
+        self.assertFalse(response.payload["link_enabled"])
         self.assertFalse(self.agent.link_enabled)
 
     def test_tempo_detect(self):
         """Test tempo detection from audio"""
-        response = self.agent.request("sync.tempo.detect", {
-            'audio_buffer': []  # Simulated
-        }, timeout=1.0)
+        response = self.agent.request(
+            "sync.tempo.detect", {"audio_buffer": []}, timeout=1.0  # Simulated
+        )
 
         self.assertIsNotNone(response)
-        self.assertTrue(response.payload['success'])
-        self.assertIn('detected_bpm', response.payload)
-        self.assertIsInstance(response.payload['detected_bpm'], (int, float))
+        self.assertTrue(response.payload["success"])
+        self.assertIn("detected_bpm", response.payload)
+        self.assertIsInstance(response.payload["detected_bpm"], (int, float))
 
     def test_statistics_tracking(self):
         """Test statistics are tracked correctly"""
         # Initial state
-        self.assertEqual(self.agent.stats['tempo_changes'], 0)
-        self.assertEqual(self.agent.stats['tap_tempo_uses'], 0)
+        self.assertEqual(self.agent.stats["tempo_changes"], 0)
+        self.assertEqual(self.agent.stats["tap_tempo_uses"], 0)
 
         # Change tempo
-        self.agent.request("sync.tempo.set", {'bpm': 130.0}, timeout=1.0)
-        self.assertEqual(self.agent.stats['tempo_changes'], 1)
+        self.agent.request("sync.tempo.set", {"bpm": 130.0}, timeout=1.0)
+        self.assertEqual(self.agent.stats["tempo_changes"], 1)
 
         # Use tap tempo
         for _ in range(4):
             self.agent.request("sync.tap.tempo", {}, timeout=1.0)
             time.sleep(0.5)
 
-        self.assertEqual(self.agent.stats['tap_tempo_uses'], 3)  # After 2nd tap
+        self.assertEqual(self.agent.stats["tap_tempo_uses"], 3)  # After 2nd tap
 
     def test_clock_thread_lifecycle(self):
         """Test clock thread starts and stops properly"""
@@ -330,8 +329,9 @@ class TestSynchronizationClockAgent(unittest.TestCase):
 
     def test_thread_safety_concurrent_tempo_changes(self):
         """Test thread safety with concurrent tempo changes"""
+
         def change_tempo(bpm):
-            self.agent.request("sync.tempo.set", {'bpm': bpm}, timeout=1.0)
+            self.agent.request("sync.tempo.set", {"bpm": bpm}, timeout=1.0)
 
         # Start multiple tempo changes concurrently
         threads = []
@@ -345,7 +345,7 @@ class TestSynchronizationClockAgent(unittest.TestCase):
             t.join()
 
         # Should have processed all changes
-        self.assertEqual(self.agent.stats['tempo_changes'], 5)
+        self.assertEqual(self.agent.stats["tempo_changes"], 5)
 
         # Final tempo should be one of the values
         final_bpm = self.agent.clock_state.bpm
@@ -353,16 +353,17 @@ class TestSynchronizationClockAgent(unittest.TestCase):
 
     def test_thread_safety_transport_control(self):
         """Test thread safety with concurrent transport operations"""
+
         def transport_operation(operation):
-            if operation == 'play':
+            if operation == "play":
                 self.agent.request("sync.transport.play", {}, timeout=1.0)
-            elif operation == 'pause':
+            elif operation == "pause":
                 self.agent.request("sync.transport.pause", {}, timeout=1.0)
-            elif operation == 'stop':
+            elif operation == "stop":
                 self.agent.request("sync.transport.stop", {}, timeout=1.0)
 
         # Execute concurrent transport operations
-        operations = ['play', 'pause', 'play', 'stop', 'play']
+        operations = ["play", "pause", "play", "stop", "play"]
         threads = []
         for op in operations:
             t = threading.Thread(target=transport_operation, args=(op,))
@@ -377,7 +378,7 @@ class TestSynchronizationClockAgent(unittest.TestCase):
 
     def test_position_consistency_during_playback(self):
         """Test position remains consistent during continuous playback"""
-        self.agent.request("sync.tempo.set", {'bpm': 120.0}, timeout=1.0)
+        self.agent.request("sync.tempo.set", {"bpm": 120.0}, timeout=1.0)
         self.agent.request("sync.transport.play", {}, timeout=1.0)
 
         # Sample positions over time
@@ -385,22 +386,24 @@ class TestSynchronizationClockAgent(unittest.TestCase):
         for _ in range(5):
             time.sleep(0.1)
             with self.agent.clock_lock:
-                positions.append({
-                    'beat': self.agent.clock_state.current_beat,
-                    'bar': self.agent.clock_state.current_bar,
-                    'time': self.agent.clock_state.song_position
-                })
+                positions.append(
+                    {
+                        "beat": self.agent.clock_state.current_beat,
+                        "bar": self.agent.clock_state.current_bar,
+                        "time": self.agent.clock_state.song_position,
+                    }
+                )
 
         self.agent.request("sync.transport.stop", {}, timeout=1.0)
 
         # Positions should be monotonically increasing
         for i in range(1, len(positions)):
-            self.assertGreaterEqual(positions[i]['time'], positions[i-1]['time'])
+            self.assertGreaterEqual(positions[i]["time"], positions[i - 1]["time"])
 
     def test_high_tempo_accuracy(self):
         """Test clock accuracy at high tempo"""
         # Set very high tempo
-        self.agent.request("sync.tempo.set", {'bpm': 300.0}, timeout=1.0)
+        self.agent.request("sync.tempo.set", {"bpm": 300.0}, timeout=1.0)
         self.agent.request("sync.transport.play", {}, timeout=1.0)
 
         # Record start time
@@ -424,7 +427,7 @@ class TestSynchronizationClockAgent(unittest.TestCase):
     def test_low_tempo_accuracy(self):
         """Test clock accuracy at low tempo"""
         # Set very low tempo
-        self.agent.request("sync.tempo.set", {'bpm': 40.0}, timeout=1.0)
+        self.agent.request("sync.tempo.set", {"bpm": 40.0}, timeout=1.0)
         self.agent.request("sync.transport.play", {}, timeout=1.0)
 
         # Record start time
@@ -452,12 +455,12 @@ class TestSynchronizationClockAgent(unittest.TestCase):
         # Change tempo multiple times
         tempos = [100, 150, 120, 180, 90]
         for bpm in tempos:
-            self.agent.request("sync.tempo.set", {'bpm': bpm}, timeout=1.0)
+            self.agent.request("sync.tempo.set", {"bpm": bpm}, timeout=1.0)
             time.sleep(0.1)
 
         # Final tempo should be last value
         self.assertEqual(self.agent.clock_state.bpm, 90.0)
-        self.assertEqual(self.agent.stats['tempo_changes'], 5)
+        self.assertEqual(self.agent.stats["tempo_changes"], 5)
 
         self.agent.request("sync.transport.stop", {}, timeout=1.0)
 
@@ -473,7 +476,7 @@ class TestSynchronizationClockAgent(unittest.TestCase):
 
     def test_clock_precision(self):
         """Test clock maintains 1ms precision"""
-        self.agent.request("sync.tempo.set", {'bpm': 120.0}, timeout=1.0)
+        self.agent.request("sync.tempo.set", {"bpm": 120.0}, timeout=1.0)
         self.agent.request("sync.transport.play", {}, timeout=1.0)
 
         # Sample beat positions rapidly
@@ -508,45 +511,33 @@ class TestClockEdgeCases(unittest.TestCase):
     def test_extreme_tempo_values(self):
         """Test handling of extreme tempo values"""
         # Very high tempo
-        response = self.agent.request("sync.tempo.set", {
-            'bpm': 999.0
-        }, timeout=1.0)
+        response = self.agent.request("sync.tempo.set", {"bpm": 999.0}, timeout=1.0)
         self.assertIsNotNone(response)
-        self.assertTrue(response.payload['success'])
+        self.assertTrue(response.payload["success"])
         self.assertEqual(self.agent.clock_state.bpm, 999.0)
 
         # Very low tempo
-        response = self.agent.request("sync.tempo.set", {
-            'bpm': 1.0
-        }, timeout=1.0)
+        response = self.agent.request("sync.tempo.set", {"bpm": 1.0}, timeout=1.0)
         self.assertIsNotNone(response)
-        self.assertTrue(response.payload['success'])
+        self.assertTrue(response.payload["success"])
         self.assertEqual(self.agent.clock_state.bpm, 1.0)
 
     def test_complex_time_signatures(self):
         """Test complex time signatures"""
-        test_cases = [
-            ('7/8', 7, 8),
-            ('5/4', 5, 4),
-            ('11/16', 11, 16),
-            ('2/2', 2, 2)
-        ]
+        test_cases = [("7/8", 7, 8), ("5/4", 5, 4), ("11/16", 11, 16), ("2/2", 2, 2)]
 
         for sig_str, expected_num, expected_denom in test_cases:
-            response = self.agent.request("sync.tempo.set", {
-                'bpm': 120.0,
-                'time_signature': sig_str
-            }, timeout=1.0)
+            response = self.agent.request(
+                "sync.tempo.set", {"bpm": 120.0, "time_signature": sig_str}, timeout=1.0
+            )
 
             self.assertIsNotNone(response)
-            self.assertTrue(response.payload['success'])
+            self.assertTrue(response.payload["success"])
             self.assertEqual(
-                self.agent.clock_state.time_signature_numerator,
-                expected_num
+                self.agent.clock_state.time_signature_numerator, expected_num
             )
             self.assertEqual(
-                self.agent.clock_state.time_signature_denominator,
-                expected_denom
+                self.agent.clock_state.time_signature_denominator, expected_denom
             )
 
     def test_rapid_transport_changes(self):
@@ -563,7 +554,7 @@ class TestClockEdgeCases(unittest.TestCase):
 
     def test_pause_play_resume(self):
         """Test pause and resume maintains position"""
-        self.agent.request("sync.tempo.set", {'bpm': 120.0}, timeout=1.0)
+        self.agent.request("sync.tempo.set", {"bpm": 120.0}, timeout=1.0)
         self.agent.request("sync.transport.play", {}, timeout=1.0)
         time.sleep(0.3)
 
@@ -577,9 +568,7 @@ class TestClockEdgeCases(unittest.TestCase):
 
         # Position should not have changed
         self.assertAlmostEqual(
-            self.agent.clock_state.song_position,
-            paused_position,
-            delta=0.01
+            self.agent.clock_state.song_position, paused_position, delta=0.01
         )
 
         # Resume
@@ -587,14 +576,11 @@ class TestClockEdgeCases(unittest.TestCase):
         time.sleep(0.2)
 
         # Position should continue from pause point
-        self.assertGreater(
-            self.agent.clock_state.song_position,
-            paused_position
-        )
+        self.assertGreater(self.agent.clock_state.song_position, paused_position)
 
         self.agent.request("sync.transport.stop", {}, timeout=1.0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Run tests
     unittest.main(verbosity=2)

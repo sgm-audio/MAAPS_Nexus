@@ -23,7 +23,7 @@ from ..core.audio_ontology import (
     AudioGoal,
     AudioAttribute,
     AgentAction,
-    AudioOntologyManager
+    AudioOntologyManager,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DynamicsSettings:
     """Settings for dynamics processing."""
+
     threshold: float  # dB (-60 to 0)
     ratio: float  # Compression ratio (1.0 to 20.0)
     attack: float  # Attack time in ms (0.1 to 100)
@@ -42,18 +43,20 @@ class DynamicsSettings:
 
     def to_vector(self) -> np.ndarray:
         """Convert to normalized vector."""
-        return np.array([
-            (self.threshold + 60) / 60,  # Normalize to [0, 1]
-            np.log10(self.ratio) / np.log10(20),  # Log scale
-            np.log10(self.attack) / np.log10(100),  # Log scale
-            np.log10(self.release) / np.log10(1000),  # Log scale
-            self.knee / 20,
-            self.makeup_gain / 30,
-            self.dry_wet,
-        ])
+        return np.array(
+            [
+                (self.threshold + 60) / 60,  # Normalize to [0, 1]
+                np.log10(self.ratio) / np.log10(20),  # Log scale
+                np.log10(self.attack) / np.log10(100),  # Log scale
+                np.log10(self.release) / np.log10(1000),  # Log scale
+                self.knee / 20,
+                self.makeup_gain / 30,
+                self.dry_wet,
+            ]
+        )
 
     @staticmethod
-    def from_vector(vector: np.ndarray) -> 'DynamicsSettings':
+    def from_vector(vector: np.ndarray) -> "DynamicsSettings":
         """Create DynamicsSettings from vector."""
         return DynamicsSettings(
             threshold=vector[0] * 60 - 60,
@@ -80,7 +83,7 @@ class DynamicsActorNetwork(nn.Module):
             nn.ReLU(),
             nn.Dropout(0.2),
             nn.Linear(hidden_dim, action_dim),
-            nn.Tanh()  # Output in [-1, 1]
+            nn.Tanh(),  # Output in [-1, 1]
         )
 
     def forward(self, state: torch.Tensor) -> torch.Tensor:
@@ -99,7 +102,7 @@ class DynamicsCriticNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, 1)
+            nn.Linear(hidden_dim, 1),
         )
 
         self.q2 = nn.Sequential(
@@ -107,10 +110,12 @@ class DynamicsCriticNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, 1)
+            nn.Linear(hidden_dim, 1),
         )
 
-    def forward(self, state: torch.Tensor, action: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, state: torch.Tensor, action: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         x = torch.cat([state, action], dim=-1)
         return self.q1(x), self.q2(x)
 
@@ -203,11 +208,15 @@ class DynamicsRLAgent:
         self.action_dim = 7
 
         # Initialize networks
-        self.actor = DynamicsActorNetwork(self.state_dim, self.action_dim).to(self.device)
+        self.actor = DynamicsActorNetwork(self.state_dim, self.action_dim).to(
+            self.device
+        )
         self.actor_target = copy.deepcopy(self.actor)
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=learning_rate)
 
-        self.critic = DynamicsCriticNetwork(self.state_dim, self.action_dim).to(self.device)
+        self.critic = DynamicsCriticNetwork(self.state_dim, self.action_dim).to(
+            self.device
+        )
         self.critic_target = copy.deepcopy(self.critic)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=learning_rate)
 
@@ -235,10 +244,12 @@ class DynamicsRLAgent:
             release=100.0,
             knee=5.0,
             makeup_gain=0.0,
-            dry_wet=0.5
+            dry_wet=0.5,
         )
 
-    def apply_compressor(self, audio: np.ndarray, settings: DynamicsSettings) -> np.ndarray:
+    def apply_compressor(
+        self, audio: np.ndarray, settings: DynamicsSettings
+    ) -> np.ndarray:
         """
         Apply compression to audio.
 
@@ -271,7 +282,9 @@ class DynamicsRLAgent:
             else:
                 # In knee, smooth transition
                 over = db - (settings.threshold - settings.knee / 2)
-                gain_reduction[i] = over ** 2 / (2 * settings.knee) * (1 - 1 / settings.ratio)
+                gain_reduction[i] = (
+                    over**2 / (2 * settings.knee) * (1 - 1 / settings.ratio)
+                )
 
         # Simple envelope follower for attack/release
         envelope = np.zeros_like(gain_reduction)
@@ -279,11 +292,15 @@ class DynamicsRLAgent:
             if gain_reduction[i] > envelope[i - 1]:
                 # Attack
                 attack_coef = 1 - np.exp(-1000 / (settings.attack * self.sample_rate))
-                envelope[i] = envelope[i - 1] + attack_coef * (gain_reduction[i] - envelope[i - 1])
+                envelope[i] = envelope[i - 1] + attack_coef * (
+                    gain_reduction[i] - envelope[i - 1]
+                )
             else:
                 # Release
                 release_coef = 1 - np.exp(-1000 / (settings.release * self.sample_rate))
-                envelope[i] = envelope[i - 1] + release_coef * (gain_reduction[i] - envelope[i - 1])
+                envelope[i] = envelope[i - 1] + release_coef * (
+                    gain_reduction[i] - envelope[i - 1]
+                )
 
         # Apply gain reduction
         gain_linear = 10 ** (-(envelope - settings.makeup_gain) / 20)
@@ -295,9 +312,7 @@ class DynamicsRLAgent:
         return output
 
     def select_action(
-        self,
-        audio_state: AudioState,
-        add_noise: bool = True
+        self, audio_state: AudioState, add_noise: bool = True
     ) -> Tuple[np.ndarray, DynamicsSettings]:
         """
         Select dynamics adjustment action.
@@ -347,7 +362,9 @@ class DynamicsRLAgent:
             return None
 
         # Sample batch
-        states, actions, rewards, next_states, dones = self.replay_buffer.sample(batch_size)
+        states, actions, rewards, next_states, dones = self.replay_buffer.sample(
+            batch_size
+        )
 
         # Convert to tensors
         states = torch.FloatTensor(states).to(self.device)
@@ -373,7 +390,9 @@ class DynamicsRLAgent:
         current_q1, current_q2 = self.critic(states, actions)
 
         # Critic loss
-        critic_loss = nn.MSELoss()(current_q1, target_q) + nn.MSELoss()(current_q2, target_q)
+        critic_loss = nn.MSELoss()(current_q1, target_q) + nn.MSELoss()(
+            current_q2, target_q
+        )
 
         # Optimize critic
         self.critic_optimizer.zero_grad()
@@ -407,11 +426,19 @@ class DynamicsRLAgent:
 
     def _update_target_networks(self):
         """Soft update of target networks."""
-        for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
-            target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+        for param, target_param in zip(
+            self.actor.parameters(), self.actor_target.parameters()
+        ):
+            target_param.data.copy_(
+                self.tau * param.data + (1 - self.tau) * target_param.data
+            )
 
-        for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
-            target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+        for param, target_param in zip(
+            self.critic.parameters(), self.critic_target.parameters()
+        ):
+            target_param.data.copy_(
+                self.tau * param.data + (1 - self.tau) * target_param.data
+            )
 
     def store_experience(
         self,
@@ -419,18 +446,20 @@ class DynamicsRLAgent:
         action: np.ndarray,
         reward: float,
         next_state: AudioState,
-        done: bool
+        done: bool,
     ):
         """Store experience in replay buffer."""
-        state_vector = np.concatenate([state.to_vector(), self.current_dynamics.to_vector()])
-        next_state_vector = np.concatenate([next_state.to_vector(), self.current_dynamics.to_vector()])
+        state_vector = np.concatenate(
+            [state.to_vector(), self.current_dynamics.to_vector()]
+        )
+        next_state_vector = np.concatenate(
+            [next_state.to_vector(), self.current_dynamics.to_vector()]
+        )
 
         self.replay_buffer.add(state_vector, action, reward, next_state_vector, done)
 
     def process_audio(
-        self,
-        audio: np.ndarray,
-        audio_state: AudioState
+        self, audio: np.ndarray, audio_state: AudioState
     ) -> Tuple[np.ndarray, AgentAction]:
         """
         Process audio with dynamics.
@@ -465,34 +494,37 @@ class DynamicsRLAgent:
                 "makeup_gain": new_dynamics.makeup_gain,
                 "dry_wet": new_dynamics.dry_wet,
             },
-            confidence=0.8
+            confidence=0.8,
         )
 
         return processed_audio, action
 
     def save_model(self, path: str):
         """Save model checkpoint."""
-        torch.save({
-            'actor_state_dict': self.actor.state_dict(),
-            'actor_target_state_dict': self.actor_target.state_dict(),
-            'critic_state_dict': self.critic.state_dict(),
-            'critic_target_state_dict': self.critic_target.state_dict(),
-            'actor_optimizer': self.actor_optimizer.state_dict(),
-            'critic_optimizer': self.critic_optimizer.state_dict(),
-            'total_steps': self.total_steps,
-        }, path)
+        torch.save(
+            {
+                "actor_state_dict": self.actor.state_dict(),
+                "actor_target_state_dict": self.actor_target.state_dict(),
+                "critic_state_dict": self.critic.state_dict(),
+                "critic_target_state_dict": self.critic_target.state_dict(),
+                "actor_optimizer": self.actor_optimizer.state_dict(),
+                "critic_optimizer": self.critic_optimizer.state_dict(),
+                "total_steps": self.total_steps,
+            },
+            path,
+        )
         logger.info(f"Saved Dynamics RL model to {path}")
 
     def load_model(self, path: str):
         """Load model checkpoint."""
         checkpoint = torch.load(path, map_location=self.device)
-        self.actor.load_state_dict(checkpoint['actor_state_dict'])
-        self.actor_target.load_state_dict(checkpoint['actor_target_state_dict'])
-        self.critic.load_state_dict(checkpoint['critic_state_dict'])
-        self.critic_target.load_state_dict(checkpoint['critic_target_state_dict'])
-        self.actor_optimizer.load_state_dict(checkpoint['actor_optimizer'])
-        self.critic_optimizer.load_state_dict(checkpoint['critic_optimizer'])
-        self.total_steps = checkpoint['total_steps']
+        self.actor.load_state_dict(checkpoint["actor_state_dict"])
+        self.actor_target.load_state_dict(checkpoint["actor_target_state_dict"])
+        self.critic.load_state_dict(checkpoint["critic_state_dict"])
+        self.critic_target.load_state_dict(checkpoint["critic_target_state_dict"])
+        self.actor_optimizer.load_state_dict(checkpoint["actor_optimizer"])
+        self.critic_optimizer.load_state_dict(checkpoint["critic_optimizer"])
+        self.total_steps = checkpoint["total_steps"]
         logger.info(f"Loaded Dynamics RL model from {path}")
 
 
@@ -510,7 +542,9 @@ if __name__ == "__main__":
     dummy_state = AudioState()
     dummy_state.set_attribute(AudioAttribute.PUNCH, 0.5)
 
-    processed, action = ray.get(dynamics_agent.process_audio.remote(dummy_audio, dummy_state))
+    processed, action = ray.get(
+        dynamics_agent.process_audio.remote(dummy_audio, dummy_state)
+    )
     print(f"Processed audio shape: {processed.shape}")
     print(f"Action: {action.action_type}")
 

@@ -22,7 +22,6 @@ except ImportError as e:
 from ...core.base_agent import BaseAgent
 from ...core.message_types import Message, Priority, Topics
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -30,6 +29,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Modulation:
     """Represents a key modulation"""
+
     time: float  # seconds
     new_key: str
     confidence: float
@@ -38,6 +38,7 @@ class Modulation:
 @dataclass
 class MusicalAnalysis:
     """Complete musical analysis results"""
+
     key: str  # e.g., "C major", "A minor"
     key_confidence: float  # 0.0-1.0
     tempo_bpm: float
@@ -67,43 +68,46 @@ class MusicalAnalysisAgent(BaseAgent):
     """
 
     # Krumhansl-Schmuckler key profiles
-    MAJOR_PROFILE = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88])
-    MINOR_PROFILE = np.array([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17])
+    MAJOR_PROFILE = np.array(
+        [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88]
+    )
+    MINOR_PROFILE = np.array(
+        [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17]
+    )
 
     # Scale patterns (semitones from root)
     SCALE_PATTERNS = {
-        'major': [0, 2, 4, 5, 7, 9, 11],
-        'minor': [0, 2, 3, 5, 7, 8, 10],
-        'dorian': [0, 2, 3, 5, 7, 9, 10],
-        'phrygian': [0, 1, 3, 5, 7, 8, 10],
-        'lydian': [0, 2, 4, 6, 7, 9, 11],
-        'mixolydian': [0, 2, 4, 5, 7, 9, 10],
-        'aeolian': [0, 2, 3, 5, 7, 8, 10],
-        'locrian': [0, 1, 3, 5, 6, 8, 10],
-        'harmonic_minor': [0, 2, 3, 5, 7, 8, 11],
-        'melodic_minor': [0, 2, 3, 5, 7, 9, 11],
-        'pentatonic_major': [0, 2, 4, 7, 9],
-        'pentatonic_minor': [0, 3, 5, 7, 10],
-        'blues': [0, 3, 5, 6, 7, 10],
+        "major": [0, 2, 4, 5, 7, 9, 11],
+        "minor": [0, 2, 3, 5, 7, 8, 10],
+        "dorian": [0, 2, 3, 5, 7, 9, 10],
+        "phrygian": [0, 1, 3, 5, 7, 8, 10],
+        "lydian": [0, 2, 4, 6, 7, 9, 11],
+        "mixolydian": [0, 2, 4, 5, 7, 9, 10],
+        "aeolian": [0, 2, 3, 5, 7, 8, 10],
+        "locrian": [0, 1, 3, 5, 6, 8, 10],
+        "harmonic_minor": [0, 2, 3, 5, 7, 8, 11],
+        "melodic_minor": [0, 2, 3, 5, 7, 9, 11],
+        "pentatonic_major": [0, 2, 4, 7, 9],
+        "pentatonic_minor": [0, 3, 5, 7, 10],
+        "blues": [0, 3, 5, 6, 7, 10],
     }
 
-    NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+    NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
     def __init__(self):
         super().__init__(
-            agent_id="musical_analysis_agent",
-            agent_name="Musical Analysis Agent"
+            agent_id="musical_analysis_agent", agent_name="Musical Analysis Agent"
         )
 
         self._lock = threading.Lock()
 
         # Statistics
         self._stats = {
-            'analyses_performed': 0,
-            'key_detections': 0,
-            'tempo_detections': 0,
-            'modulations_detected': 0,
-            'errors': 0
+            "analyses_performed": 0,
+            "key_detections": 0,
+            "tempo_detections": 0,
+            "modulations_detected": 0,
+            "errors": 0,
         }
 
     def setup(self):
@@ -144,7 +148,7 @@ class MusicalAnalysisAgent(BaseAgent):
             elif topic == "musical.analysis.modulation":
                 result = self._detect_modulations(payload)
             else:
-                result = {'success': False, 'error': f'Unknown topic: {topic}'}
+                result = {"success": False, "error": f"Unknown topic: {topic}"}
 
             # Send response
             self.respond(message, result)
@@ -152,17 +156,17 @@ class MusicalAnalysisAgent(BaseAgent):
         except Exception as e:
             logger.error(f"Error handling message: {e}", exc_info=True)
             with self._lock:
-                self._stats['errors'] += 1
-            self.respond(message, {'success': False, 'error': str(e)})
+                self._stats["errors"] += 1
+            self.respond(message, {"success": False, "error": str(e)})
 
     def _analyze_comprehensive(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Perform comprehensive musical analysis"""
         try:
-            audio = payload.get('audio')
-            sr = payload.get('sample_rate', 22050)
+            audio = payload.get("audio")
+            sr = payload.get("sample_rate", 22050)
 
             if audio is None:
-                return {'success': False, 'error': 'No audio data provided'}
+                return {"success": False, "error": "No audio data provided"}
 
             # Convert to mono if stereo
             if len(audio.shape) > 1:
@@ -206,44 +210,48 @@ class MusicalAnalysisAgent(BaseAgent):
                 pitch_center=pitch_center,
                 tonal_brightness=brightness,
                 consonance_score=consonance,
-                genre_predictions=genres
+                genre_predictions=genres,
             )
 
             with self._lock:
-                self._stats['analyses_performed'] += 1
+                self._stats["analyses_performed"] += 1
 
             return {
-                'success': True,
-                'analysis': {
-                    'key': analysis.key,
-                    'key_confidence': float(analysis.key_confidence),
-                    'tempo_bpm': float(analysis.tempo_bpm),
-                    'tempo_confidence': float(analysis.tempo_confidence),
-                    'time_signature': analysis.time_signature,
-                    'scale_type': analysis.scale_type,
-                    'modulations': [
-                        {'time': m.time, 'new_key': m.new_key, 'confidence': m.confidence}
+                "success": True,
+                "analysis": {
+                    "key": analysis.key,
+                    "key_confidence": float(analysis.key_confidence),
+                    "tempo_bpm": float(analysis.tempo_bpm),
+                    "tempo_confidence": float(analysis.tempo_confidence),
+                    "time_signature": analysis.time_signature,
+                    "scale_type": analysis.scale_type,
+                    "modulations": [
+                        {
+                            "time": m.time,
+                            "new_key": m.new_key,
+                            "confidence": m.confidence,
+                        }
                         for m in analysis.modulations
                     ],
-                    'pitch_center': float(analysis.pitch_center),
-                    'tonal_brightness': float(analysis.tonal_brightness),
-                    'consonance_score': float(analysis.consonance_score),
-                    'genre_predictions': analysis.genre_predictions
-                }
+                    "pitch_center": float(analysis.pitch_center),
+                    "tonal_brightness": float(analysis.tonal_brightness),
+                    "consonance_score": float(analysis.consonance_score),
+                    "genre_predictions": analysis.genre_predictions,
+                },
             }
 
         except Exception as e:
             logger.error(f"Error in comprehensive analysis: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
     def _detect_key(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Detect musical key only"""
         try:
-            audio = payload.get('audio')
-            sr = payload.get('sample_rate', 22050)
+            audio = payload.get("audio")
+            sr = payload.get("sample_rate", 22050)
 
             if audio is None:
-                return {'success': False, 'error': 'No audio data provided'}
+                return {"success": False, "error": "No audio data provided"}
 
             if len(audio.shape) > 1:
                 audio = librosa.to_mono(audio)
@@ -251,26 +259,22 @@ class MusicalAnalysisAgent(BaseAgent):
             key, confidence = self._analyze_key(audio, sr)
 
             with self._lock:
-                self._stats['key_detections'] += 1
+                self._stats["key_detections"] += 1
 
-            return {
-                'success': True,
-                'key': key,
-                'confidence': float(confidence)
-            }
+            return {"success": True, "key": key, "confidence": float(confidence)}
 
         except Exception as e:
             logger.error(f"Error detecting key: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
     def _detect_tempo(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Detect tempo only"""
         try:
-            audio = payload.get('audio')
-            sr = payload.get('sample_rate', 22050)
+            audio = payload.get("audio")
+            sr = payload.get("sample_rate", 22050)
 
             if audio is None:
-                return {'success': False, 'error': 'No audio data provided'}
+                return {"success": False, "error": "No audio data provided"}
 
             if len(audio.shape) > 1:
                 audio = librosa.to_mono(audio)
@@ -278,27 +282,27 @@ class MusicalAnalysisAgent(BaseAgent):
             tempo, confidence = self._analyze_tempo(audio, sr)
 
             with self._lock:
-                self._stats['tempo_detections'] += 1
+                self._stats["tempo_detections"] += 1
 
             return {
-                'success': True,
-                'tempo_bpm': float(tempo),
-                'confidence': float(confidence)
+                "success": True,
+                "tempo_bpm": float(tempo),
+                "confidence": float(confidence),
             }
 
         except Exception as e:
             logger.error(f"Error detecting tempo: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
     def _detect_time_signature(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Detect time signature"""
         try:
-            audio = payload.get('audio')
-            sr = payload.get('sample_rate', 22050)
-            tempo = payload.get('tempo_bpm')
+            audio = payload.get("audio")
+            sr = payload.get("sample_rate", 22050)
+            tempo = payload.get("tempo_bpm")
 
             if audio is None:
-                return {'success': False, 'error': 'No audio data provided'}
+                return {"success": False, "error": "No audio data provided"}
 
             if len(audio.shape) > 1:
                 audio = librosa.to_mono(audio)
@@ -308,46 +312,40 @@ class MusicalAnalysisAgent(BaseAgent):
 
             time_sig = self._analyze_time_signature(audio, sr, tempo)
 
-            return {
-                'success': True,
-                'time_signature': time_sig
-            }
+            return {"success": True, "time_signature": time_sig}
 
         except Exception as e:
             logger.error(f"Error detecting time signature: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
     def _detect_scale(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Detect scale type"""
         try:
-            audio = payload.get('audio')
-            sr = payload.get('sample_rate', 22050)
+            audio = payload.get("audio")
+            sr = payload.get("sample_rate", 22050)
 
             if audio is None:
-                return {'success': False, 'error': 'No audio data provided'}
+                return {"success": False, "error": "No audio data provided"}
 
             if len(audio.shape) > 1:
                 audio = librosa.to_mono(audio)
 
             scale_type = self._analyze_scale_type(audio, sr)
 
-            return {
-                'success': True,
-                'scale_type': scale_type
-            }
+            return {"success": True, "scale_type": scale_type}
 
         except Exception as e:
             logger.error(f"Error detecting scale: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
     def _detect_modulations(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Detect key modulations"""
         try:
-            audio = payload.get('audio')
-            sr = payload.get('sample_rate', 22050)
+            audio = payload.get("audio")
+            sr = payload.get("sample_rate", 22050)
 
             if audio is None:
-                return {'success': False, 'error': 'No audio data provided'}
+                return {"success": False, "error": "No audio data provided"}
 
             if len(audio.shape) > 1:
                 audio = librosa.to_mono(audio)
@@ -355,19 +353,19 @@ class MusicalAnalysisAgent(BaseAgent):
             modulations = self._analyze_modulations(audio, sr)
 
             with self._lock:
-                self._stats['modulations_detected'] += len(modulations)
+                self._stats["modulations_detected"] += len(modulations)
 
             return {
-                'success': True,
-                'modulations': [
-                    {'time': m.time, 'new_key': m.new_key, 'confidence': m.confidence}
+                "success": True,
+                "modulations": [
+                    {"time": m.time, "new_key": m.new_key, "confidence": m.confidence}
                     for m in modulations
-                ]
+                ],
             }
 
         except Exception as e:
             logger.error(f"Error detecting modulations: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
     def _analyze_key(self, audio: np.ndarray, sr: int) -> Tuple[str, float]:
         """Detect key using Krumhansl-Schmuckler algorithm"""
@@ -468,9 +466,14 @@ class MusicalAnalysisAgent(BaseAgent):
             if len(beat_strengths) >= period * 2:
                 # Check if every Nth beat is stronger
                 strong_positions = beat_strengths[::period]
-                other_positions = np.delete(beat_strengths, np.arange(0, len(beat_strengths), period))
+                other_positions = np.delete(
+                    beat_strengths, np.arange(0, len(beat_strengths), period)
+                )
 
-                if len(other_positions) > 0 and np.mean(strong_positions) > np.mean(other_positions) * 1.2:
+                if (
+                    len(other_positions) > 0
+                    and np.mean(strong_positions) > np.mean(other_positions) * 1.2
+                ):
                     if period == 3:
                         return "3/4"
                     elif period == 4:
@@ -541,11 +544,9 @@ class MusicalAnalysisAgent(BaseAgent):
                 current_key = key
             elif key != current_key and confidence > 0.7:
                 time = start / sr
-                modulations.append(Modulation(
-                    time=time,
-                    new_key=key,
-                    confidence=confidence
-                ))
+                modulations.append(
+                    Modulation(time=time, new_key=key, confidence=confidence)
+                )
                 current_key = key
 
         return modulations
@@ -596,7 +597,9 @@ class MusicalAnalysisAgent(BaseAgent):
 
         return float(consonance)
 
-    def _predict_genre(self, audio: np.ndarray, sr: int, tempo: float, key: str) -> List[Tuple[str, float]]:
+    def _predict_genre(
+        self, audio: np.ndarray, sr: int, tempo: float, key: str
+    ) -> List[Tuple[str, float]]:
         """Predict genre based on musical features"""
         predictions = []
 

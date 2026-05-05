@@ -25,7 +25,7 @@ from ..core.audio_ontology import (
     AudioAttribute,
     AgentAction,
     FrequencyBand,
-    AudioOntologyManager
+    AudioOntologyManager,
 )
 
 logger = logging.getLogger(__name__)
@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class EQBandSettings:
     """Settings for one EQ band."""
+
     frequency: float  # Center frequency in Hz
     gain: float  # Gain in dB (-20 to +20)
     q_factor: float  # Q factor (bandwidth), 0.1 to 10.0
@@ -43,30 +44,35 @@ class EQBandSettings:
 @dataclass
 class EQState:
     """Complete EQ state."""
+
     bands: List[EQBandSettings]
 
     def to_vector(self) -> np.ndarray:
         """Convert to flat vector for RL."""
         vector = []
         for band in self.bands:
-            vector.extend([
-                np.log10(band.frequency) / 5.0,  # Normalize log freq
-                band.gain / 20.0,  # Normalize to [-1, 1]
-                np.log10(band.q_factor) / 2.0,  # Normalize log Q
-            ])
+            vector.extend(
+                [
+                    np.log10(band.frequency) / 5.0,  # Normalize log freq
+                    band.gain / 20.0,  # Normalize to [-1, 1]
+                    np.log10(band.q_factor) / 2.0,  # Normalize log Q
+                ]
+            )
         return np.array(vector)
 
     @staticmethod
-    def from_vector(vector: np.ndarray, num_bands: int = 8) -> 'EQState':
+    def from_vector(vector: np.ndarray, num_bands: int = 8) -> "EQState":
         """Create EQState from vector."""
         bands = []
         vector = vector.reshape(num_bands, 3)
         for i, (freq_norm, gain_norm, q_norm) in enumerate(vector):
-            bands.append(EQBandSettings(
-                frequency=10 ** (freq_norm * 5.0),
-                gain=gain_norm * 20.0,
-                q_factor=10 ** (q_norm * 2.0)
-            ))
+            bands.append(
+                EQBandSettings(
+                    frequency=10 ** (freq_norm * 5.0),
+                    gain=gain_norm * 20.0,
+                    q_factor=10 ** (q_norm * 2.0),
+                )
+            )
         return EQState(bands)
 
 
@@ -78,7 +84,7 @@ class ActorNetwork(nn.Module):
         state_dim: int,
         action_dim: int,
         hidden_dim: int = 256,
-        max_action: float = 1.0
+        max_action: float = 1.0,
     ):
         super().__init__()
 
@@ -90,7 +96,7 @@ class ActorNetwork(nn.Module):
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, action_dim),
-            nn.Tanh()  # Output in [-1, 1]
+            nn.Tanh(),  # Output in [-1, 1]
         )
 
     def forward(self, state: torch.Tensor) -> torch.Tensor:
@@ -110,7 +116,7 @@ class CriticNetworkRL(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, 1)
+            nn.Linear(hidden_dim, 1),
         )
 
         # Q2 architecture (twin critic)
@@ -119,10 +125,12 @@ class CriticNetworkRL(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, 1)
+            nn.Linear(hidden_dim, 1),
         )
 
-    def forward(self, state: torch.Tensor, action: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, state: torch.Tensor, action: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Forward pass, returns both Q values."""
         x = torch.cat([state, action], dim=-1)
         return self.q1(x), self.q2(x)
@@ -246,7 +254,7 @@ class EQRLAgent:
     def _initialize_eq(self) -> EQState:
         """Initialize EQ with default flat settings."""
         # Standard frequency bands
-        frequencies = [60, 120, 250, 500, 1000, 2000, 4000, 8000][:self.num_bands]
+        frequencies = [60, 120, 250, 500, 1000, 2000, 4000, 8000][: self.num_bands]
 
         bands = [
             EQBandSettings(frequency=freq, gain=0.0, q_factor=1.0)
@@ -295,9 +303,7 @@ class EQRLAgent:
         return processed
 
     def select_action(
-        self,
-        audio_state: AudioState,
-        add_noise: bool = True
+        self, audio_state: AudioState, add_noise: bool = True
     ) -> Tuple[np.ndarray, EQState]:
         """
         Select EQ adjustment action.
@@ -348,7 +354,9 @@ class EQRLAgent:
             return None
 
         # Sample batch
-        states, actions, rewards, next_states, dones = self.replay_buffer.sample(batch_size)
+        states, actions, rewards, next_states, dones = self.replay_buffer.sample(
+            batch_size
+        )
 
         # Convert to tensors
         states = torch.FloatTensor(states).to(self.device)
@@ -374,7 +382,9 @@ class EQRLAgent:
         current_q1, current_q2 = self.critic(states, actions)
 
         # Critic loss
-        critic_loss = nn.MSELoss()(current_q1, target_q) + nn.MSELoss()(current_q2, target_q)
+        critic_loss = nn.MSELoss()(current_q1, target_q) + nn.MSELoss()(
+            current_q2, target_q
+        )
 
         # Optimize critic
         self.critic_optimizer.zero_grad()
@@ -408,11 +418,19 @@ class EQRLAgent:
 
     def _update_target_networks(self):
         """Soft update of target networks."""
-        for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
-            target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+        for param, target_param in zip(
+            self.actor.parameters(), self.actor_target.parameters()
+        ):
+            target_param.data.copy_(
+                self.tau * param.data + (1 - self.tau) * target_param.data
+            )
 
-        for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
-            target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+        for param, target_param in zip(
+            self.critic.parameters(), self.critic_target.parameters()
+        ):
+            target_param.data.copy_(
+                self.tau * param.data + (1 - self.tau) * target_param.data
+            )
 
     def store_experience(
         self,
@@ -420,18 +438,18 @@ class EQRLAgent:
         action: np.ndarray,
         reward: float,
         next_state: AudioState,
-        done: bool
+        done: bool,
     ):
         """Store experience in replay buffer."""
         state_vector = np.concatenate([state.to_vector(), self.current_eq.to_vector()])
-        next_state_vector = np.concatenate([next_state.to_vector(), self.current_eq.to_vector()])
+        next_state_vector = np.concatenate(
+            [next_state.to_vector(), self.current_eq.to_vector()]
+        )
 
         self.replay_buffer.add(state_vector, action, reward, next_state_vector, done)
 
     def process_audio(
-        self,
-        audio: np.ndarray,
-        audio_state: AudioState
+        self, audio: np.ndarray, audio_state: AudioState
     ) -> Tuple[np.ndarray, AgentAction]:
         """
         Process audio with EQ.
@@ -460,36 +478,43 @@ class EQRLAgent:
             parameters={
                 f"band_{i}_{param}": value
                 for i, band in enumerate(new_eq_state.bands)
-                for param, value in [("freq", band.frequency), ("gain", band.gain), ("q", band.q_factor)]
+                for param, value in [
+                    ("freq", band.frequency),
+                    ("gain", band.gain),
+                    ("q", band.q_factor),
+                ]
             },
-            confidence=0.8
+            confidence=0.8,
         )
 
         return processed_audio, action
 
     def save_model(self, path: str):
         """Save model checkpoint."""
-        torch.save({
-            'actor_state_dict': self.actor.state_dict(),
-            'actor_target_state_dict': self.actor_target.state_dict(),
-            'critic_state_dict': self.critic.state_dict(),
-            'critic_target_state_dict': self.critic_target.state_dict(),
-            'actor_optimizer': self.actor_optimizer.state_dict(),
-            'critic_optimizer': self.critic_optimizer.state_dict(),
-            'total_steps': self.total_steps,
-        }, path)
+        torch.save(
+            {
+                "actor_state_dict": self.actor.state_dict(),
+                "actor_target_state_dict": self.actor_target.state_dict(),
+                "critic_state_dict": self.critic.state_dict(),
+                "critic_target_state_dict": self.critic_target.state_dict(),
+                "actor_optimizer": self.actor_optimizer.state_dict(),
+                "critic_optimizer": self.critic_optimizer.state_dict(),
+                "total_steps": self.total_steps,
+            },
+            path,
+        )
         logger.info(f"Saved EQ RL model to {path}")
 
     def load_model(self, path: str):
         """Load model checkpoint."""
         checkpoint = torch.load(path, map_location=self.device)
-        self.actor.load_state_dict(checkpoint['actor_state_dict'])
-        self.actor_target.load_state_dict(checkpoint['actor_target_state_dict'])
-        self.critic.load_state_dict(checkpoint['critic_state_dict'])
-        self.critic_target.load_state_dict(checkpoint['critic_target_state_dict'])
-        self.actor_optimizer.load_state_dict(checkpoint['actor_optimizer'])
-        self.critic_optimizer.load_state_dict(checkpoint['critic_optimizer'])
-        self.total_steps = checkpoint['total_steps']
+        self.actor.load_state_dict(checkpoint["actor_state_dict"])
+        self.actor_target.load_state_dict(checkpoint["actor_target_state_dict"])
+        self.critic.load_state_dict(checkpoint["critic_state_dict"])
+        self.critic_target.load_state_dict(checkpoint["critic_target_state_dict"])
+        self.actor_optimizer.load_state_dict(checkpoint["actor_optimizer"])
+        self.critic_optimizer.load_state_dict(checkpoint["critic_optimizer"])
+        self.total_steps = checkpoint["total_steps"]
         logger.info(f"Loaded EQ RL model from {path}")
 
 

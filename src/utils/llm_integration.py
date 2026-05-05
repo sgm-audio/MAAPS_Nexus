@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 class LLMProvider(Enum):
     """Supported LLM providers"""
+
     VERTEX_AI = "vertex_ai"
     ANTHROPIC = "anthropic"
     OPENAI = "openai"
@@ -47,30 +48,38 @@ class LLMClient:
 
         if self.provider == LLMProvider.VERTEX_AI:
             from .vertex_ai_integration import VertexAIClient
+
             self._client = VertexAIClient(**kwargs)
             logger.info("Initialized Vertex AI client")
 
         elif self.provider == LLMProvider.ANTHROPIC:
             try:
                 from anthropic import Anthropic
+
                 api_key = kwargs.get("api_key") or os.getenv("ANTHROPIC_API_KEY")
                 self._client = Anthropic(api_key=api_key)
                 logger.info("Initialized Anthropic client")
             except ImportError:
-                raise ImportError("anthropic package not installed. Run: pip install anthropic")
+                raise ImportError(
+                    "anthropic package not installed. Run: pip install anthropic"
+                )
 
         elif self.provider == LLMProvider.OPENAI:
             try:
                 from openai import OpenAI
+
                 api_key = kwargs.get("api_key") or os.getenv("OPENAI_API_KEY")
                 self._client = OpenAI(api_key=api_key)
                 logger.info("Initialized OpenAI client")
             except ImportError:
-                raise ImportError("openai package not installed. Run: pip install openai")
+                raise ImportError(
+                    "openai package not installed. Run: pip install openai"
+                )
 
         elif self.provider == LLMProvider.OLLAMA:
             try:
                 import requests
+
                 self._ollama_base_url = kwargs.get("base_url", "http://localhost:11434")
                 # Test connection
                 response = requests.get(f"{self._ollama_base_url}/api/tags")
@@ -79,7 +88,9 @@ class LLMClient:
                 else:
                     raise ConnectionError("Ollama server not responding")
             except ImportError:
-                raise ImportError("requests package not installed. Run: pip install requests")
+                raise ImportError(
+                    "requests package not installed. Run: pip install requests"
+                )
 
     def chat(
         self,
@@ -88,7 +99,7 @@ class LLMClient:
         temperature: float = 0.7,
         max_tokens: int = 4096,
         model: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ) -> str:
         """
         Send a chat completion request.
@@ -111,7 +122,7 @@ class LLMClient:
                 system_prompt=system_prompt,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                **kwargs
+                **kwargs,
             )
 
         elif self.provider == LLMProvider.ANTHROPIC:
@@ -140,12 +151,13 @@ class LLMClient:
                 messages=chat_messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                **kwargs
+                **kwargs,
             )
             return response.choices[0].message.content
 
         elif self.provider == LLMProvider.OLLAMA:
             import requests
+
             model = model or os.getenv("OLLAMA_MODEL", "llama2")
 
             # Build prompt from messages
@@ -164,8 +176,8 @@ class LLMClient:
                     "model": model,
                     "prompt": prompt,
                     "temperature": temperature,
-                    "options": {"num_predict": max_tokens}
-                }
+                    "options": {"num_predict": max_tokens},
+                },
             )
 
             if response.ok:
@@ -173,6 +185,7 @@ class LLMClient:
                 full_response = ""
                 for line in response.text.strip().split("\n"):
                     import json
+
                     chunk = json.loads(line)
                     full_response += chunk.get("response", "")
                 return full_response
@@ -186,7 +199,7 @@ class LLMClient:
         temperature: float = 0.7,
         max_tokens: int = 4096,
         model: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ):
         """
         Stream a chat completion response.
@@ -208,7 +221,7 @@ class LLMClient:
                 system_prompt=system_prompt,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                **kwargs
+                **kwargs,
             )
         else:
             # Fallback to non-streaming for unsupported providers
@@ -218,7 +231,7 @@ class LLMClient:
                 temperature=temperature,
                 max_tokens=max_tokens,
                 model=model,
-                **kwargs
+                **kwargs,
             )
             yield response
 

@@ -21,7 +21,7 @@ from ..core.audio_ontology import (
     AudioGoal,
     AudioAttribute,
     AgentAction,
-    AudioOntologyManager
+    AudioOntologyManager,
 )
 
 logger = logging.getLogger(__name__)
@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 class ConflictType(Enum):
     """Types of conflicts between agents."""
+
     NO_CONFLICT = 0
     PARAMETER_CONFLICT = 1  # Both agents affecting same audio aspect
     GOAL_CONFLICT = 2  # Agents pursuing incompatible goals
@@ -39,6 +40,7 @@ class ConflictType(Enum):
 @dataclass
 class AgentProposal:
     """Proposal from an agent to take action."""
+
     agent_id: str
     action: AgentAction
     predicted_impact: Dict[AudioAttribute, float]
@@ -50,6 +52,7 @@ class AgentProposal:
 @dataclass
 class CoordinationDecision:
     """Decision from the coordinator."""
+
     approved_proposals: List[AgentProposal]
     rejected_proposals: List[AgentProposal]
     execution_order: List[str]  # Agent IDs in execution order
@@ -60,6 +63,7 @@ class CoordinationDecision:
 @dataclass
 class ConflictReport:
     """Report of conflict between agents."""
+
     conflict_type: ConflictType
     involved_agents: List[str]
     conflicting_attributes: List[AudioAttribute]
@@ -86,7 +90,7 @@ class HGOCoordinator:
         goal_hierarchy: Optional[List[AudioGoal]] = None,
         conflict_threshold: float = 0.3,
         compromise_weight: float = 0.5,
-        ontology: Optional[AudioOntologyManager] = None
+        ontology: Optional[AudioOntologyManager] = None,
     ):
         """
         Initialize HGO Coordinator.
@@ -129,9 +133,7 @@ class HGOCoordinator:
         logger.info(f"Registered agent: {agent_id}")
 
     def detect_conflicts(
-        self,
-        proposals: List[AgentProposal],
-        current_state: AudioState
+        self, proposals: List[AgentProposal], current_state: AudioState
     ) -> List[ConflictReport]:
         """
         Detect conflicts between agent proposals.
@@ -147,7 +149,7 @@ class HGOCoordinator:
 
         # Compare all pairs of proposals
         for i, prop1 in enumerate(proposals):
-            for prop2 in proposals[i + 1:]:
+            for prop2 in proposals[i + 1 :]:
                 conflict = self._check_proposal_conflict(prop1, prop2, current_state)
                 if conflict:
                     conflicts.append(conflict)
@@ -155,10 +157,7 @@ class HGOCoordinator:
         return conflicts
 
     def _check_proposal_conflict(
-        self,
-        prop1: AgentProposal,
-        prop2: AgentProposal,
-        current_state: AudioState
+        self, prop1: AgentProposal, prop2: AgentProposal, current_state: AudioState
     ) -> Optional[ConflictReport]:
         """
         Check if two proposals conflict.
@@ -194,7 +193,10 @@ class HGOCoordinator:
             return None
 
         # Determine conflict type
-        if any(attr in [AudioAttribute.CLARITY, AudioAttribute.WARMTH] for attr in conflicting_attrs):
+        if any(
+            attr in [AudioAttribute.CLARITY, AudioAttribute.WARMTH]
+            for attr in conflicting_attrs
+        ):
             conflict_type = ConflictType.GOAL_CONFLICT
         else:
             conflict_type = ConflictType.PARAMETER_CONFLICT
@@ -204,14 +206,14 @@ class HGOCoordinator:
             involved_agents=[prop1.agent_id, prop2.agent_id],
             conflicting_attributes=conflicting_attrs,
             severity=severity,
-            description=f"Conflict between {prop1.agent_id} and {prop2.agent_id} on {len(conflicting_attrs)} attributes"
+            description=f"Conflict between {prop1.agent_id} and {prop2.agent_id} on {len(conflicting_attrs)} attributes",
         )
 
     def resolve_conflicts(
         self,
         proposals: List[AgentProposal],
         conflicts: List[ConflictReport],
-        current_state: AudioState
+        current_state: AudioState,
     ) -> CoordinationDecision:
         """
         Resolve conflicts and make coordination decision.
@@ -231,7 +233,7 @@ class HGOCoordinator:
                 rejected_proposals=[],
                 execution_order=[p.agent_id for p in proposals],
                 compromise_adjustments={},
-                reasoning="No conflicts detected, all proposals approved"
+                reasoning="No conflicts detected, all proposals approved",
             )
 
         # Strategy 1: Goal hierarchy priority
@@ -254,16 +256,16 @@ class HGOCoordinator:
             for conflict in conflicts:
                 if proposal.agent_id in conflict.involved_agents:
                     # Check if other involved agent is already approved
-                    other_agents = [a for a in conflict.involved_agents if a != proposal.agent_id]
+                    other_agents = [
+                        a for a in conflict.involved_agents if a != proposal.agent_id
+                    ]
                     if any(a in [p.agent_id for p in approved] for a in other_agents):
                         has_conflict = True
 
                         # Try compromise
                         if conflict.severity < 0.7:  # Medium severity, try compromise
                             adjustment = self._calculate_compromise(
-                                proposal,
-                                conflict,
-                                current_state
+                                proposal, conflict, current_state
                             )
                             compromise_adjustments[proposal.agent_id] = adjustment
                             approved.append(proposal)
@@ -280,23 +282,23 @@ class HGOCoordinator:
         execution_order = self._determine_execution_order(approved, current_state)
 
         # Generate reasoning
-        reasoning = self._generate_reasoning(approved, rejected, conflicts, compromise_adjustments)
+        reasoning = self._generate_reasoning(
+            approved, rejected, conflicts, compromise_adjustments
+        )
 
         decision = CoordinationDecision(
             approved_proposals=approved,
             rejected_proposals=rejected,
             execution_order=execution_order,
             compromise_adjustments=compromise_adjustments,
-            reasoning=reasoning
+            reasoning=reasoning,
         )
 
         self.coordination_history.append(decision)
         return decision
 
     def _score_proposal_against_goals(
-        self,
-        proposal: AgentProposal,
-        current_state: AudioState
+        self, proposal: AgentProposal, current_state: AudioState
     ) -> float:
         """
         Score a proposal based on alignment with goal hierarchy.
@@ -342,7 +344,7 @@ class HGOCoordinator:
         self,
         proposal: AgentProposal,
         conflict: ConflictReport,
-        current_state: AudioState
+        current_state: AudioState,
     ) -> Dict[str, float]:
         """
         Calculate compromise adjustments for a proposal.
@@ -359,16 +361,13 @@ class HGOCoordinator:
         adjustment_factor = 1.0 - (conflict.severity * self.compromise_weight)
 
         adjustments = {
-            param: adjustment_factor
-            for param in proposal.action.parameters.keys()
+            param: adjustment_factor for param in proposal.action.parameters.keys()
         }
 
         return adjustments
 
     def _determine_execution_order(
-        self,
-        approved_proposals: List[AgentProposal],
-        current_state: AudioState
+        self, approved_proposals: List[AgentProposal], current_state: AudioState
     ) -> List[str]:
         """
         Determine optimal execution order for approved proposals.
@@ -398,7 +397,7 @@ class HGOCoordinator:
         approved: List[AgentProposal],
         rejected: List[AgentProposal],
         conflicts: List[ConflictReport],
-        compromises: Dict[str, Dict[str, float]]
+        compromises: Dict[str, Dict[str, float]],
     ) -> str:
         """Generate human-readable reasoning for the decision."""
         parts = []
@@ -418,9 +417,7 @@ class HGOCoordinator:
         return " | ".join(parts)
 
     async def coordinate(
-        self,
-        proposals: List[AgentProposal],
-        current_state: AudioState
+        self, proposals: List[AgentProposal], current_state: AudioState
     ) -> CoordinationDecision:
         """
         Main coordination method.
@@ -459,7 +456,8 @@ class HGOCoordinator:
             "total_coordinations": len(self.coordination_history),
             "total_conflicts": len(self.conflict_history),
             "registered_agents": len(self.registered_agents),
-            "conflict_rate": len(self.conflict_history) / max(len(self.coordination_history), 1),
+            "conflict_rate": len(self.conflict_history)
+            / max(len(self.coordination_history), 1),
         }
 
     def get_agent_performance(self, agent_id: str) -> Dict:
@@ -477,8 +475,7 @@ class HGOCoordinator:
 
 
 def create_hgo_coordinator(
-    goals: Optional[List[AudioGoal]] = None,
-    **kwargs
+    goals: Optional[List[AudioGoal]] = None, **kwargs
 ) -> ray.ObjectRef:
     """Convenience function to create HGO coordinator."""
     coordinator = HGOCoordinator.remote(goal_hierarchy=goals, **kwargs)
@@ -510,15 +507,17 @@ if __name__ == "__main__":
         action=AgentAction(agent_id="eq_agent", action_type="eq", parameters={}),
         predicted_impact={AudioAttribute.CLARITY: 0.2},
         predicted_satisfaction=0.7,
-        confidence=0.8
+        confidence=0.8,
     )
 
     prop2 = AgentProposal(
         agent_id="dynamics_agent",
-        action=AgentAction(agent_id="dynamics_agent", action_type="comp", parameters={}),
+        action=AgentAction(
+            agent_id="dynamics_agent", action_type="comp", parameters={}
+        ),
         predicted_impact={AudioAttribute.CLARITY: -0.1, AudioAttribute.PUNCH: 0.3},
         predicted_satisfaction=0.75,
-        confidence=0.85
+        confidence=0.85,
     )
 
     # Coordinate

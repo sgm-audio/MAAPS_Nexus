@@ -17,15 +17,15 @@ from .backup_redundancy_agent import BackupRedundancyAgent
 from .industry_standards_agent import IndustryStandardsAgent
 
 __all__ = [
-    'RealtimeAudioIOAgent',
-    'LiveEffectsChainAgent',
-    'MIDIControlAgent',
-    'LiveLoopingAgent',
-    'PerformanceAutomationAgent',
-    'SynchronizationClockAgent',
-    'VisualLightingControlAgent',
-    'LiveMixingDynamicsAgent',
-    'PerformanceMonitoringAgent',
-    'BackupRedundancyAgent',
-    'IndustryStandardsAgent',
+    "RealtimeAudioIOAgent",
+    "LiveEffectsChainAgent",
+    "MIDIControlAgent",
+    "LiveLoopingAgent",
+    "PerformanceAutomationAgent",
+    "SynchronizationClockAgent",
+    "VisualLightingControlAgent",
+    "LiveMixingDynamicsAgent",
+    "PerformanceMonitoringAgent",
+    "BackupRedundancyAgent",
+    "IndustryStandardsAgent",
 ]

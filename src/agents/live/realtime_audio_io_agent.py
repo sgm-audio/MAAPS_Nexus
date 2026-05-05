@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class AudioInterfaceConfig:
     """Audio interface configuration"""
+
     sample_rate: int = 48000
     buffer_size: int = 128
     input_channels: List[int] = field(default_factory=lambda: [1, 2])
@@ -34,6 +35,7 @@ class AudioInterfaceConfig:
 @dataclass
 class MonitorMix:
     """Monitor mix configuration"""
+
     mix_id: str
     source_channels: List[int]
     output_channel: int
@@ -44,6 +46,7 @@ class MonitorMix:
 @dataclass
 class LatencyMetrics:
     """Latency measurement data"""
+
     input_latency_ms: float
     output_latency_ms: float
     round_trip_latency_ms: float
@@ -55,6 +58,7 @@ class LatencyMetrics:
 @dataclass
 class RoutingConnection:
     """Audio routing connection"""
+
     connection_id: str
     source_channel: int
     destination_channel: int
@@ -78,8 +82,7 @@ class RealtimeAudioIOAgent(BaseAgent):
 
     def __init__(self):
         super().__init__(
-            agent_id="realtime_audio_io_agent",
-            agent_name="Real-Time Audio I/O Agent"
+            agent_id="realtime_audio_io_agent", agent_name="Real-Time Audio I/O Agent"
         )
 
         # Audio interface configuration
@@ -114,11 +117,11 @@ class RealtimeAudioIOAgent(BaseAgent):
 
         # Statistics
         self.stats = {
-            'buffers_processed': 0,
-            'buffer_underruns': 0,
-            'buffer_overruns': 0,
-            'total_samples_processed': 0,
-            'interface_switches': 0
+            "buffers_processed": 0,
+            "buffer_underruns": 0,
+            "buffer_overruns": 0,
+            "total_samples_processed": 0,
+            "interface_switches": 0,
         }
         self.stats_lock = threading.Lock()
 
@@ -142,7 +145,10 @@ class RealtimeAudioIOAgent(BaseAgent):
         # Start latency monitoring
         self._start_latency_monitoring()
 
-        self.log("INFO", f"Audio I/O Agent initialized - Sample Rate: {self.audio_config.sample_rate}Hz, Buffer: {self.audio_config.buffer_size} samples")
+        self.log(
+            "INFO",
+            f"Audio I/O Agent initialized - Sample Rate: {self.audio_config.sample_rate}Hz, Buffer: {self.audio_config.buffer_size} samples",
+        )
 
     def teardown(self):
         """Cleanup resources"""
@@ -183,16 +189,16 @@ class RealtimeAudioIOAgent(BaseAgent):
 
         with self.config_lock:
             # Update configuration
-            if 'sample_rate' in payload:
-                self.audio_config.sample_rate = payload['sample_rate']
-            if 'buffer_size' in payload:
-                self.audio_config.buffer_size = payload['buffer_size']
-            if 'input_channels' in payload:
-                self.audio_config.input_channels = payload['input_channels']
-            if 'output_channels' in payload:
-                self.audio_config.output_channels = payload['output_channels']
-            if 'driver' in payload:
-                self.audio_config.driver = payload['driver']
+            if "sample_rate" in payload:
+                self.audio_config.sample_rate = payload["sample_rate"]
+            if "buffer_size" in payload:
+                self.audio_config.buffer_size = payload["buffer_size"]
+            if "input_channels" in payload:
+                self.audio_config.input_channels = payload["input_channels"]
+            if "output_channels" in payload:
+                self.audio_config.output_channels = payload["output_channels"]
+            if "driver" in payload:
+                self.audio_config.driver = payload["driver"]
 
             # Reinitialize interface
             self._reinitialize_audio_interface()
@@ -201,15 +207,15 @@ class RealtimeAudioIOAgent(BaseAgent):
         latency = self._calculate_latency()
 
         response = {
-            'success': True,
-            'config': {
-                'sample_rate': self.audio_config.sample_rate,
-                'buffer_size': self.audio_config.buffer_size,
-                'input_channels': self.audio_config.input_channels,
-                'output_channels': self.audio_config.output_channels,
-                'driver': self.audio_config.driver
+            "success": True,
+            "config": {
+                "sample_rate": self.audio_config.sample_rate,
+                "buffer_size": self.audio_config.buffer_size,
+                "input_channels": self.audio_config.input_channels,
+                "output_channels": self.audio_config.output_channels,
+                "driver": self.audio_config.driver,
             },
-            'latency': latency.__dict__
+            "latency": latency.__dict__,
         }
 
         self.respond(message, response)
@@ -220,28 +226,31 @@ class RealtimeAudioIOAgent(BaseAgent):
     def _handle_routing_change(self, message: Message):
         """Handle routing matrix changes"""
         payload = message.payload
-        action = payload.get('action', 'add')  # add, remove, update
+        action = payload.get("action", "add")  # add, remove, update
 
-        if action == 'add':
+        if action == "add":
             connection = RoutingConnection(
-                connection_id=payload.get('connection_id', f"route_{time.time()}"),
-                source_channel=payload['source_channel'],
-                destination_channel=payload['destination_channel'],
-                gain=payload.get('gain', 1.0),
-                enabled=payload.get('enabled', True)
+                connection_id=payload.get("connection_id", f"route_{time.time()}"),
+                source_channel=payload["source_channel"],
+                destination_channel=payload["destination_channel"],
+                gain=payload.get("gain", 1.0),
+                enabled=payload.get("enabled", True),
             )
 
             with self.routing_lock:
                 self.routing_connections[connection.connection_id] = connection
 
-            self.respond(message, {
-                'success': True,
-                'connection_id': connection.connection_id,
-                'action': 'added'
-            })
+            self.respond(
+                message,
+                {
+                    "success": True,
+                    "connection_id": connection.connection_id,
+                    "action": "added",
+                },
+            )
 
-        elif action == 'remove':
-            connection_id = payload['connection_id']
+        elif action == "remove":
+            connection_id = payload["connection_id"]
             with self.routing_lock:
                 if connection_id in self.routing_connections:
                     del self.routing_connections[connection_id]
@@ -249,75 +258,77 @@ class RealtimeAudioIOAgent(BaseAgent):
                 else:
                     success = False
 
-            self.respond(message, {
-                'success': success,
-                'connection_id': connection_id,
-                'action': 'removed'
-            })
+            self.respond(
+                message,
+                {
+                    "success": success,
+                    "connection_id": connection_id,
+                    "action": "removed",
+                },
+            )
 
-        elif action == 'update':
-            connection_id = payload['connection_id']
+        elif action == "update":
+            connection_id = payload["connection_id"]
             with self.routing_lock:
                 if connection_id in self.routing_connections:
                     conn = self.routing_connections[connection_id]
-                    if 'gain' in payload:
-                        conn.gain = payload['gain']
-                    if 'enabled' in payload:
-                        conn.enabled = payload['enabled']
+                    if "gain" in payload:
+                        conn.gain = payload["gain"]
+                    if "enabled" in payload:
+                        conn.enabled = payload["enabled"]
                     success = True
                 else:
                     success = False
 
-            self.respond(message, {
-                'success': success,
-                'connection_id': connection_id,
-                'action': 'updated'
-            })
+            self.respond(
+                message,
+                {
+                    "success": success,
+                    "connection_id": connection_id,
+                    "action": "updated",
+                },
+            )
 
     def _handle_monitoring_config(self, message: Message):
         """Handle monitor mix configuration"""
         payload = message.payload
-        action = payload.get('action', 'create')  # create, update, delete
+        action = payload.get("action", "create")  # create, update, delete
 
-        if action == 'create':
+        if action == "create":
             mix = MonitorMix(
-                mix_id=payload.get('mix_id', f"mix_{time.time()}"),
-                source_channels=payload['source_channels'],
-                output_channel=payload['output_channel'],
-                levels=payload.get('levels', {}),
-                enabled=payload.get('enabled', True)
+                mix_id=payload.get("mix_id", f"mix_{time.time()}"),
+                source_channels=payload["source_channels"],
+                output_channel=payload["output_channel"],
+                levels=payload.get("levels", {}),
+                enabled=payload.get("enabled", True),
             )
 
             with self.monitor_lock:
                 self.monitor_mixes[mix.mix_id] = mix
 
-            self.respond(message, {
-                'success': True,
-                'mix_id': mix.mix_id,
-                'action': 'created'
-            })
+            self.respond(
+                message, {"success": True, "mix_id": mix.mix_id, "action": "created"}
+            )
 
-        elif action == 'update':
-            mix_id = payload['mix_id']
+        elif action == "update":
+            mix_id = payload["mix_id"]
             with self.monitor_lock:
                 if mix_id in self.monitor_mixes:
                     mix = self.monitor_mixes[mix_id]
-                    if 'levels' in payload:
-                        mix.levels.update(payload['levels'])
-                    if 'enabled' in payload:
-                        mix.enabled = payload['enabled']
+                    if "levels" in payload:
+                        mix.levels.update(payload["levels"])
+                    if "enabled" in payload:
+                        mix.enabled = payload["enabled"]
                     success = True
                 else:
                     success = False
 
-            self.respond(message, {
-                'success': success,
-                'mix_id': mix_id,
-                'action': 'updated'
-            })
+            self.respond(
+                message, {"success": success, "mix_id": mix_id, "action": "updated"}
+            )
 
-        elif action == 'delete':
-            mix_id = payload['mix_id']
+        elif action == "delete":
+            mix_id = payload["mix_id"]
             with self.monitor_lock:
                 if mix_id in self.monitor_mixes:
                     del self.monitor_mixes[mix_id]
@@ -325,42 +336,43 @@ class RealtimeAudioIOAgent(BaseAgent):
                 else:
                     success = False
 
-            self.respond(message, {
-                'success': success,
-                'mix_id': mix_id,
-                'action': 'deleted'
-            })
+            self.respond(
+                message, {"success": success, "mix_id": mix_id, "action": "deleted"}
+            )
 
     def _handle_input_request(self, message: Message):
         """Handle request for input audio data"""
         payload = message.payload
-        num_samples = payload.get('num_samples', self.audio_config.buffer_size)
-        channels = payload.get('channels', self.audio_config.input_channels)
+        num_samples = payload.get("num_samples", self.audio_config.buffer_size)
+        channels = payload.get("channels", self.audio_config.input_channels)
 
         # Get audio from input buffer (simulated)
         audio_data = self._read_input_buffer(num_samples, channels)
 
-        self.respond(message, {
-            'success': True,
-            'audio_data': audio_data.tolist() if audio_data is not None else None,
-            'sample_rate': self.audio_config.sample_rate,
-            'channels': channels,
-            'num_samples': num_samples
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "audio_data": audio_data.tolist() if audio_data is not None else None,
+                "sample_rate": self.audio_config.sample_rate,
+                "channels": channels,
+                "num_samples": num_samples,
+            },
+        )
 
     def _handle_output_send(self, message: Message):
         """Handle sending audio to output"""
         payload = message.payload
-        audio_data = np.array(payload['audio_data'])
-        channels = payload.get('channels', self.audio_config.output_channels)
+        audio_data = np.array(payload["audio_data"])
+        channels = payload.get("channels", self.audio_config.output_channels)
 
         # Send to output buffer
         success = self._write_output_buffer(audio_data, channels)
 
-        self.respond(message, {
-            'success': success,
-            'samples_written': len(audio_data) if success else 0
-        })
+        self.respond(
+            message,
+            {"success": success, "samples_written": len(audio_data) if success else 0},
+        )
 
     def _handle_latency_measure(self, message: Message):
         """Handle latency measurement request"""
@@ -375,30 +387,37 @@ class RealtimeAudioIOAgent(BaseAgent):
         max_latency = np.max([m.round_trip_latency_ms for m in recent_latencies])
         min_latency = np.min([m.round_trip_latency_ms for m in recent_latencies])
 
-        self.respond(message, {
-            'success': True,
-            'current_latency': latency.__dict__,
-            'statistics': {
-                'avg_latency_ms': float(avg_latency),
-                'max_latency_ms': float(max_latency),
-                'min_latency_ms': float(min_latency)
-            }
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "current_latency": latency.__dict__,
+                "statistics": {
+                    "avg_latency_ms": float(avg_latency),
+                    "max_latency_ms": float(max_latency),
+                    "min_latency_ms": float(min_latency),
+                },
+            },
+        )
 
         # Publish latency report
-        self.publish("audio.live.latency.report", {
-            'latency': latency.__dict__,
-            'statistics': {
-                'avg_latency_ms': float(avg_latency),
-                'max_latency_ms': float(max_latency),
-                'min_latency_ms': float(min_latency)
-            }
-        }, priority=Priority.MEDIUM)
+        self.publish(
+            "audio.live.latency.report",
+            {
+                "latency": latency.__dict__,
+                "statistics": {
+                    "avg_latency_ms": float(avg_latency),
+                    "max_latency_ms": float(max_latency),
+                    "min_latency_ms": float(min_latency),
+                },
+            },
+            priority=Priority.MEDIUM,
+        )
 
     def _handle_buffer_optimize(self, message: Message):
         """Handle buffer optimization request"""
         payload = message.payload
-        target_latency_ms = payload.get('target_latency_ms', 5.0)
+        target_latency_ms = payload.get("target_latency_ms", 5.0)
 
         # Calculate optimal buffer size
         optimal_buffer = self._calculate_optimal_buffer_size(target_latency_ms)
@@ -411,12 +430,15 @@ class RealtimeAudioIOAgent(BaseAgent):
 
         new_latency = self._calculate_latency()
 
-        self.respond(message, {
-            'success': True,
-            'old_buffer_size': old_buffer,
-            'new_buffer_size': optimal_buffer,
-            'achieved_latency_ms': new_latency.round_trip_latency_ms
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "old_buffer_size": old_buffer,
+                "new_buffer_size": optimal_buffer,
+                "achieved_latency_ms": new_latency.round_trip_latency_ms,
+            },
+        )
 
     def _initialize_audio_interface(self):
         """Initialize the audio interface (simulated)"""
@@ -425,7 +447,7 @@ class RealtimeAudioIOAgent(BaseAgent):
             self.output_stream_active = True
 
         with self.stats_lock:
-            self.stats['interface_switches'] += 1
+            self.stats["interface_switches"] += 1
 
         self.log("INFO", f"Audio interface initialized: {self.audio_config.driver}")
 
@@ -447,7 +469,7 @@ class RealtimeAudioIOAgent(BaseAgent):
         self.processing_thread = threading.Thread(
             target=self._processing_worker,
             name=f"{self.agent_id}_processor",
-            daemon=True
+            daemon=True,
         )
         self.processing_thread.start()
 
@@ -476,26 +498,34 @@ class RealtimeAudioIOAgent(BaseAgent):
 
                 # Update statistics
                 with self.stats_lock:
-                    self.stats['buffers_processed'] += 1
-                    self.stats['total_samples_processed'] += self.audio_config.buffer_size
+                    self.stats["buffers_processed"] += 1
+                    self.stats[
+                        "total_samples_processed"
+                    ] += self.audio_config.buffer_size
 
                 # Publish stream status periodically
-                if self.stats['buffers_processed'] % 100 == 0:
-                    self.publish("audio.live.stream.status", {
-                        'input_active': self.input_stream_active,
-                        'output_active': self.output_stream_active,
-                        'buffers_processed': self.stats['buffers_processed'],
-                        'buffer_health': self._get_buffer_health()
-                    }, priority=Priority.LOW)
+                if self.stats["buffers_processed"] % 100 == 0:
+                    self.publish(
+                        "audio.live.stream.status",
+                        {
+                            "input_active": self.input_stream_active,
+                            "output_active": self.output_stream_active,
+                            "buffers_processed": self.stats["buffers_processed"],
+                            "buffer_health": self._get_buffer_health(),
+                        },
+                        priority=Priority.LOW,
+                    )
 
                 # Sleep to simulate real-time processing
-                sleep_time = self.audio_config.buffer_size / self.audio_config.sample_rate
+                sleep_time = (
+                    self.audio_config.buffer_size / self.audio_config.sample_rate
+                )
                 time.sleep(sleep_time * 0.9)  # 90% to ensure no underruns
 
             except Exception as e:
                 logger.error(f"Error in processing worker: {e}")
                 with self.stats_lock:
-                    self.stats['buffer_underruns'] += 1
+                    self.stats["buffer_underruns"] += 1
 
     def _generate_simulated_input(self) -> np.ndarray:
         """Generate simulated input audio"""
@@ -519,14 +549,16 @@ class RealtimeAudioIOAgent(BaseAgent):
             else:
                 # Buffer underrun
                 with self.stats_lock:
-                    self.stats['buffer_underruns'] += 1
+                    self.stats["buffer_underruns"] += 1
 
-    def _read_input_buffer(self, num_samples: int, channels: List[int]) -> Optional[np.ndarray]:
+    def _read_input_buffer(
+        self, num_samples: int, channels: List[int]
+    ) -> Optional[np.ndarray]:
         """Read from input buffer"""
         with self.buffer_lock:
             if len(self.input_buffer) > 0:
                 audio = self.input_buffer.popleft()
-                return audio[:num_samples, :len(channels)]
+                return audio[:num_samples, : len(channels)]
             return None
 
     def _write_output_buffer(self, audio_data: np.ndarray, channels: List[int]) -> bool:
@@ -537,20 +569,22 @@ class RealtimeAudioIOAgent(BaseAgent):
                 return True
             else:
                 with self.stats_lock:
-                    self.stats['buffer_overruns'] += 1
+                    self.stats["buffer_overruns"] += 1
                 return False
 
     def _calculate_latency(self) -> LatencyMetrics:
         """Calculate current latency"""
         # Calculate latency based on buffer size and sample rate
-        buffer_latency_ms = (self.audio_config.buffer_size / self.audio_config.sample_rate) * 1000
+        buffer_latency_ms = (
+            self.audio_config.buffer_size / self.audio_config.sample_rate
+        ) * 1000
 
         # Add driver overhead (simulated)
         driver_overhead_ms = {
-            'ASIO': 0.5,
-            'Core Audio': 1.0,
-            'JACK': 0.3,
-            'WASAPI': 2.0
+            "ASIO": 0.5,
+            "Core Audio": 1.0,
+            "JACK": 0.3,
+            "WASAPI": 2.0,
         }.get(self.audio_config.driver, 1.5)
 
         input_latency = buffer_latency_ms + driver_overhead_ms
@@ -563,13 +597,15 @@ class RealtimeAudioIOAgent(BaseAgent):
             round_trip_latency_ms=round_trip_latency,
             buffer_size=self.audio_config.buffer_size,
             sample_rate=self.audio_config.sample_rate,
-            measured_at=time.time()
+            measured_at=time.time(),
         )
 
     def _calculate_optimal_buffer_size(self, target_latency_ms: float) -> int:
         """Calculate optimal buffer size for target latency"""
         # Calculate buffer size needed for target latency
-        target_samples = int((target_latency_ms / 1000.0) * self.audio_config.sample_rate / 2)
+        target_samples = int(
+            (target_latency_ms / 1000.0) * self.audio_config.sample_rate / 2
+        )
 
         # Round to nearest power of 2
         buffer_sizes = [32, 64, 128, 256, 512, 1024]
@@ -580,9 +616,9 @@ class RealtimeAudioIOAgent(BaseAgent):
     def _get_buffer_health(self) -> str:
         """Get buffer health status"""
         with self.stats_lock:
-            underruns = self.stats['buffer_underruns']
-            overruns = self.stats['buffer_overruns']
-            total = self.stats['buffers_processed']
+            underruns = self.stats["buffer_underruns"]
+            overruns = self.stats["buffer_overruns"]
+            total = self.stats["buffers_processed"]
 
         if total == 0:
             return "unknown"
@@ -600,6 +636,7 @@ class RealtimeAudioIOAgent(BaseAgent):
 
     def _start_latency_monitoring(self):
         """Start periodic latency monitoring"""
+
         def monitor_loop():
             while self.processing_active:
                 latency = self._calculate_latency()
@@ -608,15 +645,15 @@ class RealtimeAudioIOAgent(BaseAgent):
                     self.latency_history.append(latency)
 
                 # Publish latency report
-                self.publish("audio.live.latency.report", {
-                    'latency': latency.__dict__
-                }, priority=Priority.LOW)
+                self.publish(
+                    "audio.live.latency.report",
+                    {"latency": latency.__dict__},
+                    priority=Priority.LOW,
+                )
 
                 time.sleep(1.0)  # Update every second
 
         monitor_thread = threading.Thread(
-            target=monitor_loop,
-            name=f"{self.agent_id}_latency_monitor",
-            daemon=True
+            target=monitor_loop, name=f"{self.agent_id}_latency_monitor", daemon=True
         )
         monitor_thread.start()

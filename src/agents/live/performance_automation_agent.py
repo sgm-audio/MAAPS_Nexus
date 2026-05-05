@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 class AutomationCurve(Enum):
     """Automation curve types"""
+
     LINEAR = "linear"
     EXPONENTIAL = "exponential"
     LOGARITHMIC = "logarithmic"
@@ -30,6 +31,7 @@ class AutomationCurve(Enum):
 @dataclass
 class AutomationPoint:
     """Single automation point"""
+
     time: float  # seconds or beats
     value: float
     curve: AutomationCurve = AutomationCurve.LINEAR
@@ -38,6 +40,7 @@ class AutomationPoint:
 @dataclass
 class AutomationLane:
     """Automation lane for a parameter"""
+
     lane_id: str
     parameter_path: str  # "agent.parameter"
     points: List[AutomationPoint] = field(default_factory=list)
@@ -47,6 +50,7 @@ class AutomationLane:
 @dataclass
 class Scene:
     """Performance scene"""
+
     scene_id: str
     scene_name: str
     parameter_snapshots: Dict[str, float]  # parameter -> value
@@ -57,6 +61,7 @@ class Scene:
 @dataclass
 class Macro:
     """Multi-parameter macro control"""
+
     macro_id: str
     macro_name: str
     target_parameters: List[Dict[str, Any]]  # [{param, min, max, curve}]
@@ -67,6 +72,7 @@ class Macro:
 @dataclass
 class PerformanceCue:
     """Timeline-based performance cue"""
+
     cue_id: str
     cue_name: str
     timecode: str  # "00:02:30.500" or "beat:16.0"
@@ -92,7 +98,7 @@ class PerformanceAutomationAgent(BaseAgent):
     def __init__(self):
         super().__init__(
             agent_id="performance_automation_agent",
-            agent_name="Performance Automation Agent"
+            agent_name="Performance Automation Agent",
         )
 
         # Automation lanes
@@ -124,10 +130,10 @@ class PerformanceAutomationAgent(BaseAgent):
 
         # Statistics
         self.stats = {
-            'automations_recorded': 0,
-            'scenes_triggered': 0,
-            'cues_fired': 0,
-            'macros_changed': 0
+            "automations_recorded": 0,
+            "scenes_triggered": 0,
+            "cues_fired": 0,
+            "macros_changed": 0,
         }
         self.stats_lock = threading.Lock()
 
@@ -184,7 +190,7 @@ class PerformanceAutomationAgent(BaseAgent):
     def _handle_record_start(self, message: Message):
         """Handle automation recording start"""
         payload = message.payload
-        parameter_path = payload['parameter_path']
+        parameter_path = payload["parameter_path"]
 
         self.recording_active = True
         self.recording_start_time = time.time()
@@ -194,19 +200,18 @@ class PerformanceAutomationAgent(BaseAgent):
         with self.lanes_lock:
             if parameter_path not in self.automation_lanes:
                 self.automation_lanes[parameter_path] = AutomationLane(
-                    lane_id=f"lane_{time.time()}",
-                    parameter_path=parameter_path
+                    lane_id=f"lane_{time.time()}", parameter_path=parameter_path
                 )
 
         with self.stats_lock:
-            self.stats['automations_recorded'] += 1
+            self.stats["automations_recorded"] += 1
 
-        self.respond(message, {'success': True, 'parameter': parameter_path})
+        self.respond(message, {"success": True, "parameter": parameter_path})
 
     def _handle_record_stop(self, message: Message):
         """Handle automation recording stop"""
         payload = message.payload
-        parameter_path = payload.get('parameter_path')
+        parameter_path = payload.get("parameter_path")
 
         if parameter_path and parameter_path in self.recording_parameters:
             self.recording_parameters.remove(parameter_path)
@@ -214,28 +219,30 @@ class PerformanceAutomationAgent(BaseAgent):
         if len(self.recording_parameters) == 0:
             self.recording_active = False
 
-        self.respond(message, {'success': True})
+        self.respond(message, {"success": True})
 
     def _handle_playback_enable(self, message: Message):
         """Handle automation playback enable/disable"""
         payload = message.payload
-        enable = payload.get('enable', True)
+        enable = payload.get("enable", True)
 
         self.playback_active = enable
         if enable:
             self.playback_time = 0.0
 
-        self.respond(message, {'success': True, 'playback_active': self.playback_active})
+        self.respond(
+            message, {"success": True, "playback_active": self.playback_active}
+        )
 
     def _handle_scene_trigger(self, message: Message):
         """Handle scene trigger"""
         payload = message.payload
-        scene_id = payload['scene_id']
-        transition_time = payload.get('transition_time', 0.0)
+        scene_id = payload["scene_id"]
+        transition_time = payload.get("transition_time", 0.0)
 
         with self.scenes_lock:
             if scene_id not in self.scenes:
-                self.respond(message, {'success': False, 'error': 'Scene not found'})
+                self.respond(message, {"success": False, "error": "Scene not found"})
                 return
 
             scene = self.scenes[scene_id]
@@ -246,77 +253,90 @@ class PerformanceAutomationAgent(BaseAgent):
                 curve = scene.transition_curves.get(param_path, AutomationCurve.LINEAR)
 
                 # Publish parameter change
-                self.publish("effects.parameter.change", {
-                    'parameter_path': param_path,
-                    'value': value,
-                    'ramp_time': transition_time,
-                    'curve': curve.value
-                }, priority=Priority.HIGH)
+                self.publish(
+                    "effects.parameter.change",
+                    {
+                        "parameter_path": param_path,
+                        "value": value,
+                        "ramp_time": transition_time,
+                        "curve": curve.value,
+                    },
+                    priority=Priority.HIGH,
+                )
 
         with self.stats_lock:
-            self.stats['scenes_triggered'] += 1
+            self.stats["scenes_triggered"] += 1
 
-        self.respond(message, {
-            'success': True,
-            'scene_id': scene_id,
-            'scene_name': scene.scene_name
-        })
+        self.respond(
+            message,
+            {"success": True, "scene_id": scene_id, "scene_name": scene.scene_name},
+        )
 
-        self.publish("automation.scene.triggered", {
-            'scene_id': scene_id,
-            'scene_name': scene.scene_name
-        }, priority=Priority.HIGH)
+        self.publish(
+            "automation.scene.triggered",
+            {"scene_id": scene_id, "scene_name": scene.scene_name},
+            priority=Priority.HIGH,
+        )
 
     def _handle_scene_create(self, message: Message):
         """Handle scene creation"""
         payload = message.payload
 
         scene = Scene(
-            scene_id=payload.get('scene_id', f"scene_{time.time()}"),
-            scene_name=payload['scene_name'],
-            parameter_snapshots=payload.get('parameter_snapshots', {}),
-            transition_curves={k: AutomationCurve(v) for k, v in payload.get('transition_curves', {}).items()},
-            transition_time=payload.get('transition_time', 0.0)
+            scene_id=payload.get("scene_id", f"scene_{time.time()}"),
+            scene_name=payload["scene_name"],
+            parameter_snapshots=payload.get("parameter_snapshots", {}),
+            transition_curves={
+                k: AutomationCurve(v)
+                for k, v in payload.get("transition_curves", {}).items()
+            },
+            transition_time=payload.get("transition_time", 0.0),
         )
 
         with self.scenes_lock:
             self.scenes[scene.scene_id] = scene
 
-        self.respond(message, {
-            'success': True,
-            'scene_id': scene.scene_id,
-            'scene_name': scene.scene_name
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "scene_id": scene.scene_id,
+                "scene_name": scene.scene_name,
+            },
+        )
 
     def _handle_macro_create(self, message: Message):
         """Handle macro creation"""
         payload = message.payload
 
         macro = Macro(
-            macro_id=payload.get('macro_id', f"macro_{time.time()}"),
-            macro_name=payload['macro_name'],
-            target_parameters=payload['target_parameters'],
-            current_value=payload.get('default_value', 0.5)
+            macro_id=payload.get("macro_id", f"macro_{time.time()}"),
+            macro_name=payload["macro_name"],
+            target_parameters=payload["target_parameters"],
+            current_value=payload.get("default_value", 0.5),
         )
 
         with self.macros_lock:
             self.macros[macro.macro_id] = macro
 
-        self.respond(message, {
-            'success': True,
-            'macro_id': macro.macro_id,
-            'macro_name': macro.macro_name
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "macro_id": macro.macro_id,
+                "macro_name": macro.macro_name,
+            },
+        )
 
     def _handle_macro_change(self, message: Message):
         """Handle macro value change"""
         payload = message.payload
-        macro_id = payload['macro_id']
-        value = payload['value']
+        macro_id = payload["macro_id"]
+        value = payload["value"]
 
         with self.macros_lock:
             if macro_id not in self.macros:
-                self.respond(message, {'success': False, 'error': 'Macro not found'})
+                self.respond(message, {"success": False, "error": "Macro not found"})
                 return
 
             macro = self.macros[macro_id]
@@ -324,69 +344,68 @@ class PerformanceAutomationAgent(BaseAgent):
 
             # Update all target parameters
             for target in macro.target_parameters:
-                param = target['param']
-                min_val = target['min']
-                max_val = target['max']
-                curve = target.get('curve', 'linear')
+                param = target["param"]
+                min_val = target["min"]
+                max_val = target["max"]
+                curve = target.get("curve", "linear")
 
                 # Calculate scaled value
-                if curve == 'linear':
+                if curve == "linear":
                     scaled_value = min_val + (max_val - min_val) * value
-                elif curve == 'exponential':
-                    scaled_value = min_val + (max_val - min_val) * (value ** 2)
-                elif curve == 'logarithmic':
-                    scaled_value = min_val + (max_val - min_val) * (value ** 0.5)
+                elif curve == "exponential":
+                    scaled_value = min_val + (max_val - min_val) * (value**2)
+                elif curve == "logarithmic":
+                    scaled_value = min_val + (max_val - min_val) * (value**0.5)
                 else:
                     scaled_value = min_val + (max_val - min_val) * value
 
                 # Publish parameter change
-                self.publish("effects.parameter.change", {
-                    'parameter_path': param,
-                    'value': scaled_value
-                }, priority=Priority.HIGH)
+                self.publish(
+                    "effects.parameter.change",
+                    {"parameter_path": param, "value": scaled_value},
+                    priority=Priority.HIGH,
+                )
 
         with self.stats_lock:
-            self.stats['macros_changed'] += 1
+            self.stats["macros_changed"] += 1
 
-        self.respond(message, {'success': True, 'macro_id': macro_id, 'value': value})
+        self.respond(message, {"success": True, "macro_id": macro_id, "value": value})
 
     def _handle_cue_create(self, message: Message):
         """Handle performance cue creation"""
         payload = message.payload
 
         cue = PerformanceCue(
-            cue_id=payload.get('cue_id', f"cue_{time.time()}"),
-            cue_name=payload['cue_name'],
-            timecode=payload['timecode'],
-            actions=payload['actions'],
-            condition=payload.get('condition'),
-            enabled=payload.get('enabled', True)
+            cue_id=payload.get("cue_id", f"cue_{time.time()}"),
+            cue_name=payload["cue_name"],
+            timecode=payload["timecode"],
+            actions=payload["actions"],
+            condition=payload.get("condition"),
+            enabled=payload.get("enabled", True),
         )
 
         with self.cues_lock:
             self.cues.append(cue)
 
-        self.respond(message, {
-            'success': True,
-            'cue_id': cue.cue_id,
-            'cue_name': cue.cue_name
-        })
+        self.respond(
+            message, {"success": True, "cue_id": cue.cue_id, "cue_name": cue.cue_name}
+        )
 
     def _handle_cue_fire(self, message: Message):
         """Handle manual cue fire"""
         payload = message.payload
-        cue_id = payload['cue_id']
+        cue_id = payload["cue_id"]
 
         with self.cues_lock:
             cue = next((c for c in self.cues if c.cue_id == cue_id), None)
 
             if cue is None:
-                self.respond(message, {'success': False, 'error': 'Cue not found'})
+                self.respond(message, {"success": False, "error": "Cue not found"})
                 return
 
             self._execute_cue(cue)
 
-        self.respond(message, {'success': True, 'cue_id': cue_id})
+        self.respond(message, {"success": True, "cue_id": cue_id})
 
     def _handle_parameter_change(self, message: Message):
         """Handle parameter change (for automation recording)"""
@@ -394,8 +413,8 @@ class PerformanceAutomationAgent(BaseAgent):
             return
 
         payload = message.payload
-        parameter_path = payload.get('parameter_path', '')
-        value = payload.get('value', 0.0)
+        parameter_path = payload.get("parameter_path", "")
+        value = payload.get("value", 0.0)
 
         if parameter_path in self.recording_parameters:
             elapsed_time = time.time() - self.recording_start_time
@@ -403,16 +422,13 @@ class PerformanceAutomationAgent(BaseAgent):
             with self.lanes_lock:
                 if parameter_path in self.automation_lanes:
                     lane = self.automation_lanes[parameter_path]
-                    point = AutomationPoint(
-                        time=elapsed_time,
-                        value=value
-                    )
+                    point = AutomationPoint(time=elapsed_time, value=value)
                     lane.points.append(point)
 
     def _handle_clock_position(self, message: Message):
         """Handle clock position update"""
         payload = message.payload
-        self.playback_time = payload.get('time_seconds', 0.0)
+        self.playback_time = payload.get("time_seconds", 0.0)
 
         # Check for cue triggers
         self._check_cue_triggers()
@@ -420,9 +436,7 @@ class PerformanceAutomationAgent(BaseAgent):
     def _start_playback_thread(self):
         """Start automation playback thread"""
         self.playback_thread = threading.Thread(
-            target=self._playback_worker,
-            name=f"{self.agent_id}_playback",
-            daemon=True
+            target=self._playback_worker, name=f"{self.agent_id}_playback", daemon=True
         )
         self.playback_thread.start()
 
@@ -453,12 +467,15 @@ class PerformanceAutomationAgent(BaseAgent):
 
                 if value is not None:
                     # Publish parameter change
-                    self.publish("effects.parameter.change", {
-                        'parameter_path': lane.parameter_path,
-                        'value': value
-                    }, priority=Priority.MEDIUM)
+                    self.publish(
+                        "effects.parameter.change",
+                        {"parameter_path": lane.parameter_path, "value": value},
+                        priority=Priority.MEDIUM,
+                    )
 
-    def _get_automation_value(self, lane: AutomationLane, time: float) -> Optional[float]:
+    def _get_automation_value(
+        self, lane: AutomationLane, time: float
+    ) -> Optional[float]:
         """Get automation value at specific time"""
         if len(lane.points) == 0:
             return None
@@ -486,9 +503,9 @@ class PerformanceAutomationAgent(BaseAgent):
         if before.curve == AutomationCurve.LINEAR:
             return before.value + (after.value - before.value) * progress
         elif before.curve == AutomationCurve.EXPONENTIAL:
-            return before.value + (after.value - before.value) * (progress ** 2)
+            return before.value + (after.value - before.value) * (progress**2)
         elif before.curve == AutomationCurve.LOGARITHMIC:
-            return before.value + (after.value - before.value) * (progress ** 0.5)
+            return before.value + (after.value - before.value) * (progress**0.5)
         elif before.curve == AutomationCurve.STEP:
             return before.value
         else:
@@ -533,37 +550,38 @@ class PerformanceAutomationAgent(BaseAgent):
 
         # Execute all actions
         for action in cue.actions:
-            action_type = action.get('action_type', '')
-            parameters = action.get('parameters', {})
+            action_type = action.get("action_type", "")
+            parameters = action.get("parameters", {})
 
             # Route to appropriate topic
             topic_map = {
-                'scene_change': 'automation.scene.trigger',
-                'parameter_change': 'effects.parameter.change',
-                'loop_trigger': 'loop.record.start',
-                'lighting_cue': 'visual.lighting.scene'
+                "scene_change": "automation.scene.trigger",
+                "parameter_change": "effects.parameter.change",
+                "loop_trigger": "loop.record.start",
+                "lighting_cue": "visual.lighting.scene",
             }
 
-            topic = topic_map.get(action_type, 'automation.cue.action')
+            topic = topic_map.get(action_type, "automation.cue.action")
             self.publish(topic, parameters, priority=Priority.HIGH)
 
         with self.stats_lock:
-            self.stats['cues_fired'] += 1
+            self.stats["cues_fired"] += 1
 
-        self.publish("automation.cue.fired", {
-            'cue_id': cue.cue_id,
-            'cue_name': cue.cue_name
-        }, priority=Priority.MEDIUM)
+        self.publish(
+            "automation.cue.fired",
+            {"cue_id": cue.cue_id, "cue_name": cue.cue_name},
+            priority=Priority.MEDIUM,
+        )
 
     def _evaluate_condition(self, condition: Dict[str, Any]) -> bool:
         """Evaluate a conditional trigger"""
         # Simple condition evaluation (would be more sophisticated in production)
-        condition_type = condition.get('type', '')
+        condition_type = condition.get("type", "")
 
-        if condition_type == 'parameter_threshold':
+        if condition_type == "parameter_threshold":
             # Check if a parameter exceeds a threshold
             return True  # Simplified
-        elif condition_type == 'time_range':
+        elif condition_type == "time_range":
             # Check if current time is in range
             return True  # Simplified
 
