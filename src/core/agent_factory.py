@@ -23,7 +23,7 @@ class AgentFactory:
         "content_generation": ContentGenerationAgent,
         "performance_optimization": PerformanceOptimizationAgent,
         "metadata_management": MetadataManagementAgent,
-        "workflow_engine": WorkflowEngine
+        "workflow_engine": WorkflowEngine,
     }
 
     @classmethod
@@ -44,7 +44,9 @@ class AgentFactory:
         agent_class = cls._agent_registry.get(agent_type)
         if not agent_class:
             valid_types = ", ".join(cls._agent_registry.keys())
-            raise ValueError(f"Unknown agent type: '{agent_type}'. Valid types: {valid_types}")
+            raise ValueError(
+                f"Unknown agent type: '{agent_type}'. Valid types: {valid_types}"
+            )
 
         return agent_class(**kwargs)
 

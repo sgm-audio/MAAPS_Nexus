@@ -14,7 +14,7 @@ import sys
 import os
 from memory_profiler import profile as memory_profile
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from src.system import create_system
 
@@ -42,9 +42,9 @@ class ProfileAnalysis:
 
     def profile_audio_enhancement(self):
         """Profile audio enhancement operation"""
-        print("="*60)
+        print("=" * 60)
         print("Profiling: Audio Enhancement")
-        print("="*60 + "\n")
+        print("=" * 60 + "\n")
 
         sample_rate = 44100
         audio = np.random.randn(sample_rate * 5).astype(np.float32)
@@ -58,7 +58,7 @@ class ProfileAnalysis:
             self.system.enhance_audio(
                 audio_data=audio,
                 sample_rate=sample_rate,
-                params={'noise_reduction_amount': 0.7}
+                params={"noise_reduction_amount": 0.7},
             )
 
         profiler.disable()
@@ -67,21 +67,25 @@ class ProfileAnalysis:
         s = io.StringIO()
         ps = pstats.Stats(profiler, stream=s)
         ps.strip_dirs()
-        ps.sort_stats('cumulative')
+        ps.sort_stats("cumulative")
         ps.print_stats(20)  # Top 20 functions
 
         print(s.getvalue())
 
         # Save detailed stats
-        ps.dump_stats('tests/performance/audio_enhancement_profile.prof')
-        print("\nDetailed profile saved to: tests/performance/audio_enhancement_profile.prof")
-        print("View with: python -m pstats tests/performance/audio_enhancement_profile.prof\n")
+        ps.dump_stats("tests/performance/audio_enhancement_profile.prof")
+        print(
+            "\nDetailed profile saved to: tests/performance/audio_enhancement_profile.prof"
+        )
+        print(
+            "View with: python -m pstats tests/performance/audio_enhancement_profile.prof\n"
+        )
 
     def profile_music_generation(self):
         """Profile music generation operation"""
-        print("="*60)
+        print("=" * 60)
         print("Profiling: Music Generation")
-        print("="*60 + "\n")
+        print("=" * 60 + "\n")
 
         profiler = cProfile.Profile()
         profiler.enable()
@@ -89,10 +93,7 @@ class ProfileAnalysis:
         # Run operation
         for _ in range(15):
             self.system.generate_music(
-                instrument="piano",
-                key="C",
-                tempo=120,
-                duration=3.0
+                instrument="piano", key="C", tempo=120, duration=3.0
             )
 
         profiler.disable()
@@ -101,19 +102,21 @@ class ProfileAnalysis:
         s = io.StringIO()
         ps = pstats.Stats(profiler, stream=s)
         ps.strip_dirs()
-        ps.sort_stats('cumulative')
+        ps.sort_stats("cumulative")
         ps.print_stats(20)
 
         print(s.getvalue())
 
-        ps.dump_stats('tests/performance/music_generation_profile.prof')
-        print("\nDetailed profile saved to: tests/performance/music_generation_profile.prof\n")
+        ps.dump_stats("tests/performance/music_generation_profile.prof")
+        print(
+            "\nDetailed profile saved to: tests/performance/music_generation_profile.prof\n"
+        )
 
     def profile_metadata_extraction(self):
         """Profile metadata extraction operation"""
-        print("="*60)
+        print("=" * 60)
         print("Profiling: Metadata Extraction")
-        print("="*60 + "\n")
+        print("=" * 60 + "\n")
 
         sample_rate = 44100
         audio = np.random.randn(sample_rate * 5).astype(np.float32)
@@ -128,7 +131,7 @@ class ProfileAnalysis:
                 sample_rate=sample_rate,
                 include_spectral=True,
                 include_temporal=True,
-                include_harmonic=True
+                include_harmonic=True,
             )
 
         profiler.disable()
@@ -137,49 +140,51 @@ class ProfileAnalysis:
         s = io.StringIO()
         ps = pstats.Stats(profiler, stream=s)
         ps.strip_dirs()
-        ps.sort_stats('cumulative')
+        ps.sort_stats("cumulative")
         ps.print_stats(20)
 
         print(s.getvalue())
 
-        ps.dump_stats('tests/performance/metadata_extraction_profile.prof')
-        print("\nDetailed profile saved to: tests/performance/metadata_extraction_profile.prof\n")
+        ps.dump_stats("tests/performance/metadata_extraction_profile.prof")
+        print(
+            "\nDetailed profile saved to: tests/performance/metadata_extraction_profile.prof\n"
+        )
 
     def analyze_hotspots(self):
         """Analyze performance hotspots across all operations"""
-        print("="*60)
+        print("=" * 60)
         print("Performance Hotspot Analysis")
-        print("="*60 + "\n")
+        print("=" * 60 + "\n")
 
         # Combine stats from all profiles
-        stats = pstats.Stats('tests/performance/audio_enhancement_profile.prof')
+        stats = pstats.Stats("tests/performance/audio_enhancement_profile.prof")
 
         try:
-            stats.add('tests/performance/music_generation_profile.prof')
-            stats.add('tests/performance/metadata_extraction_profile.prof')
+            stats.add("tests/performance/music_generation_profile.prof")
+            stats.add("tests/performance/metadata_extraction_profile.prof")
         except:
             pass
 
         print("Top 30 Functions by Cumulative Time:\n")
         stats.strip_dirs()
-        stats.sort_stats('cumulative')
+        stats.sort_stats("cumulative")
         stats.print_stats(30)
 
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("Top 30 Functions by Total Time:\n")
-        stats.sort_stats('tottime')
+        stats.sort_stats("tottime")
         stats.print_stats(30)
 
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("Functions Called Most Frequently:\n")
-        stats.sort_stats('ncalls')
+        stats.sort_stats("ncalls")
         stats.print_stats(30)
 
     def memory_analysis(self):
         """Analyze memory usage patterns"""
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("Memory Usage Analysis")
-        print("="*60 + "\n")
+        print("=" * 60 + "\n")
 
         import tracemalloc
 
@@ -198,7 +203,7 @@ class ProfileAnalysis:
             self.system.enhance_audio(
                 audio_data=audio,
                 sample_rate=sample_rate,
-                params={'noise_reduction_amount': 0.7}
+                params={"noise_reduction_amount": 0.7},
             )
             if (i + 1) % 5 == 0:
                 print(f"  Completed {i+1}/20 operations")
@@ -207,7 +212,7 @@ class ProfileAnalysis:
         snapshot_after = tracemalloc.take_snapshot()
 
         # Compare snapshots
-        top_stats = snapshot_after.compare_to(snapshot_before, 'lineno')
+        top_stats = snapshot_after.compare_to(snapshot_before, "lineno")
 
         print("\nTop 20 Memory Allocations:\n")
         for stat in top_stats[:20]:
@@ -222,28 +227,36 @@ class ProfileAnalysis:
 
     def generate_report(self):
         """Generate performance analysis report"""
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("Generating Performance Report")
-        print("="*60 + "\n")
+        print("=" * 60 + "\n")
 
-        report_path = 'tests/performance/PERFORMANCE_REPORT.md'
+        report_path = "tests/performance/PERFORMANCE_REPORT.md"
 
-        with open(report_path, 'w') as f:
+        with open(report_path, "w") as f:
             f.write("# MAAPS Performance Analysis Report\n\n")
             f.write(f"Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
 
             f.write("## Summary\n\n")
-            f.write("This report contains detailed performance profiling data for MAAPS.\n\n")
+            f.write(
+                "This report contains detailed performance profiling data for MAAPS.\n\n"
+            )
 
             f.write("## Profile Files\n\n")
-            f.write("- `audio_enhancement_profile.prof` - Audio enhancement profiling\n")
+            f.write(
+                "- `audio_enhancement_profile.prof` - Audio enhancement profiling\n"
+            )
             f.write("- `music_generation_profile.prof` - Music generation profiling\n")
-            f.write("- `metadata_extraction_profile.prof` - Metadata extraction profiling\n\n")
+            f.write(
+                "- `metadata_extraction_profile.prof` - Metadata extraction profiling\n\n"
+            )
 
             f.write("## Viewing Profiles\n\n")
             f.write("```bash\n")
             f.write("# Interactive viewer\n")
-            f.write("python -m pstats tests/performance/audio_enhancement_profile.prof\n\n")
+            f.write(
+                "python -m pstats tests/performance/audio_enhancement_profile.prof\n\n"
+            )
             f.write("# Commands in pstats:\n")
             f.write("#   sort cumulative  - Sort by cumulative time\n")
             f.write("#   stats 20         - Show top 20 functions\n")
@@ -287,9 +300,9 @@ class ProfileAnalysis:
             # Generate report
             self.generate_report()
 
-            print("\n" + "="*60)
+            print("\n" + "=" * 60)
             print("Profiling Complete!")
-            print("="*60)
+            print("=" * 60)
             print("\nNext steps:")
             print("1. Review profile files with: python -m pstats <profile_file>")
             print("2. Visualize with: snakeviz <profile_file>")

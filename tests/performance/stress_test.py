@@ -14,7 +14,7 @@ from typing import List, Dict, Any
 import sys
 import os
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from src.system import create_system
 
@@ -54,19 +54,21 @@ class StressTest:
 
         while time.time() - start < duration and not self.stop_flag.is_set():
             sample = {
-                'timestamp': time.time() - start,
-                'cpu_percent': process.cpu_percent(interval=1),
-                'memory_mb': process.memory_info().rss / 1024 / 1024,
-                'threads': process.num_threads(),
-                'system_cpu': psutil.cpu_percent(interval=None),
-                'system_memory': psutil.virtual_memory().percent
+                "timestamp": time.time() - start,
+                "cpu_percent": process.cpu_percent(interval=1),
+                "memory_mb": process.memory_info().rss / 1024 / 1024,
+                "threads": process.num_threads(),
+                "system_cpu": psutil.cpu_percent(interval=None),
+                "system_memory": psutil.virtual_memory().percent,
             }
             samples.append(sample)
             time.sleep(1)
 
         return samples
 
-    def worker_thread(self, worker_id: int, task_queue: queue.Queue, results_queue: queue.Queue):
+    def worker_thread(
+        self, worker_id: int, task_queue: queue.Queue, results_queue: queue.Queue
+    ):
         """Worker thread for concurrent operations"""
         sample_rate = 44100
         audio = np.random.randn(sample_rate * 2).astype(np.float32)
@@ -80,47 +82,46 @@ class StressTest:
                 start = time.time()
 
                 # Perform operation
-                if task['type'] == 'enhance':
+                if task["type"] == "enhance":
                     result = self.system.enhance_audio(
                         audio_data=audio,
                         sample_rate=sample_rate,
-                        params={'noise_reduction_amount': 0.7}
+                        params={"noise_reduction_amount": 0.7},
                     )
-                elif task['type'] == 'generate':
+                elif task["type"] == "generate":
                     result = self.system.generate_music(
-                        instrument="piano",
-                        tempo=120,
-                        duration=2.0
+                        instrument="piano", tempo=120, duration=2.0
                     )
-                elif task['type'] == 'metadata':
+                elif task["type"] == "metadata":
                     result = self.system.extract_metadata(
-                        audio_data=audio,
-                        sample_rate=sample_rate
+                        audio_data=audio, sample_rate=sample_rate
                     )
 
                 elapsed = time.time() - start
 
-                results_queue.put({
-                    'worker_id': worker_id,
-                    'task_type': task['type'],
-                    'success': True,
-                    'elapsed': elapsed
-                })
+                results_queue.put(
+                    {
+                        "worker_id": worker_id,
+                        "task_type": task["type"],
+                        "success": True,
+                        "elapsed": elapsed,
+                    }
+                )
 
             except queue.Empty:
                 continue
             except Exception as e:
-                self.error_queue.put({
-                    'worker_id': worker_id,
-                    'error': str(e),
-                    'task': task
-                })
-                results_queue.put({
-                    'worker_id': worker_id,
-                    'task_type': task.get('type', 'unknown'),
-                    'success': False,
-                    'error': str(e)
-                })
+                self.error_queue.put(
+                    {"worker_id": worker_id, "error": str(e), "task": task}
+                )
+                results_queue.put(
+                    {
+                        "worker_id": worker_id,
+                        "task_type": task.get("type", "unknown"),
+                        "success": False,
+                        "error": str(e),
+                    }
+                )
             finally:
                 task_queue.task_done()
 
@@ -134,12 +135,9 @@ class StressTest:
         results_queue = queue.Queue()
 
         # Create tasks
-        task_types = ['enhance', 'generate', 'metadata']
+        task_types = ["enhance", "generate", "metadata"]
         for i in range(n_tasks):
-            task_queue.put({
-                'id': i,
-                'type': task_types[i % len(task_types)]
-            })
+            task_queue.put({"id": i, "type": task_types[i % len(task_types)]})
 
         # Start workers
         workers = []
@@ -149,7 +147,7 @@ class StressTest:
             worker = threading.Thread(
                 target=self.worker_thread,
                 args=(i, task_queue, results_queue),
-                daemon=True
+                daemon=True,
             )
             worker.start()
             workers.append(worker)
@@ -183,9 +181,11 @@ class StressTest:
             results.append(results_queue.get())
 
         # Analyze
-        successful = sum(1 for r in results if r['success'])
-        failed = sum(1 for r in results if not r['success'])
-        avg_time = np.mean([r['elapsed'] for r in results if r['success'] and 'elapsed' in r])
+        successful = sum(1 for r in results if r["success"])
+        failed = sum(1 for r in results if not r["success"])
+        avg_time = np.mean(
+            [r["elapsed"] for r in results if r["success"] and "elapsed" in r]
+        )
         throughput = successful / elapsed
 
         print(f"\nResults:")
@@ -197,13 +197,13 @@ class StressTest:
         print(f"  Throughput:     {throughput:.2f} tasks/sec")
 
         return {
-            'n_workers': n_workers,
-            'n_tasks': n_tasks,
-            'successful': successful,
-            'failed': failed,
-            'elapsed': elapsed,
-            'throughput': throughput,
-            'avg_time': avg_time
+            "n_workers": n_workers,
+            "n_tasks": n_tasks,
+            "successful": successful,
+            "failed": failed,
+            "elapsed": elapsed,
+            "throughput": throughput,
+            "avg_time": avg_time,
         }
 
     def test_memory_stress(self, duration: int = 60):
@@ -217,8 +217,7 @@ class StressTest:
 
         # Start resource monitoring
         monitor_thread = threading.Thread(
-            target=lambda: self.monitor_resources(duration),
-            daemon=True
+            target=lambda: self.monitor_resources(duration), daemon=True
         )
         monitor_thread.start()
 
@@ -234,7 +233,7 @@ class StressTest:
                 result = self.system.enhance_audio(
                     audio_data=audio,
                     sample_rate=sample_rate,
-                    params={'noise_reduction_amount': 0.7}
+                    params={"noise_reduction_amount": 0.7},
                 )
 
                 # Keep some results in memory
@@ -258,9 +257,9 @@ class StressTest:
         print(f"  Rate:        {operations/elapsed:.2f} ops/sec")
 
         return {
-            'operations': operations,
-            'elapsed': elapsed,
-            'rate': operations / elapsed
+            "operations": operations,
+            "elapsed": elapsed,
+            "rate": operations / elapsed,
         }
 
     def test_sustained_load(self, duration: int = 300):
@@ -288,18 +287,15 @@ class StressTest:
                     self.system.enhance_audio(
                         audio_data=audio,
                         sample_rate=sample_rate,
-                        params={'noise_reduction_amount': 0.7}
+                        params={"noise_reduction_amount": 0.7},
                     )
                 elif op_type == 1:
                     self.system.generate_music(
-                        instrument="piano",
-                        tempo=120,
-                        duration=2.0
+                        instrument="piano", tempo=120, duration=2.0
                     )
                 else:
                     self.system.extract_metadata(
-                        audio_data=audio,
-                        sample_rate=sample_rate
+                        audio_data=audio, sample_rate=sample_rate
                     )
 
                 op_time = time.time() - op_start
@@ -312,11 +308,13 @@ class StressTest:
                     avg_response = np.mean(response_times[-50:])
                     health = self.system.get_health()
 
-                    print(f"  Time: {elapsed:.0f}s | "
-                          f"Ops: {operations} | "
-                          f"Rate: {rate:.2f}/s | "
-                          f"Avg Response: {avg_response:.3f}s | "
-                          f"Health: {health['health_score']}%")
+                    print(
+                        f"  Time: {elapsed:.0f}s | "
+                        f"Ops: {operations} | "
+                        f"Rate: {rate:.2f}/s | "
+                        f"Avg Response: {avg_response:.3f}s | "
+                        f"Health: {health['health_score']}%"
+                    )
 
             except Exception as e:
                 errors += 1
@@ -336,13 +334,13 @@ class StressTest:
         print(f"  P99 Response:    {np.percentile(response_times, 99):.3f}s")
 
         return {
-            'duration': elapsed,
-            'operations': operations,
-            'errors': errors,
-            'throughput': operations / elapsed,
-            'avg_response': np.mean(response_times),
-            'p95_response': np.percentile(response_times, 95),
-            'p99_response': np.percentile(response_times, 99)
+            "duration": elapsed,
+            "operations": operations,
+            "errors": errors,
+            "throughput": operations / elapsed,
+            "avg_response": np.mean(response_times),
+            "p95_response": np.percentile(response_times, 95),
+            "p99_response": np.percentile(response_times, 99),
         }
 
     def run_all(self):

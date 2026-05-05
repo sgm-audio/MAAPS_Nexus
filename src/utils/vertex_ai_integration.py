@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class VertexAIConfig:
     """Configuration for Vertex AI"""
+
     project_id: str
     location: str = "us-central1"
     model: str = "claude-3-5-sonnet@20241022"
@@ -36,7 +37,7 @@ class VertexAIClient:
         self,
         project_id: Optional[str] = None,
         location: Optional[str] = None,
-        model: Optional[str] = None
+        model: Optional[str] = None,
     ):
         """
         Initialize Vertex AI client.
@@ -64,10 +65,11 @@ class VertexAIClient:
             from anthropic import AnthropicVertex
 
             self._client = AnthropicVertex(
-                project_id=self.project_id,
-                region=self.location
+                project_id=self.project_id, region=self.location
             )
-            logger.info(f"Vertex AI client initialized: {self.model} in {self.location}")
+            logger.info(
+                f"Vertex AI client initialized: {self.model} in {self.location}"
+            )
 
         except ImportError:
             raise ImportError(
@@ -83,7 +85,7 @@ class VertexAIClient:
         system_prompt: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        **kwargs
+        **kwargs,
     ) -> str:
         """
         Send a chat completion request to Vertex AI.
@@ -150,7 +152,7 @@ class VertexAIClient:
                     generation_config={
                         "temperature": temperature,
                         "max_output_tokens": max_tokens,
-                    }
+                    },
                 )
 
                 return response.text
@@ -173,7 +175,7 @@ class VertexAIClient:
         system_prompt: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        **kwargs
+        **kwargs,
     ):
         """
         Stream a chat completion response from Vertex AI.
@@ -219,7 +221,7 @@ class VertexAIClient:
                 system_prompt=system_prompt,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                **kwargs
+                **kwargs,
             )
             yield response
 
@@ -233,7 +235,7 @@ class VertexAIClient:
         try:
             response = self.chat(
                 messages=[{"role": "user", "content": "Say 'connected' only."}],
-                max_tokens=10
+                max_tokens=10,
             )
 
             return {
@@ -241,7 +243,7 @@ class VertexAIClient:
                 "model": self.model,
                 "location": self.location,
                 "project_id": self.project_id,
-                "response": response.strip()
+                "response": response.strip(),
             }
 
         except Exception as e:
@@ -250,7 +252,7 @@ class VertexAIClient:
                 "model": self.model,
                 "location": self.location,
                 "project_id": self.project_id,
-                "error": str(e)
+                "error": str(e),
             }
 
 

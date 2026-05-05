@@ -13,7 +13,7 @@ from src.agents.live.loop_processors import (
     CrossfadeProcessor,
     LoopQuantizer,
     LoopRecorder,
-    OverdubProcessor
+    OverdubProcessor,
 )
 from src.core import Message
 
@@ -110,12 +110,14 @@ class TestLoopProcessors(unittest.TestCase):
         attack_points = [1000, 15000, 30000]
         for point in attack_points:
             # Create sharp attack with high amplitude change
-            signal_with_transients[point-10:point] = 0.0
-            signal_with_transients[point:point+50] = 1.0  # Very strong transient
-            signal_with_transients[point+50:point+1000] = 0.5  # Sustain
+            signal_with_transients[point - 10 : point] = 0.0
+            signal_with_transients[point : point + 50] = 1.0  # Very strong transient
+            signal_with_transients[point + 50 : point + 1000] = 0.5  # Sustain
 
         # Use lower threshold for better detection
-        slices = slicer.slice_by_transients(signal_with_transients, self.sample_rate, threshold=0.2)
+        slices = slicer.slice_by_transients(
+            signal_with_transients, self.sample_rate, threshold=0.2
+        )
 
         # Should detect at least 1 slice (algorithm may merge close transients)
         # The function returns slice points, not individual transients
@@ -147,7 +149,9 @@ class TestLoopProcessors(unittest.TestCase):
         # Should have intermediate values (not all 0.5 or -0.5)
         self.assertGreater(len(crossfade_region), 0)
         # At least some samples should be between -0.5 and 0.5
-        intermediate_samples = np.sum((crossfade_region > -0.5) & (crossfade_region < 0.5))
+        intermediate_samples = np.sum(
+            (crossfade_region > -0.5) & (crossfade_region < 0.5)
+        )
         self.assertGreater(intermediate_samples, 0)
 
     def test_loop_crossfade(self):
@@ -155,10 +159,9 @@ class TestLoopProcessors(unittest.TestCase):
         crossfader = CrossfadeProcessor()
 
         # Create loop with very different start and end values
-        loop = np.concatenate([
-            np.ones(5000) * 0.9,   # Start: 0.9
-            np.ones(5000) * -0.9   # End: -0.9
-        ])
+        loop = np.concatenate(
+            [np.ones(5000) * 0.9, np.ones(5000) * -0.9]  # Start: 0.9  # End: -0.9
+        )
 
         # Apply loop crossfade
         seamless = crossfader.loop_crossfade(loop, 500)
@@ -174,7 +177,9 @@ class TestLoopProcessors(unittest.TestCase):
         # At least some end samples should be different from original -0.9
         # (they should be mixed with the 0.9 from the beginning)
         different_samples = np.sum(np.abs(end_region - (-0.9)) > 0.1)
-        self.assertGreater(different_samples, 10)  # At least 10 samples should show mixing
+        self.assertGreater(
+            different_samples, 10
+        )  # At least 10 samples should show mixing
 
     def test_quantizer(self):
         """Test loop quantization to beats"""
@@ -264,10 +269,10 @@ class TestLiveLoopingAgent(unittest.TestCase):
             topic="loop.track.create",
             sender="test",
             payload={
-                'track_name': 'Test Track',
-                'length_beats': 4,
-                'sync_to_tempo': True
-            }
+                "track_name": "Test Track",
+                "length_beats": 4,
+                "sync_to_tempo": True,
+            },
         )
 
         self.agent._handle_track_create(msg)
@@ -281,7 +286,7 @@ class TestLiveLoopingAgent(unittest.TestCase):
         create_msg = Message(
             topic="loop.track.create",
             sender="test",
-            payload={'track_name': 'Delete Me', 'track_id': 'delete_test'}
+            payload={"track_name": "Delete Me", "track_id": "delete_test"},
         )
         self.agent._handle_track_create(create_msg)
 
@@ -289,55 +294,57 @@ class TestLiveLoopingAgent(unittest.TestCase):
         delete_msg = Message(
             topic="loop.track.delete",
             sender="test",
-            payload={'track_id': 'delete_test'}
+            payload={"track_id": "delete_test"},
         )
         self.agent._handle_track_delete(delete_msg)
 
         # Track should be removed
-        self.assertNotIn('delete_test', self.agent.loop_tracks)
+        self.assertNotIn("delete_test", self.agent.loop_tracks)
 
     def test_record_loop(self):
         """Test loop recording"""
         # Create track
-        self.agent._handle_track_create(Message(
-            topic="loop.track.create",
-            sender="test",
-            payload={'track_name': 'Record Test', 'track_id': 'record_test'}
-        ))
+        self.agent._handle_track_create(
+            Message(
+                topic="loop.track.create",
+                sender="test",
+                payload={"track_name": "Record Test", "track_id": "record_test"},
+            )
+        )
 
         # Start recording
         start_msg = Message(
             topic="loop.record.start",
             sender="test",
-            payload={'track_id': 'record_test', 'mode': 'replace'}
+            payload={"track_id": "record_test", "mode": "replace"},
         )
         self.agent._handle_record_start(start_msg)
 
         # Check recording state
-        track = self.agent.loop_tracks['record_test']
-        self.assertEqual(track.state.value, 'recording')
+        track = self.agent.loop_tracks["record_test"]
+        self.assertEqual(track.state.value, "recording")
 
         # Stop recording
         stop_msg = Message(
-            topic="loop.record.stop",
-            sender="test",
-            payload={'track_id': 'record_test'}
+            topic="loop.record.stop", sender="test", payload={"track_id": "record_test"}
         )
         self.agent._handle_record_stop(stop_msg)
 
         # Should be playing now
-        self.assertEqual(track.state.value, 'playing')
+        self.assertEqual(track.state.value, "playing")
 
     def test_playback_toggle(self):
         """Test toggling playback"""
         # Create track with audio
-        self.agent._handle_track_create(Message(
-            topic="loop.track.create",
-            sender="test",
-            payload={'track_name': 'Playback Test', 'track_id': 'playback_test'}
-        ))
+        self.agent._handle_track_create(
+            Message(
+                topic="loop.track.create",
+                sender="test",
+                payload={"track_name": "Playback Test", "track_id": "playback_test"},
+            )
+        )
 
-        track = self.agent.loop_tracks['playback_test']
+        track = self.agent.loop_tracks["playback_test"]
         track.audio_data = self.test_audio
         track.state = track.state.PLAYING
 
@@ -345,33 +352,33 @@ class TestLiveLoopingAgent(unittest.TestCase):
         msg = Message(
             topic="loop.playback.toggle",
             sender="test",
-            payload={'track_id': 'playback_test'}
+            payload={"track_id": "playback_test"},
         )
         self.agent._handle_playback_toggle(msg)
 
-        self.assertEqual(track.state.value, 'stopped')
+        self.assertEqual(track.state.value, "stopped")
 
         # Toggle back to playing
         self.agent._handle_playback_toggle(msg)
-        self.assertEqual(track.state.value, 'playing')
+        self.assertEqual(track.state.value, "playing")
 
     def test_undo_redo(self):
         """Test undo/redo functionality"""
         # Create track
-        self.agent._handle_track_create(Message(
-            topic="loop.track.create",
-            sender="test",
-            payload={'track_name': 'Undo Test', 'track_id': 'undo_test'}
-        ))
+        self.agent._handle_track_create(
+            Message(
+                topic="loop.track.create",
+                sender="test",
+                payload={"track_name": "Undo Test", "track_id": "undo_test"},
+            )
+        )
 
-        track = self.agent.loop_tracks['undo_test']
+        track = self.agent.loop_tracks["undo_test"]
         track.audio_data = self.test_audio.copy()
 
         # Make a change (clear)
         clear_msg = Message(
-            topic="loop.clear",
-            sender="test",
-            payload={'track_id': 'undo_test'}
+            topic="loop.clear", sender="test", payload={"track_id": "undo_test"}
         )
         self.agent._handle_clear(clear_msg)
 
@@ -381,9 +388,7 @@ class TestLiveLoopingAgent(unittest.TestCase):
 
         # Undo
         undo_msg = Message(
-            topic="loop.undo",
-            sender="test",
-            payload={'track_id': 'undo_test'}
+            topic="loop.undo", sender="test", payload={"track_id": "undo_test"}
         )
         self.agent._handle_undo(undo_msg)
 
@@ -392,9 +397,7 @@ class TestLiveLoopingAgent(unittest.TestCase):
 
         # Redo
         redo_msg = Message(
-            topic="loop.redo",
-            sender="test",
-            payload={'track_id': 'undo_test'}
+            topic="loop.redo", sender="test", payload={"track_id": "undo_test"}
         )
         self.agent._handle_redo(redo_msg)
 
@@ -404,13 +407,15 @@ class TestLiveLoopingAgent(unittest.TestCase):
     def test_manipulate_reverse(self):
         """Test reverse operation"""
         # Create track
-        self.agent._handle_track_create(Message(
-            topic="loop.track.create",
-            sender="test",
-            payload={'track_name': 'Reverse Test', 'track_id': 'reverse_test'}
-        ))
+        self.agent._handle_track_create(
+            Message(
+                topic="loop.track.create",
+                sender="test",
+                payload={"track_name": "Reverse Test", "track_id": "reverse_test"},
+            )
+        )
 
-        track = self.agent.loop_tracks['reverse_test']
+        track = self.agent.loop_tracks["reverse_test"]
         track.audio_data = self.test_audio.copy()
         original_first_sample = track.audio_data[0]
 
@@ -418,7 +423,7 @@ class TestLiveLoopingAgent(unittest.TestCase):
         msg = Message(
             topic="loop.manipulate",
             sender="test",
-            payload={'track_id': 'reverse_test', 'operation': 'reverse'}
+            payload={"track_id": "reverse_test", "operation": "reverse"},
         )
         self.agent._handle_manipulate(msg)
 
@@ -428,13 +433,15 @@ class TestLiveLoopingAgent(unittest.TestCase):
     def test_manipulate_pitch_shift(self):
         """Test pitch shifting"""
         # Create track
-        self.agent._handle_track_create(Message(
-            topic="loop.track.create",
-            sender="test",
-            payload={'track_name': 'Pitch Test', 'track_id': 'pitch_test'}
-        ))
+        self.agent._handle_track_create(
+            Message(
+                topic="loop.track.create",
+                sender="test",
+                payload={"track_name": "Pitch Test", "track_id": "pitch_test"},
+            )
+        )
 
-        track = self.agent.loop_tracks['pitch_test']
+        track = self.agent.loop_tracks["pitch_test"]
         track.audio_data = self.test_audio.copy()
 
         # Pitch shift up 5 semitones
@@ -442,10 +449,10 @@ class TestLiveLoopingAgent(unittest.TestCase):
             topic="loop.manipulate",
             sender="test",
             payload={
-                'track_id': 'pitch_test',
-                'operation': 'pitch_shift',
-                'parameters': {'semitones': 5.0}
-            }
+                "track_id": "pitch_test",
+                "operation": "pitch_shift",
+                "parameters": {"semitones": 5.0},
+            },
         )
         self.agent._handle_manipulate(msg)
 
@@ -455,13 +462,15 @@ class TestLiveLoopingAgent(unittest.TestCase):
     def test_manipulate_time_stretch(self):
         """Test time stretching"""
         # Create track
-        self.agent._handle_track_create(Message(
-            topic="loop.track.create",
-            sender="test",
-            payload={'track_name': 'Stretch Test', 'track_id': 'stretch_test'}
-        ))
+        self.agent._handle_track_create(
+            Message(
+                topic="loop.track.create",
+                sender="test",
+                payload={"track_name": "Stretch Test", "track_id": "stretch_test"},
+            )
+        )
 
-        track = self.agent.loop_tracks['stretch_test']
+        track = self.agent.loop_tracks["stretch_test"]
         track.audio_data = self.test_audio.copy()
         original_length = len(track.audio_data)
 
@@ -470,10 +479,10 @@ class TestLiveLoopingAgent(unittest.TestCase):
             topic="loop.manipulate",
             sender="test",
             payload={
-                'track_id': 'stretch_test',
-                'operation': 'time_stretch',
-                'parameters': {'factor': 1.5}
-            }
+                "track_id": "stretch_test",
+                "operation": "time_stretch",
+                "parameters": {"factor": 1.5},
+            },
         )
         self.agent._handle_manipulate(msg)
 
@@ -486,25 +495,25 @@ class TestLiveLoopingAgent(unittest.TestCase):
         self.agent.master_tempo = 120.0
 
         # Create synced track
-        self.agent._handle_track_create(Message(
-            topic="loop.track.create",
-            sender="test",
-            payload={
-                'track_name': 'Sync Test',
-                'track_id': 'sync_test',
-                'sync_to_tempo': True,
-                'length_beats': 4
-            }
-        ))
+        self.agent._handle_track_create(
+            Message(
+                topic="loop.track.create",
+                sender="test",
+                payload={
+                    "track_name": "Sync Test",
+                    "track_id": "sync_test",
+                    "sync_to_tempo": True,
+                    "length_beats": 4,
+                },
+            )
+        )
 
-        track = self.agent.loop_tracks['sync_test']
+        track = self.agent.loop_tracks["sync_test"]
         track.audio_data = self.test_audio.copy()
 
         # Change tempo
         tempo_msg = Message(
-            topic="sync.clock.tempo",
-            sender="test",
-            payload={'bpm': 140.0}
+            topic="sync.clock.tempo", sender="test", payload={"bpm": 140.0}
         )
         self.agent._handle_tempo_change(tempo_msg)
 
@@ -514,35 +523,39 @@ class TestLiveLoopingAgent(unittest.TestCase):
     def test_statistics_tracking(self):
         """Test that statistics are tracked"""
         # Create and record loop
-        self.agent._handle_track_create(Message(
-            topic="loop.track.create",
-            sender="test",
-            payload={'track_name': 'Stats Test', 'track_id': 'stats_test'}
-        ))
+        self.agent._handle_track_create(
+            Message(
+                topic="loop.track.create",
+                sender="test",
+                payload={"track_name": "Stats Test", "track_id": "stats_test"},
+            )
+        )
 
         # Record
-        self.agent._handle_record_start(Message(
-            topic="loop.record.start",
-            sender="test",
-            payload={'track_id': 'stats_test'}
-        ))
+        self.agent._handle_record_start(
+            Message(
+                topic="loop.record.start",
+                sender="test",
+                payload={"track_id": "stats_test"},
+            )
+        )
 
         # Check stats
-        self.assertEqual(self.agent.stats['loops_recorded'], 1)
+        self.assertEqual(self.agent.stats["loops_recorded"], 1)
 
         # Undo
-        track = self.agent.loop_tracks['stats_test']
+        track = self.agent.loop_tracks["stats_test"]
         track.audio_data = self.test_audio.copy()
         track.undo_history.append(self.test_audio.copy())
 
-        self.agent._handle_undo(Message(
-            topic="loop.undo",
-            sender="test",
-            payload={'track_id': 'stats_test'}
-        ))
+        self.agent._handle_undo(
+            Message(
+                topic="loop.undo", sender="test", payload={"track_id": "stats_test"}
+            )
+        )
 
-        self.assertEqual(self.agent.stats['undos_performed'], 1)
+        self.assertEqual(self.agent.stats["undos_performed"], 1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main(verbosity=2)

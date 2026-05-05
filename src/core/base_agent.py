@@ -15,12 +15,12 @@ from enum import Enum
 from .message_bus import get_message_bus, MessageBus
 from .message_types import Message, Priority, Topics, SystemEvent, LogEntry
 
-
 logger = logging.getLogger(__name__)
 
 
 class AgentState(Enum):
     """Agent lifecycle states"""
+
     CREATED = "created"
     STARTING = "starting"
     RUNNING = "running"
@@ -66,7 +66,7 @@ class BaseAgent(ABC):
             "messages_sent": 0,
             "errors": 0,
             "uptime_seconds": 0.0,
-            "start_time": None
+            "start_time": None,
         }
         self._metrics_lock = threading.Lock()
 
@@ -108,33 +108,37 @@ class BaseAgent(ABC):
         with self._state_lock:
             old_state = self._state
             self._state = new_state
-        
+
         # Publish status change event
         payload = {
             "agent_id": self.agent_id,
             "agent_name": self.agent_name,
             "old_state": old_state.value,
             "new_state": new_state.value,
-            "timestamp": time.time()
+            "timestamp": time.time(),
         }
-        
+
         if error:
             payload["error"] = str(error)
-            
+
         # Use a generic status topic that the Coordinator subscribes to
         topic = "system.agent.status"
-        
+
         # Determine priority based on state
         priority = Priority.HIGH if new_state == AgentState.ERROR else Priority.MEDIUM
-        
+
         self.publish(topic, payload, priority=priority)
-        logger.debug(f"Agent {self.agent_id} state changed: {old_state.value} -> {new_state.value}")
+        logger.debug(
+            f"Agent {self.agent_id} state changed: {old_state.value} -> {new_state.value}"
+        )
 
     def start(self):
         """Start the agent"""
         with self._state_lock:
             if self._state != AgentState.CREATED:
-                logger.warning(f"Agent {self.agent_id} already started or in invalid state")
+                logger.warning(
+                    f"Agent {self.agent_id} already started or in invalid state"
+                )
                 return
 
         self._set_state(AgentState.STARTING)
@@ -212,7 +216,9 @@ class BaseAgent(ABC):
             self._subscribed_topics.remove(topic)
         logger.debug(f"Agent {self.agent_id} unsubscribed from {topic}")
 
-    def publish(self, topic: str, payload: Dict[str, Any], priority: Priority = Priority.MEDIUM) -> bool:
+    def publish(
+        self, topic: str, payload: Dict[str, Any], priority: Priority = Priority.MEDIUM
+    ) -> bool:
         """
         Publish a message.
 
@@ -225,10 +231,7 @@ class BaseAgent(ABC):
             True if message was published successfully
         """
         message = Message(
-            topic=topic,
-            sender=self.agent_id,
-            payload=payload,
-            priority=priority
+            topic=topic, sender=self.agent_id, payload=payload, priority=priority
         )
 
         success = self._message_bus.publish(message)
@@ -239,8 +242,13 @@ class BaseAgent(ABC):
 
         return success
 
-    def request(self, topic: str, payload: Dict[str, Any],
-                timeout: float = 5.0, priority: Priority = Priority.MEDIUM) -> Optional[Message]:
+    def request(
+        self,
+        topic: str,
+        payload: Dict[str, Any],
+        timeout: float = 5.0,
+        priority: Priority = Priority.MEDIUM,
+    ) -> Optional[Message]:
         """
         Send a request and wait for response.
 
@@ -254,10 +262,7 @@ class BaseAgent(ABC):
             Response message or None if timeout
         """
         message = Message(
-            topic=topic,
-            sender=self.agent_id,
-            payload=payload,
-            priority=priority
+            topic=topic, sender=self.agent_id, payload=payload, priority=priority
         )
 
         response = self._message_bus.request(message, timeout)
@@ -269,7 +274,9 @@ class BaseAgent(ABC):
 
         return response
 
-    def respond(self, original_message: Message, response_payload: Dict[str, Any]) -> bool:
+    def respond(
+        self, original_message: Message, response_payload: Dict[str, Any]
+    ) -> bool:
         """
         Send a response to a request.
 
@@ -296,14 +303,14 @@ class BaseAgent(ABC):
             agent_id=self.agent_id,
             message=message,
             context=context or {},
-            metrics=self.get_metrics()
+            metrics=self.get_metrics(),
         )
 
         # Publish to logging topic
         topic_map = {
             "INFO": Topics.LOG_EVENT_INFO,
             "WARNING": Topics.LOG_EVENT_WARNING,
-            "ERROR": Topics.LOG_EVENT_ERROR
+            "ERROR": Topics.LOG_EVENT_ERROR,
         }
 
         topic = topic_map.get(level, Topics.LOG_EVENT_INFO)
@@ -313,7 +320,7 @@ class BaseAgent(ABC):
         logger.log(
             getattr(logging, level),
             f"[{self.agent_id}] {message}",
-            extra={"context": context}
+            extra={"context": context},
         )
 
     def get_metrics(self) -> Dict[str, Any]:
@@ -363,12 +370,14 @@ class BaseAgent(ABC):
                     "agent_id": self.agent_id,
                     "error": str(e),
                     "message_id": message.message_id,
-                    "topic": message.topic
+                    "topic": message.topic,
                 },
-                severity="error"
+                severity="error",
             )
 
-    def _publish_system_event(self, topic: str, data: Dict[str, Any], severity: str = "info"):
+    def _publish_system_event(
+        self, topic: str, data: Dict[str, Any], severity: str = "info"
+    ):
         """
         Publish a system event.
 
@@ -378,10 +387,7 @@ class BaseAgent(ABC):
             severity: Event severity
         """
         event = SystemEvent(
-            event_type=topic,
-            agent_id=self.agent_id,
-            severity=severity,
-            data=data
+            event_type=topic, agent_id=self.agent_id, severity=severity, data=data
         )
 
         self.publish(topic, event.__dict__, priority=Priority.HIGH)
@@ -389,9 +395,7 @@ class BaseAgent(ABC):
     def _start_heartbeat(self):
         """Start the heartbeat thread"""
         self._heartbeat_thread = threading.Thread(
-            target=self._heartbeat_loop,
-            name=f"{self.agent_id}_heartbeat",
-            daemon=True
+            target=self._heartbeat_loop, name=f"{self.agent_id}_heartbeat", daemon=True
         )
         self._heartbeat_thread.start()
 
@@ -408,7 +412,7 @@ class BaseAgent(ABC):
                 self._publish_system_event(
                     Topics.SYSTEM_HEARTBEAT,
                     {"agent_id": self.agent_id, "metrics": self.get_metrics()},
-                    severity="info"
+                    severity="info",
                 )
             except Exception as e:
                 logger.error(f"Error sending heartbeat from {self.agent_id}: {e}")

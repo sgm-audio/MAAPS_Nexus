@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ResourceMetrics:
     """System resource metrics"""
+
     cpu_usage: float
     memory_usage: float
     gpu_usage: float
@@ -49,6 +50,7 @@ class ResourceMetrics:
 @dataclass
 class TaskInfo:
     """Information about a queued task"""
+
     task_id: str
     task_type: str
     priority: int
@@ -61,6 +63,7 @@ class TaskInfo:
 @dataclass
 class CacheEntry:
     """Cache entry information"""
+
     key: str
     data: Any
     size_bytes: int
@@ -85,7 +88,7 @@ class PerformanceOptimizationAgent(BaseAgent):
     def __init__(self):
         super().__init__(
             agent_id="performance_optimization_agent",
-            agent_name="Performance & Resource Optimization Agent"
+            agent_name="Performance & Resource Optimization Agent",
         )
 
         # Resource monitoring
@@ -100,10 +103,10 @@ class PerformanceOptimizationAgent(BaseAgent):
 
         # Alert thresholds
         self.alert_thresholds = {
-            'cpu_usage': 85.0,
-            'memory_usage': 90.0,
-            'gpu_usage': 90.0,
-            'disk_io': 100 * 1024 * 1024,  # 100 MB/s
+            "cpu_usage": 85.0,
+            "memory_usage": 90.0,
+            "gpu_usage": 90.0,
+            "disk_io": 100 * 1024 * 1024,  # 100 MB/s
         }
 
         # Task scheduling
@@ -120,14 +123,14 @@ class PerformanceOptimizationAgent(BaseAgent):
 
         # Statistics
         self.stats = {
-            'cache_hits': 0,
-            'cache_misses': 0,
-            'cache_evictions': 0,
-            'tasks_scheduled': 0,
-            'tasks_completed': 0,
-            'avg_cpu_usage': 0.0,
-            'avg_memory_usage': 0.0,
-            'avg_gpu_usage': 0.0
+            "cache_hits": 0,
+            "cache_misses": 0,
+            "cache_evictions": 0,
+            "tasks_scheduled": 0,
+            "tasks_completed": 0,
+            "avg_cpu_usage": 0.0,
+            "avg_memory_usage": 0.0,
+            "avg_gpu_usage": 0.0,
         }
         self.stats_lock = threading.Lock()
 
@@ -194,60 +197,62 @@ class PerformanceOptimizationAgent(BaseAgent):
             current = self.current_metrics
 
         if current:
-            self.respond(message, {
-                'success': True,
-                'metrics': {
-                    'cpu_usage_percent': current.cpu_usage,
-                    'memory_usage_percent': current.memory_usage,
-                    'gpu_usage_percent': current.gpu_usage,
-                    'gpu_memory_percent': current.gpu_memory,
-                    'disk_io_read_mbps': current.disk_io_read / (1024 * 1024),
-                    'disk_io_write_mbps': current.disk_io_write / (1024 * 1024),
-                    'timestamp': current.timestamp
+            self.respond(
+                message,
+                {
+                    "success": True,
+                    "metrics": {
+                        "cpu_usage_percent": current.cpu_usage,
+                        "memory_usage_percent": current.memory_usage,
+                        "gpu_usage_percent": current.gpu_usage,
+                        "gpu_memory_percent": current.gpu_memory,
+                        "disk_io_read_mbps": current.disk_io_read / (1024 * 1024),
+                        "disk_io_write_mbps": current.disk_io_write / (1024 * 1024),
+                        "timestamp": current.timestamp,
+                    },
+                    "history_available": len(self.resource_history),
                 },
-                'history_available': len(self.resource_history)
-            })
+            )
         else:
-            self.respond(message, {
-                'success': False,
-                'error': 'No metrics available yet'
-            })
+            self.respond(
+                message, {"success": False, "error": "No metrics available yet"}
+            )
 
     def _handle_task_schedule(self, message: Message):
         """Handle task scheduling request"""
         payload = message.payload
         task_info = TaskInfo(
-            task_id=payload.get('task_id', str(time.time())),
-            task_type=payload.get('task_type', 'unknown'),
-            priority=payload.get('priority', 5),
-            estimated_duration=payload.get('estimated_duration', 60.0),
-            resource_requirements=payload.get('resource_requirements', {}),
-            submission_time=time.time()
+            task_id=payload.get("task_id", str(time.time())),
+            task_type=payload.get("task_type", "unknown"),
+            priority=payload.get("priority", 5),
+            estimated_duration=payload.get("estimated_duration", 60.0),
+            resource_requirements=payload.get("resource_requirements", {}),
+            submission_time=time.time(),
         )
 
         # Add to queue (lower priority number = higher priority)
         self.task_queue.put((task_info.priority, task_info.submission_time, task_info))
 
         with self.stats_lock:
-            self.stats['tasks_scheduled'] += 1
+            self.stats["tasks_scheduled"] += 1
 
-        self.respond(message, {
-            'success': True,
-            'task_id': task_info.task_id,
-            'queue_position': self.task_queue.qsize(),
-            'estimated_start_time': self._estimate_start_time(task_info)
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "task_id": task_info.task_id,
+                "queue_position": self.task_queue.qsize(),
+                "estimated_start_time": self._estimate_start_time(task_info),
+            },
+        )
 
     def _handle_cache_get(self, message: Message):
         """Handle cache retrieval request"""
         payload = message.payload
-        cache_key = payload.get('key')
+        cache_key = payload.get("key")
 
         if not cache_key:
-            self.respond(message, {
-                'success': False,
-                'error': 'No cache key provided'
-            })
+            self.respond(message, {"success": False, "error": "No cache key provided"})
             return
 
         with self.cache_lock:
@@ -259,34 +264,31 @@ class PerformanceOptimizationAgent(BaseAgent):
                 entry.last_accessed = time.time()
 
                 with self.stats_lock:
-                    self.stats['cache_hits'] += 1
+                    self.stats["cache_hits"] += 1
 
-                self.respond(message, {
-                    'success': True,
-                    'found': True,
-                    'data': entry.data,
-                    'access_count': entry.access_count
-                })
+                self.respond(
+                    message,
+                    {
+                        "success": True,
+                        "found": True,
+                        "data": entry.data,
+                        "access_count": entry.access_count,
+                    },
+                )
             else:
                 with self.stats_lock:
-                    self.stats['cache_misses'] += 1
+                    self.stats["cache_misses"] += 1
 
-                self.respond(message, {
-                    'success': True,
-                    'found': False
-                })
+                self.respond(message, {"success": True, "found": False})
 
     def _handle_cache_set(self, message: Message):
         """Handle cache storage request"""
         payload = message.payload
-        cache_key = payload.get('key')
-        data = payload.get('data')
+        cache_key = payload.get("key")
+        data = payload.get("data")
 
         if not cache_key or data is None:
-            self.respond(message, {
-                'success': False,
-                'error': 'Missing key or data'
-            })
+            self.respond(message, {"success": False, "error": "Missing key or data"})
             return
 
         # Estimate data size
@@ -298,7 +300,10 @@ class PerformanceOptimizationAgent(BaseAgent):
 
         with self.cache_lock:
             # Check if we need to evict entries
-            while self.cache_current_size + size_bytes > self.cache_max_size and self.memory_cache:
+            while (
+                self.cache_current_size + size_bytes > self.cache_max_size
+                and self.memory_cache
+            ):
                 self._evict_cache_entry()
 
             # Add new entry
@@ -308,24 +313,28 @@ class PerformanceOptimizationAgent(BaseAgent):
                 size_bytes=size_bytes,
                 access_count=0,
                 last_accessed=time.time(),
-                created_at=time.time()
+                created_at=time.time(),
             )
 
             self.memory_cache[cache_key] = entry
             self.cache_current_size += size_bytes
 
-        self.respond(message, {
-            'success': True,
-            'cached': True,
-            'size_bytes': size_bytes,
-            'cache_usage_percent': (self.cache_current_size / self.cache_max_size) * 100
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "cached": True,
+                "size_bytes": size_bytes,
+                "cache_usage_percent": (self.cache_current_size / self.cache_max_size)
+                * 100,
+            },
+        )
 
     def _handle_cache_clear(self, message: Message):
         """Handle cache clear request"""
         payload = message.payload
-        clear_all = payload.get('clear_all', False)
-        key = payload.get('key')
+        clear_all = payload.get("clear_all", False)
+        key = payload.get("key")
 
         with self.cache_lock:
             if clear_all:
@@ -343,10 +352,7 @@ class PerformanceOptimizationAgent(BaseAgent):
             else:
                 entries_cleared = 0
 
-        self.respond(message, {
-            'success': True,
-            'entries_cleared': entries_cleared
-        })
+        self.respond(message, {"success": True, "entries_cleared": entries_cleared})
 
     def _handle_performance_analyze(self, message: Message):
         """Handle performance analysis request"""
@@ -357,34 +363,38 @@ class PerformanceOptimizationAgent(BaseAgent):
         bottlenecks = self._detect_bottlenecks()
 
         # Generate recommendations
-        recommendations = self._generate_optimization_recommendations(analysis, bottlenecks)
+        recommendations = self._generate_optimization_recommendations(
+            analysis, bottlenecks
+        )
 
-        self.respond(message, {
-            'success': True,
-            'analysis': analysis,
-            'bottlenecks': bottlenecks,
-            'recommendations': recommendations
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "analysis": analysis,
+                "bottlenecks": bottlenecks,
+                "recommendations": recommendations,
+            },
+        )
 
     def _handle_optimization_request(self, message: Message):
         """Handle optimization request"""
         payload = message.payload
-        optimization_type = payload.get('type', 'general')
+        optimization_type = payload.get("type", "general")
 
-        if optimization_type == 'cache':
+        if optimization_type == "cache":
             result = self._optimize_cache()
-        elif optimization_type == 'scheduler':
+        elif optimization_type == "scheduler":
             result = self._optimize_scheduler()
-        elif optimization_type == 'resources':
+        elif optimization_type == "resources":
             result = self._optimize_resources()
         else:
             result = self._optimize_general()
 
-        self.respond(message, {
-            'success': True,
-            'optimization_type': optimization_type,
-            'result': result
-        })
+        self.respond(
+            message,
+            {"success": True, "optimization_type": optimization_type, "result": result},
+        )
 
     # Resource monitoring
 
@@ -396,9 +406,7 @@ class PerformanceOptimizationAgent(BaseAgent):
 
         self.monitoring_active = True
         self.monitoring_thread = threading.Thread(
-            target=self._monitoring_loop,
-            name=f"{self.agent_id}_monitor",
-            daemon=True
+            target=self._monitoring_loop, name=f"{self.agent_id}_monitor", daemon=True
         )
         self.monitoring_thread.start()
 
@@ -430,12 +438,12 @@ class PerformanceOptimizationAgent(BaseAgent):
                 self.publish(
                     "system.resource.metrics",
                     {
-                        'cpu': metrics.cpu_usage,
-                        'memory': metrics.memory_usage,
-                        'gpu': metrics.gpu_usage,
-                        'timestamp': metrics.timestamp
+                        "cpu": metrics.cpu_usage,
+                        "memory": metrics.memory_usage,
+                        "gpu": metrics.gpu_usage,
+                        "timestamp": metrics.timestamp,
                     },
-                    priority=Priority.LOW
+                    priority=Priority.LOW,
                 )
 
                 time.sleep(self.monitoring_interval)
@@ -482,68 +490,65 @@ class PerformanceOptimizationAgent(BaseAgent):
             disk_io_write=disk_io_write,
             network_sent=network_sent,
             network_recv=network_recv,
-            timestamp=time.time()
+            timestamp=time.time(),
         )
 
     def _check_thresholds(self, metrics: ResourceMetrics):
         """Check if metrics exceed thresholds and publish alerts"""
         alerts = []
 
-        if metrics.cpu_usage > self.alert_thresholds['cpu_usage']:
-            alerts.append({
-                'type': 'cpu_high',
-                'value': metrics.cpu_usage,
-                'threshold': self.alert_thresholds['cpu_usage']
-            })
+        if metrics.cpu_usage > self.alert_thresholds["cpu_usage"]:
+            alerts.append(
+                {
+                    "type": "cpu_high",
+                    "value": metrics.cpu_usage,
+                    "threshold": self.alert_thresholds["cpu_usage"],
+                }
+            )
 
-        if metrics.memory_usage > self.alert_thresholds['memory_usage']:
-            alerts.append({
-                'type': 'memory_high',
-                'value': metrics.memory_usage,
-                'threshold': self.alert_thresholds['memory_usage']
-            })
+        if metrics.memory_usage > self.alert_thresholds["memory_usage"]:
+            alerts.append(
+                {
+                    "type": "memory_high",
+                    "value": metrics.memory_usage,
+                    "threshold": self.alert_thresholds["memory_usage"],
+                }
+            )
 
-        if metrics.gpu_usage > self.alert_thresholds['gpu_usage']:
-            alerts.append({
-                'type': 'gpu_high',
-                'value': metrics.gpu_usage,
-                'threshold': self.alert_thresholds['gpu_usage']
-            })
+        if metrics.gpu_usage > self.alert_thresholds["gpu_usage"]:
+            alerts.append(
+                {
+                    "type": "gpu_high",
+                    "value": metrics.gpu_usage,
+                    "threshold": self.alert_thresholds["gpu_usage"],
+                }
+            )
 
         # Publish alerts
         for alert in alerts:
-            self.publish(
-                "system.resource.alert",
-                alert,
-                priority=Priority.HIGH
-            )
+            self.publish("system.resource.alert", alert, priority=Priority.HIGH)
 
     def _update_resource_stats(self, metrics: ResourceMetrics):
         """Update resource statistics"""
         with self.stats_lock:
             # Simple moving average
             alpha = 0.1
-            self.stats['avg_cpu_usage'] = (
-                alpha * metrics.cpu_usage +
-                (1 - alpha) * self.stats.get('avg_cpu_usage', 0.0)
-            )
-            self.stats['avg_memory_usage'] = (
-                alpha * metrics.memory_usage +
-                (1 - alpha) * self.stats.get('avg_memory_usage', 0.0)
-            )
-            self.stats['avg_gpu_usage'] = (
-                alpha * metrics.gpu_usage +
-                (1 - alpha) * self.stats.get('avg_gpu_usage', 0.0)
-            )
+            self.stats["avg_cpu_usage"] = alpha * metrics.cpu_usage + (
+                1 - alpha
+            ) * self.stats.get("avg_cpu_usage", 0.0)
+            self.stats["avg_memory_usage"] = alpha * metrics.memory_usage + (
+                1 - alpha
+            ) * self.stats.get("avg_memory_usage", 0.0)
+            self.stats["avg_gpu_usage"] = alpha * metrics.gpu_usage + (
+                1 - alpha
+            ) * self.stats.get("avg_gpu_usage", 0.0)
 
     # Task scheduling
 
     def _start_scheduler(self):
         """Start task scheduler thread"""
         self.scheduler_thread = threading.Thread(
-            target=self._scheduler_loop,
-            name=f"{self.agent_id}_scheduler",
-            daemon=True
+            target=self._scheduler_loop, name=f"{self.agent_id}_scheduler", daemon=True
         )
         self.scheduler_thread.start()
 
@@ -574,10 +579,10 @@ class PerformanceOptimizationAgent(BaseAgent):
                     self.publish(
                         "system.task.started",
                         {
-                            'task_id': task_info.task_id,
-                            'task_type': task_info.task_type
+                            "task_id": task_info.task_id,
+                            "task_type": task_info.task_type,
                         },
-                        priority=Priority.MEDIUM
+                        priority=Priority.MEDIUM,
                     )
 
                     # Simulate task execution
@@ -590,16 +595,16 @@ class PerformanceOptimizationAgent(BaseAgent):
                     self.completed_tasks.append(task_info)
 
                     with self.stats_lock:
-                        self.stats['tasks_completed'] += 1
+                        self.stats["tasks_completed"] += 1
 
                     # Publish completion event
                     self.publish(
                         "system.task.completed",
                         {
-                            'task_id': task_info.task_id,
-                            'task_type': task_info.task_type
+                            "task_id": task_info.task_id,
+                            "task_type": task_info.task_type,
                         },
-                        priority=Priority.LOW
+                        priority=Priority.LOW,
                     )
                 else:
                     # Re-queue task
@@ -619,19 +624,19 @@ class PerformanceOptimizationAgent(BaseAgent):
         requirements = task_info.resource_requirements
 
         # Check CPU availability
-        required_cpu = requirements.get('cpu_percent', 0)
+        required_cpu = requirements.get("cpu_percent", 0)
         available_cpu = 100 - self.current_metrics.cpu_usage
         if required_cpu > available_cpu:
             return False
 
         # Check memory availability
-        required_memory = requirements.get('memory_percent', 0)
+        required_memory = requirements.get("memory_percent", 0)
         available_memory = 100 - self.current_metrics.memory_usage
         if required_memory > available_memory:
             return False
 
         # Check GPU availability
-        required_gpu = requirements.get('gpu_percent', 0)
+        required_gpu = requirements.get("gpu_percent", 0)
         available_gpu = 100 - self.current_metrics.gpu_usage
         if required_gpu > 0 and required_gpu > available_gpu:
             return False
@@ -659,7 +664,7 @@ class PerformanceOptimizationAgent(BaseAgent):
 
         # Find LRU entry
         lru_key = None
-        lru_time = float('inf')
+        lru_time = float("inf")
 
         for key, entry in self.memory_cache.items():
             if entry.last_accessed < lru_time:
@@ -672,7 +677,7 @@ class PerformanceOptimizationAgent(BaseAgent):
             del self.memory_cache[lru_key]
 
             with self.stats_lock:
-                self.stats['cache_evictions'] += 1
+                self.stats["cache_evictions"] += 1
 
     # Performance analysis
 
@@ -690,24 +695,24 @@ class PerformanceOptimizationAgent(BaseAgent):
         import numpy as np
 
         return {
-            'cpu': {
-                'avg': float(np.mean(cpu_values)),
-                'max': float(np.max(cpu_values)),
-                'min': float(np.min(cpu_values)),
-                'std': float(np.std(cpu_values))
+            "cpu": {
+                "avg": float(np.mean(cpu_values)),
+                "max": float(np.max(cpu_values)),
+                "min": float(np.min(cpu_values)),
+                "std": float(np.std(cpu_values)),
             },
-            'memory': {
-                'avg': float(np.mean(memory_values)),
-                'max': float(np.max(memory_values)),
-                'min': float(np.min(memory_values)),
-                'std': float(np.std(memory_values))
+            "memory": {
+                "avg": float(np.mean(memory_values)),
+                "max": float(np.max(memory_values)),
+                "min": float(np.min(memory_values)),
+                "std": float(np.std(memory_values)),
             },
-            'gpu': {
-                'avg': float(np.mean(gpu_values)),
-                'max': float(np.max(gpu_values)),
-                'min': float(np.min(gpu_values)),
-                'std': float(np.std(gpu_values))
-            }
+            "gpu": {
+                "avg": float(np.mean(gpu_values)),
+                "max": float(np.max(gpu_values)),
+                "min": float(np.min(gpu_values)),
+                "std": float(np.std(gpu_values)),
+            },
         }
 
     def _detect_bottlenecks(self) -> List[str]:
@@ -728,23 +733,29 @@ class PerformanceOptimizationAgent(BaseAgent):
 
         # Check cache efficiency
         with self.stats_lock:
-            total_accesses = self.stats['cache_hits'] + self.stats['cache_misses']
+            total_accesses = self.stats["cache_hits"] + self.stats["cache_misses"]
             if total_accesses > 100:
-                hit_rate = self.stats['cache_hits'] / total_accesses
+                hit_rate = self.stats["cache_hits"] / total_accesses
                 if hit_rate < 0.5:
                     bottlenecks.append("Low cache hit rate")
 
         return bottlenecks
 
-    def _generate_optimization_recommendations(self, analysis: Dict, bottlenecks: List[str]) -> List[str]:
+    def _generate_optimization_recommendations(
+        self, analysis: Dict, bottlenecks: List[str]
+    ) -> List[str]:
         """Generate optimization recommendations"""
         recommendations = []
 
         if "CPU usage high" in bottlenecks:
-            recommendations.append("Consider reducing concurrent tasks or upgrading CPU")
+            recommendations.append(
+                "Consider reducing concurrent tasks or upgrading CPU"
+            )
 
         if "Memory usage high" in bottlenecks:
-            recommendations.append("Increase cache eviction rate or reduce memory-intensive operations")
+            recommendations.append(
+                "Increase cache eviction rate or reduce memory-intensive operations"
+            )
 
         if "GPU usage high" in bottlenecks:
             recommendations.append("Batch GPU operations or consider multi-GPU setup")
@@ -763,7 +774,9 @@ class PerformanceOptimizationAgent(BaseAgent):
             keys_to_remove = []
             for key, entry in self.memory_cache.items():
                 age = time.time() - entry.created_at
-                if age > 3600 and entry.access_count < 2:  # Older than 1 hour, accessed < 2 times
+                if (
+                    age > 3600 and entry.access_count < 2
+                ):  # Older than 1 hour, accessed < 2 times
                     keys_to_remove.append(key)
 
             for key in keys_to_remove:
@@ -774,29 +787,31 @@ class PerformanceOptimizationAgent(BaseAgent):
             final_size = len(self.memory_cache)
 
         return {
-            'entries_removed': initial_size - final_size,
-            'memory_freed_bytes': sum(
-                self.memory_cache.get(k, CacheEntry('', None, 0, 0, 0, 0)).size_bytes
+            "entries_removed": initial_size - final_size,
+            "memory_freed_bytes": sum(
+                self.memory_cache.get(k, CacheEntry("", None, 0, 0, 0, 0)).size_bytes
                 for k in keys_to_remove
-            )
+            ),
         }
 
     def _optimize_scheduler(self) -> Dict:
         """Optimize task scheduler"""
         return {
-            'queue_size': self.task_queue.qsize(),
-            'running_tasks': len(self.running_tasks),
-            'completed_tasks': len(self.completed_tasks)
+            "queue_size": self.task_queue.qsize(),
+            "running_tasks": len(self.running_tasks),
+            "completed_tasks": len(self.completed_tasks),
         }
 
     def _optimize_resources(self) -> Dict:
         """Optimize resource usage"""
         return {
-            'message': 'Resource optimization performed',
-            'current_metrics': {
-                'cpu': self.current_metrics.cpu_usage if self.current_metrics else 0,
-                'memory': self.current_metrics.memory_usage if self.current_metrics else 0
-            }
+            "message": "Resource optimization performed",
+            "current_metrics": {
+                "cpu": self.current_metrics.cpu_usage if self.current_metrics else 0,
+                "memory": (
+                    self.current_metrics.memory_usage if self.current_metrics else 0
+                ),
+            },
         }
 
     def _optimize_general(self) -> Dict:
@@ -805,6 +820,6 @@ class PerformanceOptimizationAgent(BaseAgent):
         scheduler_result = self._optimize_scheduler()
 
         return {
-            'cache_optimization': cache_result,
-            'scheduler_optimization': scheduler_result
+            "cache_optimization": cache_result,
+            "scheduler_optimization": scheduler_result,
         }

@@ -13,7 +13,6 @@ import logging
 
 from .message_types import Message, Priority, MessageType
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -54,7 +53,7 @@ class MessageBus:
             "messages_delivered": 0,
             "messages_failed": 0,
             "messages_dropped": 0,
-            "total_latency_ms": 0.0
+            "total_latency_ms": 0.0,
         }
         self._metrics_lock = threading.Lock()
 
@@ -71,9 +70,7 @@ class MessageBus:
 
         self._running = True
         self._dispatcher_thread = threading.Thread(
-            target=self._dispatch_messages,
-            name="MessageBusDispatcher",
-            daemon=True
+            target=self._dispatch_messages, name="MessageBusDispatcher", daemon=True
         )
         self._dispatcher_thread.start()
         logger.info("Message bus started")
@@ -113,7 +110,8 @@ class MessageBus:
         with self._subscription_lock:
             if topic in self._subscriptions:
                 self._subscriptions[topic] = [
-                    (aid, cb) for aid, cb in self._subscriptions[topic]
+                    (aid, cb)
+                    for aid, cb in self._subscriptions[topic]
                     if aid != agent_id
                 ]
                 logger.debug(f"Agent {agent_id} unsubscribed from {topic}")
@@ -138,7 +136,9 @@ class MessageBus:
             with self._metrics_lock:
                 self._metrics["messages_published"] += 1
 
-            logger.debug(f"Published message {message.message_id} to topic {message.topic}")
+            logger.debug(
+                f"Published message {message.message_id} to topic {message.topic}"
+            )
             return True
 
         except queue.Full:
@@ -159,7 +159,9 @@ class MessageBus:
                 except queue.Full:
                     with self._metrics_lock:
                         self._metrics["messages_dropped"] += 1
-                    logger.error(f"Failed to queue message {message.message_id} - queue full")
+                    logger.error(
+                        f"Failed to queue message {message.message_id} - queue full"
+                    )
                     return False
 
     def request(self, message: Message, timeout: float = 5.0) -> Optional[Message]:
@@ -224,7 +226,7 @@ class MessageBus:
             payload=response_payload,
             correlation_id=original_message.correlation_id,
             message_type=MessageType.RESPONSE,
-            priority=original_message.priority
+            priority=original_message.priority,
         )
 
         # Check if anyone is waiting for this response
@@ -375,14 +377,14 @@ class MessageBus:
             return True
 
         # Wildcard matching
-        topic_parts = topic.split('.')
-        pattern_parts = pattern.split('.')
+        topic_parts = topic.split(".")
+        pattern_parts = pattern.split(".")
 
         if len(topic_parts) != len(pattern_parts):
             return False
 
         for topic_part, pattern_part in zip(topic_parts, pattern_parts):
-            if pattern_part == '*':
+            if pattern_part == "*":
                 continue
             if topic_part != pattern_part:
                 return False

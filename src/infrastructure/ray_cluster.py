@@ -29,7 +29,7 @@ class RayClusterManager:
         object_store_memory: Optional[int] = None,
         dashboard_host: str = "127.0.0.1",
         dashboard_port: int = 8265,
-        enable_logging: bool = True
+        enable_logging: bool = True,
     ):
         """
         Initialize Ray cluster manager.
@@ -73,20 +73,26 @@ class RayClusterManager:
         try:
             ray_init_kwargs = {
                 "ignore_reinit_error": True,
-                "logging_level": logging.INFO if self.enable_logging else logging.WARNING,
+                "logging_level": (
+                    logging.INFO if self.enable_logging else logging.WARNING
+                ),
                 "dashboard_host": self.dashboard_host,
                 "dashboard_port": self.dashboard_port,
             }
 
             if address is None:
                 # Start local cluster
-                ray_init_kwargs.update({
-                    "num_cpus": self.num_cpus,
-                    "num_gpus": self.num_gpus,
-                    "object_store_memory": self.object_store_memory,
-                    "_memory": self.memory,
-                })
-                logger.info(f"Starting local Ray cluster: {self.num_cpus} CPUs, {self.num_gpus} GPUs")
+                ray_init_kwargs.update(
+                    {
+                        "num_cpus": self.num_cpus,
+                        "num_gpus": self.num_gpus,
+                        "object_store_memory": self.object_store_memory,
+                        "_memory": self.memory,
+                    }
+                )
+                logger.info(
+                    f"Starting local Ray cluster: {self.num_cpus} CPUs, {self.num_gpus} GPUs"
+                )
             else:
                 # Connect to existing cluster
                 ray_init_kwargs["address"] = address
@@ -115,7 +121,7 @@ class RayClusterManager:
             "cluster_resources": ray.cluster_resources(),
             "available_resources": ray.available_resources(),
             "nodes": ray.nodes(),
-            "dashboard_url": f"http://{self.dashboard_host}:{self.dashboard_port}"
+            "dashboard_url": f"http://{self.dashboard_host}:{self.dashboard_port}",
         }
 
     def health_check(self) -> bool:
@@ -159,7 +165,7 @@ class ResourceMonitor:
             "cpu_percent": psutil.cpu_percent(interval=0.1),
             "memory_percent": psutil.virtual_memory().percent,
             "ray_cluster": ray.cluster_resources(),
-            "ray_available": ray.available_resources()
+            "ray_available": ray.available_resources(),
         }
 
     def is_resource_available(self, required_cpus: float = 1.0) -> bool:
@@ -171,7 +177,7 @@ class ResourceMonitor:
 def get_or_create_cluster(
     num_cpus: Optional[int] = None,
     num_gpus: Optional[int] = None,
-    address: Optional[str] = None
+    address: Optional[str] = None,
 ) -> RayClusterManager:
     """
     Convenience function to get or create Ray cluster.

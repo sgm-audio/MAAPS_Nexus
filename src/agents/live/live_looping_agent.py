@@ -22,7 +22,7 @@ from .loop_processors import (
     CrossfadeProcessor,
     LoopQuantizer,
     LoopRecorder,
-    OverdubProcessor
+    OverdubProcessor,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 class LoopMode(Enum):
     """Loop recording modes"""
+
     REPLACE = "replace"
     OVERDUB = "overdub"
     MULTIPLY = "multiply"
@@ -38,6 +39,7 @@ class LoopMode(Enum):
 
 class LoopState(Enum):
     """Loop playback states"""
+
     STOPPED = "stopped"
     RECORDING = "recording"
     PLAYING = "playing"
@@ -48,6 +50,7 @@ class LoopState(Enum):
 @dataclass
 class LoopTrack:
     """Multi-track loop"""
+
     track_id: str
     track_name: str
     audio_data: np.ndarray = field(default_factory=lambda: np.array([]))
@@ -79,10 +82,7 @@ class LiveLoopingAgent(BaseAgent):
     """
 
     def __init__(self, sample_rate: int = 44100):
-        super().__init__(
-            agent_id="live_looping_agent",
-            agent_name="Live Looping Agent"
-        )
+        super().__init__(agent_id="live_looping_agent", agent_name="Live Looping Agent")
 
         # Audio configuration
         self.sample_rate = sample_rate
@@ -120,11 +120,11 @@ class LiveLoopingAgent(BaseAgent):
 
         # Statistics
         self.stats = {
-            'loops_recorded': 0,
-            'overdubs_performed': 0,
-            'undos_performed': 0,
-            'loops_played': 0,
-            'slices_created': 0
+            "loops_recorded": 0,
+            "overdubs_performed": 0,
+            "undos_performed": 0,
+            "loops_played": 0,
+            "slices_created": 0,
         }
         self.stats_lock = threading.Lock()
 
@@ -194,32 +194,36 @@ class LiveLoopingAgent(BaseAgent):
         payload = message.payload
 
         track = LoopTrack(
-            track_id=payload.get('track_id', f"track_{time.time()}"),
-            track_name=payload['track_name'],
-            length_beats=payload.get('length_beats', 4),
-            sync_to_tempo=payload.get('sync_to_tempo', True),
-            volume=payload.get('volume', 1.0),
-            pan=payload.get('pan', 0.0)
+            track_id=payload.get("track_id", f"track_{time.time()}"),
+            track_name=payload["track_name"],
+            length_beats=payload.get("length_beats", 4),
+            sync_to_tempo=payload.get("sync_to_tempo", True),
+            volume=payload.get("volume", 1.0),
+            pan=payload.get("pan", 0.0),
         )
 
         with self.tracks_lock:
             self.loop_tracks[track.track_id] = track
 
-        self.respond(message, {
-            'success': True,
-            'track_id': track.track_id,
-            'track_name': track.track_name
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "track_id": track.track_id,
+                "track_name": track.track_name,
+            },
+        )
 
-        self.publish("loop.track.created", {
-            'track_id': track.track_id,
-            'track_name': track.track_name
-        }, priority=Priority.MEDIUM)
+        self.publish(
+            "loop.track.created",
+            {"track_id": track.track_id, "track_name": track.track_name},
+            priority=Priority.MEDIUM,
+        )
 
     def _handle_track_delete(self, message: Message):
         """Handle loop track deletion"""
         payload = message.payload
-        track_id = payload['track_id']
+        track_id = payload["track_id"]
 
         with self.tracks_lock:
             if track_id in self.loop_tracks:
@@ -228,18 +232,18 @@ class LiveLoopingAgent(BaseAgent):
             else:
                 success = False
 
-        self.respond(message, {'success': success, 'track_id': track_id})
+        self.respond(message, {"success": success, "track_id": track_id})
 
     def _handle_record_start(self, message: Message):
         """Handle loop recording start"""
         payload = message.payload
-        track_id = payload['track_id']
-        mode = LoopMode(payload.get('mode', 'replace'))
-        quantize = payload.get('quantize', self.quantize_recording)
+        track_id = payload["track_id"]
+        mode = LoopMode(payload.get("mode", "replace"))
+        quantize = payload.get("quantize", self.quantize_recording)
 
         with self.tracks_lock:
             if track_id not in self.loop_tracks:
-                self.respond(message, {'success': False, 'error': 'Track not found'})
+                self.respond(message, {"success": False, "error": "Track not found"})
                 return
 
             track = self.loop_tracks[track_id]
@@ -260,28 +264,32 @@ class LiveLoopingAgent(BaseAgent):
                 # Keep existing audio, will multiply length
 
         with self.stats_lock:
-            self.stats['loops_recorded'] += 1
+            self.stats["loops_recorded"] += 1
 
-        self.respond(message, {
-            'success': True,
-            'track_id': track_id,
-            'mode': mode.value,
-            'state': track.state.value
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "track_id": track_id,
+                "mode": mode.value,
+                "state": track.state.value,
+            },
+        )
 
-        self.publish("loop.record.started", {
-            'track_id': track_id,
-            'mode': mode.value
-        }, priority=Priority.HIGH)
+        self.publish(
+            "loop.record.started",
+            {"track_id": track_id, "mode": mode.value},
+            priority=Priority.HIGH,
+        )
 
     def _handle_record_stop(self, message: Message):
         """Handle loop recording stop"""
         payload = message.payload
-        track_id = payload['track_id']
+        track_id = payload["track_id"]
 
         with self.tracks_lock:
             if track_id not in self.loop_tracks:
-                self.respond(message, {'success': False, 'error': 'Track not found'})
+                self.respond(message, {"success": False, "error": "Track not found"})
                 return
 
             track = self.loop_tracks[track_id]
@@ -294,25 +302,28 @@ class LiveLoopingAgent(BaseAgent):
                 if self.quantize_recording and track.sync_to_tempo:
                     track.audio_data = self._quantize_loop_length(track)
 
-        self.respond(message, {
-            'success': True,
-            'track_id': track_id,
-            'state': track.state.value,
-            'length_samples': len(track.audio_data)
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "track_id": track_id,
+                "state": track.state.value,
+                "length_samples": len(track.audio_data),
+            },
+        )
 
-        self.publish("loop.record.stopped", {
-            'track_id': track_id
-        }, priority=Priority.HIGH)
+        self.publish(
+            "loop.record.stopped", {"track_id": track_id}, priority=Priority.HIGH
+        )
 
     def _handle_playback_toggle(self, message: Message):
         """Handle loop playback toggle"""
         payload = message.payload
-        track_id = payload['track_id']
+        track_id = payload["track_id"]
 
         with self.tracks_lock:
             if track_id not in self.loop_tracks:
-                self.respond(message, {'success': False, 'error': 'Track not found'})
+                self.respond(message, {"success": False, "error": "Track not found"})
                 return
 
             track = self.loop_tracks[track_id]
@@ -323,20 +334,18 @@ class LiveLoopingAgent(BaseAgent):
             elif track.state == LoopState.STOPPED:
                 track.state = LoopState.PLAYING
 
-        self.respond(message, {
-            'success': True,
-            'track_id': track_id,
-            'state': track.state.value
-        })
+        self.respond(
+            message, {"success": True, "track_id": track_id, "state": track.state.value}
+        )
 
     def _handle_overdub_enable(self, message: Message):
         """Handle overdub mode enable"""
         payload = message.payload
-        track_id = payload['track_id']
+        track_id = payload["track_id"]
 
         with self.tracks_lock:
             if track_id not in self.loop_tracks:
-                self.respond(message, {'success': False, 'error': 'Track not found'})
+                self.respond(message, {"success": False, "error": "Track not found"})
                 return
 
             track = self.loop_tracks[track_id]
@@ -348,22 +357,20 @@ class LiveLoopingAgent(BaseAgent):
             track.state = LoopState.OVERDUBBING
 
         with self.stats_lock:
-            self.stats['overdubs_performed'] += 1
+            self.stats["overdubs_performed"] += 1
 
-        self.respond(message, {
-            'success': True,
-            'track_id': track_id,
-            'state': track.state.value
-        })
+        self.respond(
+            message, {"success": True, "track_id": track_id, "state": track.state.value}
+        )
 
     def _handle_clear(self, message: Message):
         """Handle loop clear"""
         payload = message.payload
-        track_id = payload['track_id']
+        track_id = payload["track_id"]
 
         with self.tracks_lock:
             if track_id not in self.loop_tracks:
-                self.respond(message, {'success': False, 'error': 'Track not found'})
+                self.respond(message, {"success": False, "error": "Track not found"})
                 return
 
             track = self.loop_tracks[track_id]
@@ -376,19 +383,16 @@ class LiveLoopingAgent(BaseAgent):
             track.audio_data = np.array([])
             track.state = LoopState.STOPPED
 
-        self.respond(message, {
-            'success': True,
-            'track_id': track_id
-        })
+        self.respond(message, {"success": True, "track_id": track_id})
 
     def _handle_undo(self, message: Message):
         """Handle loop undo"""
         payload = message.payload
-        track_id = payload['track_id']
+        track_id = payload["track_id"]
 
         with self.tracks_lock:
             if track_id not in self.loop_tracks:
-                self.respond(message, {'success': False, 'error': 'Track not found'})
+                self.respond(message, {"success": False, "error": "Track not found"})
                 return
 
             track = self.loop_tracks[track_id]
@@ -402,24 +406,27 @@ class LiveLoopingAgent(BaseAgent):
                 success = True
 
                 with self.stats_lock:
-                    self.stats['undos_performed'] += 1
+                    self.stats["undos_performed"] += 1
             else:
                 success = False
 
-        self.respond(message, {
-            'success': success,
-            'track_id': track_id,
-            'undo_available': len(track.undo_history) > 0
-        })
+        self.respond(
+            message,
+            {
+                "success": success,
+                "track_id": track_id,
+                "undo_available": len(track.undo_history) > 0,
+            },
+        )
 
     def _handle_redo(self, message: Message):
         """Handle loop redo"""
         payload = message.payload
-        track_id = payload['track_id']
+        track_id = payload["track_id"]
 
         with self.tracks_lock:
             if track_id not in self.loop_tracks:
-                self.respond(message, {'success': False, 'error': 'Track not found'})
+                self.respond(message, {"success": False, "error": "Track not found"})
                 return
 
             track = self.loop_tracks[track_id]
@@ -434,22 +441,25 @@ class LiveLoopingAgent(BaseAgent):
             else:
                 success = False
 
-        self.respond(message, {
-            'success': success,
-            'track_id': track_id,
-            'redo_available': len(track.redo_stack) > 0
-        })
+        self.respond(
+            message,
+            {
+                "success": success,
+                "track_id": track_id,
+                "redo_available": len(track.redo_stack) > 0,
+            },
+        )
 
     def _handle_manipulate(self, message: Message):
         """Handle loop manipulation"""
         payload = message.payload
-        track_id = payload['track_id']
-        operation = payload['operation']
-        parameters = payload.get('parameters', {})
+        track_id = payload["track_id"]
+        operation = payload["operation"]
+        parameters = payload.get("parameters", {})
 
         with self.tracks_lock:
             if track_id not in self.loop_tracks:
-                self.respond(message, {'success': False, 'error': 'Track not found'})
+                self.respond(message, {"success": False, "error": "Track not found"})
                 return
 
             track = self.loop_tracks[track_id]
@@ -469,45 +479,46 @@ class LiveLoopingAgent(BaseAgent):
                 track.speed = 2.0
                 track.audio_data = self.time_stretcher.stretch(track.audio_data, 0.5)
             elif operation == "pitch_shift":
-                semitones = parameters.get('semitones', 0.0)
+                semitones = parameters.get("semitones", 0.0)
                 track.pitch_shift = semitones
                 track.audio_data = self.pitch_shifter.shift(track.audio_data, semitones)
             elif operation == "time_stretch":
-                stretch_factor = parameters.get('factor', 1.0)
-                track.audio_data = self.time_stretcher.stretch(track.audio_data, stretch_factor)
+                stretch_factor = parameters.get("factor", 1.0)
+                track.audio_data = self.time_stretcher.stretch(
+                    track.audio_data, stretch_factor
+                )
             elif operation == "normalize":
                 track.audio_data = self._normalize_audio(track.audio_data)
             elif operation == "slice_by_beats":
-                num_slices = parameters.get('num_beats', track.length_beats)
+                num_slices = parameters.get("num_beats", track.length_beats)
                 slices = self.slicer.slice_by_beats(
-                    track.audio_data,
-                    num_slices,
-                    self.master_tempo,
-                    self.sample_rate
+                    track.audio_data, num_slices, self.master_tempo, self.sample_rate
                 )
                 # Store slices as metadata (could be used for rearrangement)
                 with self.stats_lock:
-                    self.stats['slices_created'] += len(slices)
+                    self.stats["slices_created"] += len(slices)
             elif operation == "crossfade_loop":
-                crossfade_ms = parameters.get('crossfade_ms', 10.0)
+                crossfade_ms = parameters.get("crossfade_ms", 10.0)
                 crossfade_samples = int((crossfade_ms / 1000.0) * self.sample_rate)
-                track.audio_data = self.crossfader.loop_crossfade(track.audio_data, crossfade_samples)
+                track.audio_data = self.crossfader.loop_crossfade(
+                    track.audio_data, crossfade_samples
+                )
             elif operation == "overdub":
-                new_audio = np.array(parameters.get('audio_data', []))
-                mix = parameters.get('mix', 0.5)
-                track.audio_data = self.overdubber.overdub(track.audio_data, new_audio, mix)
+                new_audio = np.array(parameters.get("audio_data", []))
+                mix = parameters.get("mix", 0.5)
+                track.audio_data = self.overdubber.overdub(
+                    track.audio_data, new_audio, mix
+                )
 
-        self.respond(message, {
-            'success': True,
-            'track_id': track_id,
-            'operation': operation
-        })
+        self.respond(
+            message, {"success": True, "track_id": track_id, "operation": operation}
+        )
 
     def _handle_sync_quantize(self, message: Message):
         """Handle loop sync quantization"""
         payload = message.payload
-        master_tempo = payload.get('master_tempo', self.master_tempo)
-        time_signature = payload.get('time_signature', self.time_signature)
+        master_tempo = payload.get("master_tempo", self.master_tempo)
+        time_signature = payload.get("time_signature", self.time_signature)
 
         with self.beat_lock:
             self.master_tempo = master_tempo
@@ -519,16 +530,19 @@ class LiveLoopingAgent(BaseAgent):
                 if track.sync_to_tempo and len(track.audio_data) > 0:
                     track.audio_data = self._quantize_loop_length(track)
 
-        self.respond(message, {
-            'success': True,
-            'master_tempo': master_tempo,
-            'time_signature': time_signature
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "master_tempo": master_tempo,
+                "time_signature": time_signature,
+            },
+        )
 
     def _handle_tempo_change(self, message: Message):
         """Handle tempo change from sync agent"""
         payload = message.payload
-        new_tempo = payload.get('bpm', self.master_tempo)
+        new_tempo = payload.get("bpm", self.master_tempo)
 
         with self.beat_lock:
             self.master_tempo = new_tempo
@@ -540,9 +554,7 @@ class LiveLoopingAgent(BaseAgent):
         """Start playback processing thread"""
         self.playback_active = True
         self.playback_thread = threading.Thread(
-            target=self._playback_worker,
-            name=f"{self.agent_id}_playback",
-            daemon=True
+            target=self._playback_worker, name=f"{self.agent_id}_playback", daemon=True
         )
         self.playback_thread.start()
 
@@ -569,7 +581,7 @@ class LiveLoopingAgent(BaseAgent):
                             self._process_loop_playback(track)
 
                             with self.stats_lock:
-                                self.stats['loops_played'] += 1
+                                self.stats["loops_played"] += 1
 
                 time.sleep(0.01)  # 10ms processing interval
 
@@ -590,9 +602,7 @@ class LiveLoopingAgent(BaseAgent):
             return track.audio_data
 
         return self.quantizer.quantize_to_beats(
-            track.audio_data,
-            track.length_beats,
-            self.master_tempo
+            track.audio_data, track.length_beats, self.master_tempo
         )
 
     def _time_stretch(self, audio: np.ndarray, factor: float) -> np.ndarray:

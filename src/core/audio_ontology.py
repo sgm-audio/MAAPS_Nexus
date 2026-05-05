@@ -16,44 +16,46 @@ import numpy as np
 
 class AudioAttribute(Enum):
     """Core audio quality attributes in the ontology."""
+
     # Frequency Domain
-    CLARITY = auto()         # High-frequency definition, articulation
-    WARMTH = auto()          # Low-mid frequency richness
-    BRIGHTNESS = auto()      # High-frequency presence
-    MUD = auto()            # Low-mid frequency buildup (negative)
-    HARSHNESS = auto()      # Upper-mid harshness (negative)
-    THINNESS = auto()       # Lack of low-frequency content (negative)
+    CLARITY = auto()  # High-frequency definition, articulation
+    WARMTH = auto()  # Low-mid frequency richness
+    BRIGHTNESS = auto()  # High-frequency presence
+    MUD = auto()  # Low-mid frequency buildup (negative)
+    HARSHNESS = auto()  # Upper-mid harshness (negative)
+    THINNESS = auto()  # Lack of low-frequency content (negative)
 
     # Dynamics
-    PUNCH = auto()          # Transient impact and attack
-    COMPRESSION = auto()    # Dynamic range reduction
-    EXPANSION = auto()      # Dynamic range increase
-    SUSTAIN = auto()        # Note/sound length
-    DENSITY = auto()        # Harmonic/sonic fullness
+    PUNCH = auto()  # Transient impact and attack
+    COMPRESSION = auto()  # Dynamic range reduction
+    EXPANSION = auto()  # Dynamic range increase
+    SUSTAIN = auto()  # Note/sound length
+    DENSITY = auto()  # Harmonic/sonic fullness
 
     # Spatial
-    WIDTH = auto()          # Stereo width
-    DEPTH = auto()          # Front-to-back dimension
-    HEIGHT = auto()         # Vertical spatial dimension
+    WIDTH = auto()  # Stereo width
+    DEPTH = auto()  # Front-to-back dimension
+    HEIGHT = auto()  # Vertical spatial dimension
 
     # Tonal Balance
-    BALANCE = auto()        # Overall frequency balance
-    PRESENCE = auto()       # Mid-range presence (vocal/lead focus)
-    AIR = auto()            # Ultra-high frequency extension
+    BALANCE = auto()  # Overall frequency balance
+    PRESENCE = auto()  # Mid-range presence (vocal/lead focus)
+    AIR = auto()  # Ultra-high frequency extension
 
     # Artifacts
-    DISTORTION = auto()     # Harmonic/inharmonic distortion (negative)
-    NOISE = auto()          # Background noise level (negative)
-    CLIPPING = auto()       # Digital clipping (negative)
+    DISTORTION = auto()  # Harmonic/inharmonic distortion (negative)
+    NOISE = auto()  # Background noise level (negative)
+    CLIPPING = auto()  # Digital clipping (negative)
 
 
 class FrequencyBand(Enum):
     """Standard frequency bands for audio processing."""
-    SUB_BASS = (20, 60)       # Sub-bass
-    BASS = (60, 250)          # Bass
-    LOW_MID = (250, 500)      # Low-mids
-    MID = (500, 2000)         # Mids
-    HIGH_MID = (2000, 6000)   # High-mids
+
+    SUB_BASS = (20, 60)  # Sub-bass
+    BASS = (60, 250)  # Bass
+    LOW_MID = (250, 500)  # Low-mids
+    MID = (500, 2000)  # Mids
+    HIGH_MID = (2000, 6000)  # High-mids
     PRESENCE = (6000, 12000)  # Presence
     BRILLIANCE = (12000, 20000)  # Brilliance/Air
 
@@ -68,6 +70,7 @@ class AudioGoal:
     Represents a target audio quality state.
     Used by agents to understand desired outcomes.
     """
+
     attribute: AudioAttribute
     target_value: float  # 0.0 to 1.0 (0 = none, 1 = maximum)
     priority: float = 0.5  # 0.0 to 1.0 (importance weight)
@@ -88,6 +91,7 @@ class AudioState:
     Represents the current state of audio in terms of ontology attributes.
     This is what the Critic agent evaluates.
     """
+
     attributes: Dict[AudioAttribute, float] = field(default_factory=dict)
     confidence: Dict[AudioAttribute, float] = field(default_factory=dict)
     timestamp: Optional[float] = None
@@ -96,7 +100,9 @@ class AudioState:
         """Get attribute value with default."""
         return self.attributes.get(attr, default)
 
-    def set_attribute(self, attr: AudioAttribute, value: float, confidence: float = 1.0):
+    def set_attribute(
+        self, attr: AudioAttribute, value: float, confidence: float = 1.0
+    ):
         """Set attribute value with confidence."""
         self.attributes[attr] = np.clip(value, 0.0, 1.0)
         self.confidence[attr] = np.clip(confidence, 0.0, 1.0)
@@ -105,7 +111,9 @@ class AudioState:
         """Get confidence in attribute measurement."""
         return self.confidence.get(attr, 0.0)
 
-    def to_vector(self, attributes: Optional[List[AudioAttribute]] = None) -> np.ndarray:
+    def to_vector(
+        self, attributes: Optional[List[AudioAttribute]] = None
+    ) -> np.ndarray:
         """Convert state to feature vector for ML models."""
         if attributes is None:
             attributes = list(AudioAttribute)
@@ -117,6 +125,7 @@ class AgentAction:
     """
     Represents an action an agent can take (e.g., EQ adjustment, compression).
     """
+
     agent_id: str
     action_type: str  # "eq_adjustment", "compression", etc.
     parameters: Dict[str, float]
@@ -159,12 +168,20 @@ class AudioOntologyManager:
             FrequencyBand.BRILLIANCE: [AudioAttribute.AIR, AudioAttribute.BRIGHTNESS],
         }
 
-    def get_attribute_correlation(self, attr1: AudioAttribute, attr2: AudioAttribute) -> float:
+    def get_attribute_correlation(
+        self, attr1: AudioAttribute, attr2: AudioAttribute
+    ) -> float:
         """Get correlation between two attributes."""
-        key = (attr1, attr2) if (attr1, attr2) in self.attribute_correlations else (attr2, attr1)
+        key = (
+            (attr1, attr2)
+            if (attr1, attr2) in self.attribute_correlations
+            else (attr2, attr1)
+        )
         return self.attribute_correlations.get(key, 0.0)
 
-    def get_conflicting_attributes(self, attr: AudioAttribute, threshold: float = 0.6) -> List[AudioAttribute]:
+    def get_conflicting_attributes(
+        self, attr: AudioAttribute, threshold: float = 0.6
+    ) -> List[AudioAttribute]:
         """Get attributes that conflict with the given attribute."""
         conflicts = []
         for (a1, a2), correlation in self.attribute_correlations.items():
@@ -175,7 +192,9 @@ class AudioOntologyManager:
                     conflicts.append(a1)
         return conflicts
 
-    def get_synergistic_attributes(self, attr: AudioAttribute, threshold: float = 0.6) -> List[AudioAttribute]:
+    def get_synergistic_attributes(
+        self, attr: AudioAttribute, threshold: float = 0.6
+    ) -> List[AudioAttribute]:
         """Get attributes that work well together with the given attribute."""
         synergies = []
         for (a1, a2), correlation in self.attribute_correlations.items():
@@ -186,11 +205,15 @@ class AudioOntologyManager:
                     synergies.append(a1)
         return synergies
 
-    def get_attributes_for_frequency_band(self, band: FrequencyBand) -> List[AudioAttribute]:
+    def get_attributes_for_frequency_band(
+        self, band: FrequencyBand
+    ) -> List[AudioAttribute]:
         """Get audio attributes affected by a frequency band."""
         return self.frequency_attribute_map.get(band, [])
 
-    def get_frequency_bands_for_attribute(self, attr: AudioAttribute) -> List[FrequencyBand]:
+    def get_frequency_bands_for_attribute(
+        self, attr: AudioAttribute
+    ) -> List[FrequencyBand]:
         """Get frequency bands that affect an attribute."""
         bands = []
         for band, attributes in self.frequency_attribute_map.items():
@@ -198,7 +221,9 @@ class AudioOntologyManager:
                 bands.append(band)
         return bands
 
-    def estimate_satisfaction_score(self, current_state: AudioState, goals: List[AudioGoal]) -> float:
+    def estimate_satisfaction_score(
+        self, current_state: AudioState, goals: List[AudioGoal]
+    ) -> float:
         """
         Calculate overall satisfaction score (0.0 to 1.0).
         Used by Critic agent to evaluate audio quality.
@@ -227,9 +252,7 @@ class AudioOntologyManager:
         return 0.5
 
     def predict_action_impact(
-        self,
-        action: AgentAction,
-        current_state: AudioState
+        self, action: AgentAction, current_state: AudioState
     ) -> AudioState:
         """
         Predict the resulting audio state after applying an action.
@@ -252,7 +275,9 @@ class AudioOntologyManager:
                     correlation = self.get_attribute_correlation(attr, other_attr)
                     if abs(correlation) > 0.3:
                         current_val = new_state.get_attribute(other_attr)
-                        correlated_impact = impact * correlation * 0.3  # Damped correlation
+                        correlated_impact = (
+                            impact * correlation * 0.3
+                        )  # Damped correlation
                         new_val = np.clip(current_val + correlated_impact, 0.0, 1.0)
                         confidence = new_state.get_confidence(other_attr) * 0.9
                         new_state.set_attribute(other_attr, new_val, confidence)

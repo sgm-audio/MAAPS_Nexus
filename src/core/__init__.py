@@ -15,16 +15,14 @@ from .message_types import (
     VSTPluginState,
     DAWProjectState,
     SystemEvent,
-    LogEntry
+    LogEntry,
 )
 from .base_agent import BaseAgent, AgentState, AgentRegistry, get_agent_registry
-
 
 __all__ = [
     # Message Bus
     "MessageBus",
     "get_message_bus",
-
     # Message Types
     "Message",
     "Priority",
@@ -37,10 +35,9 @@ __all__ = [
     "DAWProjectState",
     "SystemEvent",
     "LogEntry",
-
     # Base Agent
     "BaseAgent",
     "AgentState",
     "AgentRegistry",
-    "get_agent_registry"
+    "get_agent_registry",
 ]

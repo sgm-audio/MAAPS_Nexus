@@ -12,6 +12,7 @@ import uuid
 
 class Priority(Enum):
     """Message priority levels"""
+
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
@@ -20,6 +21,7 @@ class Priority(Enum):
 
 class MessageType(Enum):
     """Types of messages in the system"""
+
     EVENT = "event"
     REQUEST = "request"
     RESPONSE = "response"
@@ -29,6 +31,7 @@ class MessageType(Enum):
 @dataclass
 class Message:
     """Base message structure for all inter-agent communication"""
+
     topic: str
     sender: str
     payload: Dict[str, Any]
@@ -48,13 +51,14 @@ class Message:
             "priority": self.priority.value,
             "message_type": self.message_type.value,
             "payload": self.payload,
-            "correlation_id": self.correlation_id
+            "correlation_id": self.correlation_id,
         }
 
 
 @dataclass
 class AudioBuffer:
     """Audio data structure"""
+
     buffer_id: str
     sample_rate: int
     channels: int
@@ -68,6 +72,7 @@ class AudioBuffer:
 @dataclass
 class SpectralFeatures:
     """Spectral audio features"""
+
     centroid: float
     rolloff: float
     flux: float
@@ -78,6 +83,7 @@ class SpectralFeatures:
 @dataclass
 class TemporalFeatures:
     """Temporal audio features"""
+
     tempo: float
     beat_positions: List[float]
     onset_strength: List[float]
@@ -87,6 +93,7 @@ class TemporalFeatures:
 @dataclass
 class HarmonicFeatures:
     """Harmonic audio features"""
+
     key: str
     scale: str
     chroma: List[float]
@@ -96,6 +103,7 @@ class HarmonicFeatures:
 @dataclass
 class DynamicFeatures:
     """Dynamic audio features"""
+
     rms: float
     peak: float
     dynamic_range: float
@@ -105,6 +113,7 @@ class DynamicFeatures:
 @dataclass
 class AudioFeatures:
     """Complete audio feature set"""
+
     buffer_id: str
     spectral: SpectralFeatures
     temporal: TemporalFeatures
@@ -116,6 +125,7 @@ class AudioFeatures:
 @dataclass
 class ParameterSuggestion:
     """Individual parameter optimization suggestion"""
+
     current_value: float
     suggested_value: float
     confidence: float
@@ -125,6 +135,7 @@ class ParameterSuggestion:
 @dataclass
 class OptimizationSuggestion:
     """VST parameter optimization suggestion"""
+
     suggestion_id: str
     buffer_id: str
     target_plugin: str
@@ -138,6 +149,7 @@ class OptimizationSuggestion:
 @dataclass
 class VSTParameter:
     """VST plugin parameter"""
+
     name: str
     value: float
     display_value: str
@@ -148,6 +160,7 @@ class VSTParameter:
 @dataclass
 class VSTPluginState:
     """VST plugin state"""
+
     plugin_id: str
     plugin_name: str
     vendor: str
@@ -161,6 +174,7 @@ class VSTPluginState:
 @dataclass
 class TrackInfo:
     """DAW track information"""
+
     name: str
     track_type: str
     volume: float
@@ -174,6 +188,7 @@ class TrackInfo:
 @dataclass
 class TransportState:
     """DAW transport state"""
+
     is_playing: bool
     is_recording: bool
     position: float
@@ -184,6 +199,7 @@ class TransportState:
 @dataclass
 class DAWProjectState:
     """Complete DAW project state"""
+
     project_id: str
     project_name: str
     sample_rate: int
@@ -196,6 +212,7 @@ class DAWProjectState:
 @dataclass
 class SystemEvent:
     """System-level event"""
+
     event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     event_type: str = ""
     agent_id: str = ""
@@ -208,6 +225,7 @@ class SystemEvent:
 @dataclass
 class LogEntry:
     """Log entry structure"""
+
     log_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: float = field(default_factory=lambda: datetime.now().timestamp())
     level: str = "INFO"
@@ -283,6 +301,7 @@ class Topics:
 
 class Timeouts:
     """Standardized timeout values in seconds"""
+
     SHORT = 5.0
     MEDIUM = 30.0
     LONG = 60.0

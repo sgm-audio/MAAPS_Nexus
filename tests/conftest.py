@@ -1,4 +1,3 @@
-
 import pytest
 import ray
 import sys
@@ -6,6 +5,7 @@ import os
 
 # Add src to path for all tests
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 @pytest.fixture(scope="session", autouse=True)
 def ray_session():
@@ -17,8 +17,8 @@ def ray_session():
         except Exception as e:
             print(f"Failed to init Ray: {e}")
             # Fallback or fail
-    
+
     yield
-    
+
     if ray.is_initialized():
         ray.shutdown()

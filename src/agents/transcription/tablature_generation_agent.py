@@ -19,13 +19,13 @@ except ImportError as e:
 from ...core.base_agent import BaseAgent
 from ...core.message_types import Message, Priority, Topics
 
-
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class TabNote:
     """Represents a tablature note"""
+
     string: int  # String number (1-6 for guitar)
     fret: int  # Fret number
     start_time: float
@@ -37,6 +37,7 @@ class TabNote:
 @dataclass
 class ChordDiagram:
     """Guitar chord diagram"""
+
     name: str
     frets: List[int]  # Fret for each string (-1 = muted, 0 = open)
     fingers: List[int]  # Finger for each string (0 = not played)
@@ -45,6 +46,7 @@ class ChordDiagram:
 @dataclass
 class Tablature:
     """Complete tablature"""
+
     instrument: str  # "guitar", "bass", etc.
     tuning: List[str]  # ["E", "A", "D", "G", "B", "E"]
     notes: List[TabNote]
@@ -71,33 +73,33 @@ class TablatureGenerationAgent(BaseAgent):
 
     # Standard tunings (low to high)
     TUNINGS = {
-        'guitar_standard': ['E2', 'A2', 'D3', 'G3', 'B3', 'E4'],
-        'guitar_drop_d': ['D2', 'A2', 'D3', 'G3', 'B3', 'E4'],
-        'guitar_7string': ['B1', 'E2', 'A2', 'D3', 'G3', 'B3', 'E4'],
-        'guitar_8string': ['F#1', 'B1', 'E2', 'A2', 'D3', 'G3', 'B3', 'E4'],
-        'bass_4string': ['E1', 'A1', 'D2', 'G2'],
-        'bass_5string': ['B0', 'E1', 'A1', 'D2', 'G2'],
-        'bass_6string': ['B0', 'E1', 'A1', 'D2', 'G2', 'C3'],
-        'ukulele_standard': ['G4', 'C4', 'E4', 'A4'],
-        'ukulele_baritone': ['D3', 'G3', 'B3', 'E4'],
+        "guitar_standard": ["E2", "A2", "D3", "G3", "B3", "E4"],
+        "guitar_drop_d": ["D2", "A2", "D3", "G3", "B3", "E4"],
+        "guitar_7string": ["B1", "E2", "A2", "D3", "G3", "B3", "E4"],
+        "guitar_8string": ["F#1", "B1", "E2", "A2", "D3", "G3", "B3", "E4"],
+        "bass_4string": ["E1", "A1", "D2", "G2"],
+        "bass_5string": ["B0", "E1", "A1", "D2", "G2"],
+        "bass_6string": ["B0", "E1", "A1", "D2", "G2", "C3"],
+        "ukulele_standard": ["G4", "C4", "E4", "A4"],
+        "ukulele_baritone": ["D3", "G3", "B3", "E4"],
     }
 
     def __init__(self):
         super().__init__(
             agent_id="tablature_generation_agent",
-            agent_name="Tablature Generation Agent"
+            agent_name="Tablature Generation Agent",
         )
 
         self._lock = threading.Lock()
 
         # Statistics
         self._stats = {
-            'tablatures_generated': 0,
-            'guitar_tabs': 0,
-            'bass_tabs': 0,
-            'ukulele_tabs': 0,
-            'total_notes': 0,
-            'errors': 0
+            "tablatures_generated": 0,
+            "guitar_tabs": 0,
+            "bass_tabs": 0,
+            "ukulele_tabs": 0,
+            "total_notes": 0,
+            "errors": 0,
         }
 
     def setup(self):
@@ -132,7 +134,7 @@ class TablatureGenerationAgent(BaseAgent):
             elif topic == "tablature.export":
                 result = self._export_tablature(payload)
             else:
-                result = {'success': False, 'error': f'Unknown topic: {topic}'}
+                result = {"success": False, "error": f"Unknown topic: {topic}"}
 
             # Send response
             self.respond(message, result)
@@ -140,19 +142,19 @@ class TablatureGenerationAgent(BaseAgent):
         except Exception as e:
             logger.error(f"Error handling message: {e}", exc_info=True)
             with self._lock:
-                self._stats['errors'] += 1
-            self.respond(message, {'success': False, 'error': str(e)})
+                self._stats["errors"] += 1
+            self.respond(message, {"success": False, "error": str(e)})
 
     def _generate_tablature(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Generate tablature from MIDI notes"""
         try:
-            notes = payload.get('notes', [])
-            instrument = payload.get('instrument', 'guitar').lower()
-            tuning_name = payload.get('tuning', f'{instrument}_standard')
-            tempo_bpm = payload.get('tempo_bpm', 120.0)
+            notes = payload.get("notes", [])
+            instrument = payload.get("instrument", "guitar").lower()
+            tuning_name = payload.get("tuning", f"{instrument}_standard")
+            tempo_bpm = payload.get("tempo_bpm", 120.0)
 
             if not notes:
-                return {'success': False, 'error': 'No notes provided'}
+                return {"success": False, "error": "No notes provided"}
 
             # Get tuning
             tuning = self._get_tuning(instrument, tuning_name)
@@ -172,38 +174,35 @@ class TablatureGenerationAgent(BaseAgent):
                 tuning=[self._note_name(note) for note in tuning],
                 notes=tab_notes,
                 tempo_bpm=tempo_bpm,
-                difficulty_rating=difficulty
+                difficulty_rating=difficulty,
             )
 
             # Update statistics
             with self._lock:
-                self._stats['tablatures_generated'] += 1
-                self._stats['total_notes'] += len(tab_notes)
-                if 'guitar' in instrument:
-                    self._stats['guitar_tabs'] += 1
-                elif 'bass' in instrument:
-                    self._stats['bass_tabs'] += 1
-                elif 'ukulele' in instrument:
-                    self._stats['ukulele_tabs'] += 1
+                self._stats["tablatures_generated"] += 1
+                self._stats["total_notes"] += len(tab_notes)
+                if "guitar" in instrument:
+                    self._stats["guitar_tabs"] += 1
+                elif "bass" in instrument:
+                    self._stats["bass_tabs"] += 1
+                elif "ukulele" in instrument:
+                    self._stats["ukulele_tabs"] += 1
 
-            return {
-                'success': True,
-                'tablature': self._tablature_to_dict(tablature)
-            }
+            return {"success": True, "tablature": self._tablature_to_dict(tablature)}
 
         except Exception as e:
             logger.error(f"Error generating tablature: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
     def _generate_from_audio(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Generate tablature directly from audio"""
         try:
-            audio = payload.get('audio')
-            sr = payload.get('sample_rate', 22050)
-            instrument = payload.get('instrument', 'guitar').lower()
+            audio = payload.get("audio")
+            sr = payload.get("sample_rate", 22050)
+            instrument = payload.get("instrument", "guitar").lower()
 
             if audio is None:
-                return {'success': False, 'error': 'No audio data provided'}
+                return {"success": False, "error": "No audio data provided"}
 
             # First transcribe to MIDI
             # This would normally call the AudioToMIDIAgent
@@ -215,16 +214,16 @@ class TablatureGenerationAgent(BaseAgent):
             # Extract pitch
             f0, voiced_flag, voiced_probs = librosa.pyin(
                 audio,
-                fmin=librosa.note_to_hz('C2'),
-                fmax=librosa.note_to_hz('C7'),
-                sr=sr
+                fmin=librosa.note_to_hz("C2"),
+                fmax=librosa.note_to_hz("C7"),
+                sr=sr,
             )
 
             # Convert to MIDI notes (simplified)
             notes = self._f0_to_midi_notes(f0, voiced_flag, sr)
 
             # Get tuning
-            tuning_name = f'{instrument}_standard'
+            tuning_name = f"{instrument}_standard"
             tuning = self._get_tuning(instrument, tuning_name)
 
             # Convert to tablature
@@ -238,101 +237,94 @@ class TablatureGenerationAgent(BaseAgent):
                 tuning=[self._note_name(note) for note in tuning],
                 notes=tab_notes,
                 tempo_bpm=float(tempo),
-                difficulty_rating=self._calculate_difficulty(tab_notes)
+                difficulty_rating=self._calculate_difficulty(tab_notes),
             )
 
             with self._lock:
-                self._stats['tablatures_generated'] += 1
+                self._stats["tablatures_generated"] += 1
 
-            return {
-                'success': True,
-                'tablature': self._tablature_to_dict(tablature)
-            }
+            return {"success": True, "tablature": self._tablature_to_dict(tablature)}
 
         except Exception as e:
             logger.error(f"Error generating from audio: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
     def _optimize_fingering(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Optimize fingering for tablature"""
         try:
-            tablature_dict = payload.get('tablature')
+            tablature_dict = payload.get("tablature")
 
             if not tablature_dict:
-                return {'success': False, 'error': 'No tablature provided'}
+                return {"success": False, "error": "No tablature provided"}
 
             # Reconstruct tablature
             tab_notes = [
                 TabNote(
-                    string=n['string'],
-                    fret=n['fret'],
-                    start_time=n['start_time'],
-                    duration=n['duration'],
-                    technique=n.get('technique'),
-                    finger=n.get('finger')
+                    string=n["string"],
+                    fret=n["fret"],
+                    start_time=n["start_time"],
+                    duration=n["duration"],
+                    technique=n.get("technique"),
+                    finger=n.get("finger"),
                 )
-                for n in tablature_dict.get('notes', [])
+                for n in tablature_dict.get("notes", [])
             ]
 
-            tuning = self._parse_tuning(tablature_dict.get('tuning', []))
+            tuning = self._parse_tuning(tablature_dict.get("tuning", []))
 
             # Re-optimize fingering
             optimized_notes = self._apply_fingering(tab_notes, tuning)
 
             return {
-                'success': True,
-                'optimized_notes': [
+                "success": True,
+                "optimized_notes": [
                     {
-                        'string': n.string,
-                        'fret': n.fret,
-                        'start_time': n.start_time,
-                        'duration': n.duration,
-                        'technique': n.technique,
-                        'finger': n.finger
+                        "string": n.string,
+                        "fret": n.fret,
+                        "start_time": n.start_time,
+                        "duration": n.duration,
+                        "technique": n.technique,
+                        "finger": n.finger,
                     }
                     for n in optimized_notes
-                ]
+                ],
             }
 
         except Exception as e:
             logger.error(f"Error optimizing fingering: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
     def _export_tablature(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Export tablature in various formats"""
         try:
-            tablature_dict = payload.get('tablature')
-            export_format = payload.get('format', 'ascii').lower()
+            tablature_dict = payload.get("tablature")
+            export_format = payload.get("format", "ascii").lower()
 
             if not tablature_dict:
-                return {'success': False, 'error': 'No tablature provided'}
+                return {"success": False, "error": "No tablature provided"}
 
-            if export_format == 'ascii':
+            if export_format == "ascii":
                 output = self._to_ascii(tablature_dict)
-            elif export_format == 'json':
+            elif export_format == "json":
                 output = tablature_dict  # Already in JSON format
             else:
-                return {'success': False, 'error': f'Unknown format: {export_format}'}
+                return {"success": False, "error": f"Unknown format: {export_format}"}
 
-            return {
-                'success': True,
-                'format': export_format,
-                'output': output
-            }
+            return {"success": True, "format": export_format, "output": output}
 
         except Exception as e:
             logger.error(f"Error exporting tablature: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
     def _get_tuning(self, instrument: str, tuning_name: str) -> List[int]:
         """Get tuning as MIDI note numbers"""
         if tuning_name not in self.TUNINGS:
             # Default to standard tuning for instrument
-            tuning_name = f'{instrument}_standard'
+            tuning_name = f"{instrument}_standard"
 
         if tuning_name not in self.TUNINGS:
             # Ultimate fallback
-            tuning_name = 'guitar_standard'
+            tuning_name = "guitar_standard"
 
         note_names = self.TUNINGS[tuning_name]
         return [librosa.note_to_midi(note) for note in note_names]
@@ -342,24 +334,21 @@ class TablatureGenerationAgent(BaseAgent):
         tuning = []
         for note_name in tuning_names:
             # Add octave if not present
-            if len(note_name) == 1 or (len(note_name) == 2 and '#' in note_name):
-                note_name += '3'  # Default octave
+            if len(note_name) == 1 or (len(note_name) == 2 and "#" in note_name):
+                note_name += "3"  # Default octave
             tuning.append(librosa.note_to_midi(note_name))
         return tuning
 
     def _midi_to_tab(
-        self,
-        notes: List[Dict[str, Any]],
-        tuning: List[int],
-        instrument: str
+        self, notes: List[Dict[str, Any]], tuning: List[int], instrument: str
     ) -> List[TabNote]:
         """Convert MIDI notes to tablature notes"""
         tab_notes = []
 
         for note in notes:
-            pitch = note.get('pitch')
-            start_time = note.get('start_time', 0.0)
-            duration = note.get('duration', 0.5)
+            pitch = note.get("pitch")
+            start_time = note.get("start_time", 0.0)
+            duration = note.get("duration", 0.5)
 
             if pitch is None:
                 continue
@@ -368,16 +357,20 @@ class TablatureGenerationAgent(BaseAgent):
             string, fret = self._find_position(pitch, tuning)
 
             if string is not None and fret is not None:
-                tab_notes.append(TabNote(
-                    string=string,
-                    fret=fret,
-                    start_time=start_time,
-                    duration=duration
-                ))
+                tab_notes.append(
+                    TabNote(
+                        string=string,
+                        fret=fret,
+                        start_time=start_time,
+                        duration=duration,
+                    )
+                )
 
         return tab_notes
 
-    def _find_position(self, pitch: int, tuning: List[int]) -> Tuple[Optional[int], Optional[int]]:
+    def _find_position(
+        self, pitch: int, tuning: List[int]
+    ) -> Tuple[Optional[int], Optional[int]]:
         """Find best string and fret for a pitch"""
         max_fret = 24  # Maximum fret number
 
@@ -402,7 +395,9 @@ class TablatureGenerationAgent(BaseAgent):
 
         return best_string, best_fret
 
-    def _apply_fingering(self, tab_notes: List[TabNote], tuning: List[int]) -> List[TabNote]:
+    def _apply_fingering(
+        self, tab_notes: List[TabNote], tuning: List[int]
+    ) -> List[TabNote]:
         """Apply intelligent fingering suggestions"""
         if not tab_notes:
             return tab_notes
@@ -438,15 +433,17 @@ class TablatureGenerationAgent(BaseAgent):
                 # Same string, close time -> could be hammer-on/pull-off
                 if note.string == prev_note.string and time_diff < 0.3:
                     if note.fret > prev_note.fret:
-                        note.technique = 'h'  # Hammer-on
+                        note.technique = "h"  # Hammer-on
                     elif note.fret < prev_note.fret:
-                        note.technique = 'p'  # Pull-off
+                        note.technique = "p"  # Pull-off
 
                 # Quick fret change -> could be slide
-                if (note.string == prev_note.string and
-                    abs(note.fret - prev_note.fret) > 2 and
-                    time_diff < 0.2):
-                    note.technique = 's'  # Slide
+                if (
+                    note.string == prev_note.string
+                    and abs(note.fret - prev_note.fret) > 2
+                    and time_diff < 0.2
+                ):
+                    note.technique = "s"  # Slide
 
         return sorted_notes
 
@@ -471,7 +468,7 @@ class TablatureGenerationAgent(BaseAgent):
         # Factor 3: String jumps
         string_jumps = 0
         for i in range(1, len(tab_notes)):
-            if abs(tab_notes[i].string - tab_notes[i-1].string) > 2:
+            if abs(tab_notes[i].string - tab_notes[i - 1].string) > 2:
                 string_jumps += 1
         jump_difficulty = min(10, string_jumps / len(tab_notes) * 50)
         difficulty_factors.append(jump_difficulty)
@@ -495,10 +492,7 @@ class TablatureGenerationAgent(BaseAgent):
         return float(np.clip(difficulty, 1.0, 10.0))
 
     def _f0_to_midi_notes(
-        self,
-        f0: np.ndarray,
-        voiced_flag: np.ndarray,
-        sr: int
+        self, f0: np.ndarray, voiced_flag: np.ndarray, sr: int
     ) -> List[Dict[str, Any]]:
         """Convert F0 contour to MIDI notes (simplified)"""
         notes = []
@@ -518,12 +512,14 @@ class TablatureGenerationAgent(BaseAgent):
                     midi_note = int(np.round(librosa.hz_to_midi(median_hz)))
 
                     if 0 <= midi_note <= 127:
-                        notes.append({
-                            'pitch': midi_note,
-                            'start_time': note_start,
-                            'duration': times[i] - note_start,
-                            'velocity': 64
-                        })
+                        notes.append(
+                            {
+                                "pitch": midi_note,
+                                "start_time": note_start,
+                                "duration": times[i] - note_start,
+                                "velocity": 64,
+                            }
+                        )
 
                     note_start = None
                     note_pitches = []
@@ -537,28 +533,28 @@ class TablatureGenerationAgent(BaseAgent):
     def _tablature_to_dict(self, tablature: Tablature) -> Dict[str, Any]:
         """Convert tablature to dictionary"""
         return {
-            'instrument': tablature.instrument,
-            'tuning': tablature.tuning,
-            'notes': [
+            "instrument": tablature.instrument,
+            "tuning": tablature.tuning,
+            "notes": [
                 {
-                    'string': n.string,
-                    'fret': n.fret,
-                    'start_time': float(n.start_time),
-                    'duration': float(n.duration),
-                    'technique': n.technique,
-                    'finger': n.finger
+                    "string": n.string,
+                    "fret": n.fret,
+                    "start_time": float(n.start_time),
+                    "duration": float(n.duration),
+                    "technique": n.technique,
+                    "finger": n.finger,
                 }
                 for n in tablature.notes
             ],
-            'tempo_bpm': float(tablature.tempo_bpm),
-            'time_signature': tablature.time_signature,
-            'difficulty_rating': float(tablature.difficulty_rating)
+            "tempo_bpm": float(tablature.tempo_bpm),
+            "time_signature": tablature.time_signature,
+            "difficulty_rating": float(tablature.difficulty_rating),
         }
 
     def _to_ascii(self, tablature_dict: Dict[str, Any]) -> str:
         """Convert tablature to ASCII format"""
-        tuning = tablature_dict.get('tuning', [])
-        notes = tablature_dict.get('notes', [])
+        tuning = tablature_dict.get("tuning", [])
+        notes = tablature_dict.get("notes", [])
 
         if not tuning or not notes:
             return "Empty tablature"
@@ -568,12 +564,12 @@ class TablatureGenerationAgent(BaseAgent):
         lines = [f"{tuning[i]}|" for i in range(num_strings)]
 
         # Sort notes by time
-        sorted_notes = sorted(notes, key=lambda n: n['start_time'])
+        sorted_notes = sorted(notes, key=lambda n: n["start_time"])
 
         # Group notes by time (chords)
         time_groups = {}
         for note in sorted_notes:
-            time_key = round(note['start_time'] * 4) / 4  # Quantize to 16th notes
+            time_key = round(note["start_time"] * 4) / 4  # Quantize to 16th notes
             if time_key not in time_groups:
                 time_groups[time_key] = []
             time_groups[time_key].append(note)
@@ -588,9 +584,9 @@ class TablatureGenerationAgent(BaseAgent):
 
             # Add notes
             for note in group:
-                string_idx = note['string'] - 1
-                fret = note['fret']
-                technique = note.get('technique', '')
+                string_idx = note["string"] - 1
+                fret = note["fret"]
+                technique = note.get("technique", "")
 
                 # Add fret number
                 fret_str = str(fret)

@@ -39,7 +39,7 @@ class SharedMemoryAudioBuffer:
         buffer_name: str,
         buffer_size: int = 8192,
         num_channels: int = 2,
-        sample_rate: int = 44100
+        sample_rate: int = 44100,
     ):
         """
         Initialize shared memory buffer.
@@ -81,23 +81,17 @@ class SharedMemoryAudioBuffer:
         try:
             # Try to open existing
             self.shm_handle = mmap.mmap(
-                -1,
-                self.total_size,
-                tagname=self.buffer_name,
-                access=mmap.ACCESS_WRITE
+                -1, self.total_size, tagname=self.buffer_name, access=mmap.ACCESS_WRITE
             )
             logger.info(f"Opened existing shared memory: {self.buffer_name}")
         except FileNotFoundError:
             # Create new
             self.shm_handle = mmap.mmap(
-                -1,
-                self.total_size,
-                tagname=self.buffer_name,
-                access=mmap.ACCESS_WRITE
+                -1, self.total_size, tagname=self.buffer_name, access=mmap.ACCESS_WRITE
             )
             # Initialize header to zeros
             self.shm_handle.seek(0)
-            self.shm_handle.write(b'\x00' * self.header_size)
+            self.shm_handle.write(b"\x00" * self.header_size)
             logger.info(f"Created new shared memory: {self.buffer_name}")
 
     def _initialize_posix(self):
@@ -107,27 +101,21 @@ class SharedMemoryAudioBuffer:
         try:
             # Try to create new
             self.shm = posix_ipc.SharedMemory(
-                self.buffer_name,
-                flags=posix_ipc.O_CREAT,
-                size=self.total_size
+                self.buffer_name, flags=posix_ipc.O_CREAT, size=self.total_size
             )
             # Map to memory
             self.shm_handle = mmap.mmap(
-                self.shm.fd,
-                self.total_size,
-                access=mmap.ACCESS_WRITE
+                self.shm.fd, self.total_size, access=mmap.ACCESS_WRITE
             )
             # Initialize header
             self.shm_handle.seek(0)
-            self.shm_handle.write(b'\x00' * self.header_size)
+            self.shm_handle.write(b"\x00" * self.header_size)
             logger.info(f"Created new shared memory: {self.buffer_name}")
         except posix_ipc.ExistentialError:
             # Already exists, open it
             self.shm = posix_ipc.SharedMemory(self.buffer_name)
             self.shm_handle = mmap.mmap(
-                self.shm.fd,
-                self.total_size,
-                access=mmap.ACCESS_WRITE
+                self.shm.fd, self.total_size, access=mmap.ACCESS_WRITE
             )
             logger.info(f"Opened existing shared memory: {self.buffer_name}")
 
@@ -140,13 +128,13 @@ class SharedMemoryAudioBuffer:
         """
         self.shm_handle.seek(0)
         data = self.shm_handle.read(self.header_size)
-        read_pos, write_pos, processing_flag = struct.unpack('QQI', data)
+        read_pos, write_pos, processing_flag = struct.unpack("QQI", data)
         return read_pos, write_pos, processing_flag
 
     def write_header(self, read_pos: int, write_pos: int, processing_flag: int):
         """Write header to shared memory."""
         self.shm_handle.seek(0)
-        data = struct.pack('QQI', read_pos, write_pos, processing_flag)
+        data = struct.pack("QQI", read_pos, write_pos, processing_flag)
         self.shm_handle.write(data)
 
     def read_audio(self, num_samples: int) -> Optional[np.ndarray]:
@@ -179,7 +167,7 @@ class SharedMemoryAudioBuffer:
 
             self.shm_handle.seek(offset)
             data = self.shm_handle.read(self.num_channels * 4)
-            audio[i, :] = struct.unpack(f'{self.num_channels}f', data)
+            audio[i, :] = struct.unpack(f"{self.num_channels}f", data)
 
         # Update read position
         new_read_pos = (read_pos + num_samples) % self.buffer_size
@@ -203,7 +191,7 @@ class SharedMemoryAudioBuffer:
             offset = self.header_size + pos * self.num_channels * 4
 
             self.shm_handle.seek(offset)
-            data = struct.pack(f'{self.num_channels}f', *audio[i, :])
+            data = struct.pack(f"{self.num_channels}f", *audio[i, :])
             self.shm_handle.write(data)
 
         # Update write position
@@ -212,7 +200,7 @@ class SharedMemoryAudioBuffer:
 
     def close(self):
         """Close shared memory."""
-        if hasattr(self, 'shm_handle'):
+        if hasattr(self, "shm_handle"):
             self.shm_handle.close()
         logger.info(f"Closed shared memory: {self.buffer_name}")
 
@@ -229,7 +217,7 @@ class VST3Communicator:
         control_pipe_name: str = "maaps_nexus_control",
         buffer_size: int = 2048,
         num_channels: int = 2,
-        sample_rate: int = 44100
+        sample_rate: int = 44100,
     ):
         """
         Initialize VST3 communicator.
@@ -249,17 +237,11 @@ class VST3Communicator:
 
         # Initialize shared memory
         self.input_buffer = SharedMemoryAudioBuffer(
-            f"{buffer_name}_input",
-            buffer_size,
-            num_channels,
-            sample_rate
+            f"{buffer_name}_input", buffer_size, num_channels, sample_rate
         )
 
         self.output_buffer = SharedMemoryAudioBuffer(
-            f"{buffer_name}_output",
-            buffer_size,
-            num_channels,
-            sample_rate
+            f"{buffer_name}_output", buffer_size, num_channels, sample_rate
         )
 
         # Audio processing queue
@@ -283,7 +265,9 @@ class VST3Communicator:
             return
 
         self.running = True
-        self.processing_thread = threading.Thread(target=self._processing_loop, daemon=True)
+        self.processing_thread = threading.Thread(
+            target=self._processing_loop, daemon=True
+        )
         self.processing_thread.start()
         logger.info("Started processing thread")
 
@@ -330,7 +314,9 @@ class VST3Communicator:
                     self.latency_ms = elapsed * 1000.0
 
                     if self.latency_ms > 10.0:
-                        logger.warning(f"Latency exceeded 10ms: {self.latency_ms:.2f}ms")
+                        logger.warning(
+                            f"Latency exceeded 10ms: {self.latency_ms:.2f}ms"
+                        )
 
                 else:
                     # No audio available, sleep briefly

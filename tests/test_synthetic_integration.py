@@ -19,6 +19,7 @@ from src.agents.critic_agent import CriticAgent
 from src.agents.hgo_coordinator import HGOCoordinator, AgentProposal
 from src.core.audio_ontology import AudioAttribute, AgentAction
 
+
 class TestSyntheticIntegration(unittest.TestCase):
     """Stress tests using synthetic data."""
 
@@ -38,23 +39,21 @@ class TestSyntheticIntegration(unittest.TestCase):
 
     def test_critic_with_varied_audio(self):
         """Test Critic Agent with various synthetic audio signals."""
-        signal_types = ['sine', 'noise', 'chirp', 'complex', 'silence']
-        
+        signal_types = ["sine", "noise", "chirp", "complex", "silence"]
+
         for sig_type in signal_types:
             # Generate synthetic data
             audio = self.generator.generate_audio_samples(signal_type=sig_type)
             state = self.generator.generate_audio_state(completeness=0.5)
             goal = self.generator.generate_audio_goal()
-            
+
             # Validation
             self.assertTrue(len(audio) > 0)
             self.assertTrue(self.generator.validate_audio_state(state))
-            
+
             # Execute Agent Action
-            evaluation = ray.get(self.critic.evaluate.remote(
-                audio, state, [goal]
-            ))
-            
+            evaluation = ray.get(self.critic.evaluate.remote(audio, state, [goal]))
+
             # Verify Output
             self.assertIsNotNone(evaluation)
             self.assertTrue(0.0 <= evaluation.satisfaction_score <= 1.0)
@@ -64,7 +63,7 @@ class TestSyntheticIntegration(unittest.TestCase):
     def test_coordinator_with_random_proposals(self):
         """Test HGO Coordinator with randomized agent proposals."""
         current_state = self.generator.generate_audio_state()
-        
+
         proposals = []
         for i in range(5):
             # Create synthetic proposal
@@ -72,41 +71,46 @@ class TestSyntheticIntegration(unittest.TestCase):
             action = AgentAction(
                 agent_id=f"agent_{i}",
                 action_type="synthetic_action",
-                parameters=action_params
+                parameters=action_params,
             )
-            
+
             # Random impact prediction
             impact = {
-                attr: np.random.uniform(-0.5, 0.5) 
+                attr: np.random.uniform(-0.5, 0.5)
                 for attr in np.random.choice(list(AudioAttribute), 3)
             }
-            
+
             prop = AgentProposal(
                 agent_id=f"agent_{i}",
                 action=action,
                 predicted_impact=impact,
                 predicted_satisfaction=np.random.random(),
-                confidence=np.random.random()
+                confidence=np.random.random(),
             )
             proposals.append(prop)
-            
+
         # Execute Coordinator
         decision = ray.get(self.coordinator.coordinate.remote(proposals, current_state))
-        
+
         # Verify
         self.assertIsNotNone(decision)
-        total_processed = len(decision.approved_proposals) + len(decision.rejected_proposals)
+        total_processed = len(decision.approved_proposals) + len(
+            decision.rejected_proposals
+        )
         self.assertEqual(total_processed, 5)
-        self.assertTrue(len(decision.execution_order) == len(decision.approved_proposals))
+        self.assertTrue(
+            len(decision.execution_order) == len(decision.approved_proposals)
+        )
 
     def test_generator_validation(self):
         """Self-test the generator validation logic."""
         buffer = self.generator.generate_audio_buffer()
         self.assertTrue(self.generator.validate_audio_buffer(buffer))
-        
+
         # Corrupt buffer
-        buffer.samples = [] # Invalid
+        buffer.samples = []  # Invalid
         self.assertFalse(self.generator.validate_audio_buffer(buffer))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()
