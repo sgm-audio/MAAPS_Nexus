@@ -1,54 +1,97 @@
-```
-# Dependencies
+# Python artifacts
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
-
-# Build artifacts
+.Python
+.venv/
+venv/
+ENV/
+*.egg-info/
 dist/
 build/
-*.egg-info/
+.eggs/
 
-# Environment
+# Environment & secrets
 .env
-.env.local
-*.env.*
+.env.*
+!.env.example
 
-# Editors
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Logs
-*.log
-
-# Coverage
-.coverage
-coverage/
-htmlcov/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Database
+# Databases
 *.db
 *.sqlite
 *.sqlite3
 
-# Temporary files
-*.tmp
-*.temp
+# Logs and caches
+logs/
+*.log
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.snapshots/
+htmlcov/
+coverage.xml
+.coverage
+
+# Node / frontend
+node_modules/
+.parcel-cache/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+Thumbs.db
+*.swp
+*.swo
 *.bak
 
-# Cache
-.cache/
-.mypy_cache/
-.pytest_cache/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-```
+# Data & temp
+data/
+tmp/
+*.tmp
+
+# Binary / large media
+*.zip
+*.tar.gz
+*.pdf
+*.jpeg
+*.jpg
+*.png
+*.gif
+*.mp3
+*.wav
+*.flac
+
+# ML model files
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+models/
+
+# Build artifacts
+vst3_plugin/build/
+
+# CI configs for other platforms
+.gitlab-ci.yml
+
+# Root-level dev/personal scripts and output files
+check_torch.py
+test_auth_manual.py
+test_features.py
+test_vertex_ai.py
+my_audio_app.py
+start_using_maaps.py
+examples_final.txt
+examples_output.txt
+MAAPS_System_Prompt.txt
+"MAAPS Core Engine Prototype*"
+
+# Secrets and keys
+*.pem
+*.key
+*.crt
+credentials.json
+secrets.json
+service_account*.json

@@ -9,6 +9,7 @@ from enum import Enum
 
 class APIResponse(BaseModel):
     """Standard API response wrapper"""
+
     status: str = Field(..., description="Response status: success, error")
     message: Optional[str] = Field(None, description="Optional message")
     data: Optional[Any] = Field(None, description="Response data")
@@ -16,6 +17,7 @@ class APIResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     """Error response model"""
+
     status: str = "error"
     error: str = Field(..., description="Error type")
     detail: str = Field(..., description="Error details")
@@ -25,6 +27,7 @@ class ErrorResponse(BaseModel):
 # Effect Types
 class EffectType(str, Enum):
     """Available effect types"""
+
     GATE = "gate"
     COMPRESSOR = "compressor"
     LIMITER = "limiter"
@@ -45,6 +48,7 @@ class EffectType(str, Enum):
 # Automation Curve Types
 class CurveType(str, Enum):
     """Automation curve types"""
+
     LINEAR = "linear"
     EXPONENTIAL = "exponential"
     LOGARITHMIC = "logarithmic"
@@ -55,6 +59,7 @@ class CurveType(str, Enum):
 # Loop Status
 class LoopStatus(str, Enum):
     """Loop track status"""
+
     EMPTY = "empty"
     RECORDING = "recording"
     PLAYING = "playing"
@@ -64,6 +69,7 @@ class LoopStatus(str, Enum):
 # Recording Mode
 class RecordingMode(str, Enum):
     """Loop recording modes"""
+
     REPLACE = "replace"
     OVERDUB = "overdub"
     MULTIPLY = "multiply"
@@ -72,6 +78,7 @@ class RecordingMode(str, Enum):
 # Loop Manipulation Operations
 class LoopOperation(str, Enum):
     """Loop manipulation operations"""
+
     REVERSE = "reverse"
     PITCH_SHIFT = "pitch_shift"
     TIME_STRETCH = "time_stretch"
@@ -83,6 +90,7 @@ class LoopOperation(str, Enum):
 # Cue Action Types
 class CueActionType(str, Enum):
     """Performance cue action types"""
+
     SCENE_CHANGE = "scene_change"
     PARAMETER_CHANGE = "parameter_change"
     MACRO_CHANGE = "macro_change"
@@ -90,19 +98,16 @@ class CueActionType(str, Enum):
 
 def success_response(data: Any, message: Optional[str] = None) -> Dict:
     """Create success response"""
-    return {
-        "status": "success",
-        "message": message,
-        "data": data
-    }
+    return {"status": "success", "message": message, "data": data}
 
 
 def error_response(error: str, detail: str) -> Dict:
     """Create error response"""
     from datetime import datetime
+
     return {
         "status": "error",
         "error": error,
         "detail": detail,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }

@@ -15,15 +15,11 @@ router = APIRouter()
 
 @router.get("/health", response_model=dict)
 async def get_system_health(
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    adapter: MessageBusAdapter = Depends(get_message_bus_adapter),
 ):
     """Get overall system health"""
     try:
-        response = await adapter.request(
-            "system.health.get",
-            {},
-            timeout=3.0
-        )
+        response = await adapter.request("system.health.get", {}, timeout=3.0)
 
         return success_response(response)
 
@@ -36,15 +32,11 @@ async def get_system_health(
 
 @router.get("/metrics", response_model=dict)
 async def get_system_metrics(
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    adapter: MessageBusAdapter = Depends(get_message_bus_adapter),
 ):
     """Get system resource metrics"""
     try:
-        response = await adapter.request(
-            "system.metrics.get",
-            {},
-            timeout=3.0
-        )
+        response = await adapter.request("system.metrics.get", {}, timeout=3.0)
 
         return success_response(response)
 
@@ -57,15 +49,12 @@ async def get_system_metrics(
 
 @router.get("/agents/{agent_name}/stats", response_model=dict)
 async def get_agent_stats(
-    agent_name: str,
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    agent_name: str, adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
 ):
     """Get specific agent statistics"""
     try:
         response = await adapter.request(
-            "system.agent.stats",
-            {"agent_name": agent_name},
-            timeout=3.0
+            "system.agent.stats", {"agent_name": agent_name}, timeout=3.0
         )
 
         return success_response(response)
@@ -78,16 +67,10 @@ async def get_agent_stats(
 
 
 @router.get("/agents", response_model=dict)
-async def list_agents(
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
-):
+async def list_agents(adapter: MessageBusAdapter = Depends(get_message_bus_adapter)):
     """List all agents and their status"""
     try:
-        response = await adapter.request(
-            "system.agents.list",
-            {},
-            timeout=3.0
-        )
+        response = await adapter.request("system.agents.list", {}, timeout=3.0)
 
         return success_response(response)
 
