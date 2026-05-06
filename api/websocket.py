@@ -48,7 +48,7 @@ class WebSocketManager:
         for client_id, websocket in list(self.active_connections.items()):
             try:
                 await websocket.close()
-            except:
+            except Exception:
                 pass
 
         self.active_connections.clear()
@@ -210,7 +210,8 @@ class WebSocketManager:
                 )
             else:
                 logger.warning(
-                    f"WebSocket client {client_id} authentication failed: {auth_success.get('error')}"
+                    f"WebSocket client {client_id} authentication failed: "
+                    f"{auth_success.get('error')}"
                 )
 
         else:

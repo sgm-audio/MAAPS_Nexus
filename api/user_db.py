@@ -17,7 +17,10 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class User:
     """User model"""
-    def __init__(self, username: str, hashed_password: str, email: Optional[str] = None):
+
+    def __init__(
+        self, username: str, hashed_password: str, email: Optional[str] = None
+    ):
         self.username = username
         self.hashed_password = hashed_password
         self.email = email
@@ -53,7 +56,9 @@ class UserDatabase:
         """Verify a password against its hash"""
         return pwd_context.verify(plain_password, hashed_password)
 
-    def create_user(self, username: str, password: str, email: Optional[str] = None) -> User:
+    def create_user(
+        self, username: str, password: str, email: Optional[str] = None
+    ) -> User:
         """
         Create a new user
 
@@ -108,7 +113,9 @@ class UserDatabase:
             return None
 
         if not self.verify_password(password, user.hashed_password):
-            logger.warning(f"Authentication failed: Invalid password for user '{username}'")
+            logger.warning(
+                f"Authentication failed: Invalid password for user '{username}'"
+            )
             return None
 
         logger.info(f"Authentication successful: {username}")

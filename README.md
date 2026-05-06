@@ -1,3 +1,9 @@
+# MUSE/OS — Multi-Agent Audio Processing Core
+
+> **Part of the MUSE/OS Ecosystem** | [MUSE/OS Overview](../MUSE_OS_README.md) | [Manifesto](../MANIFESTO.md) | [D2F Architecture](../D2F_ARCHITECTURE.md)
+
+---
+
 # Multi-Agent Audio Processing System
 
 A comprehensive, production-ready multi-agent system for advanced audio processing, AI-powered music generation, and intelligent project management.

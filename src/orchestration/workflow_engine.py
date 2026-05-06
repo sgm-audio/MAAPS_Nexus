@@ -14,7 +14,7 @@ from enum import Enum
 import logging
 import uuid
 
-from ..core import BaseAgent, Message, Topics, Priority
+from src.core import BaseAgent, Message, Topics, Priority
 
 logger = logging.getLogger(__name__)
 

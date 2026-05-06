@@ -295,7 +295,7 @@ class PerformanceOptimizationAgent(BaseAgent):
         try:
             data_bytes = pickle.dumps(data)
             size_bytes = len(data_bytes)
-        except:
+        except Exception:
             size_bytes = len(str(data).encode())
 
         with self.cache_lock:
@@ -468,7 +468,7 @@ class PerformanceOptimizationAgent(BaseAgent):
                     gpu = gpus[0]
                     gpu_usage = gpu.load * 100
                     gpu_memory = gpu.memoryUtil * 100
-        except:
+        except Exception:
             pass
 
         # Disk I/O
