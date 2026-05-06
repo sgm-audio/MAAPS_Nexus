@@ -7,12 +7,20 @@ from fastapi import APIRouter, HTTPException, Depends
 import logging
 
 from api.schemas.automation import (
-    StartRecordingRequest, RecordingResponse,
-    EnablePlaybackRequest, PlaybackResponse,
-    CreateSceneRequest, SceneResponse, TriggerSceneResponse,
-    CreateMacroRequest, MacroResponse,
-    ChangeMacroRequest, MacroValueResponse,
-    CreateCueRequest, CueResponse, FireCueResponse
+    StartRecordingRequest,
+    RecordingResponse,
+    EnablePlaybackRequest,
+    PlaybackResponse,
+    CreateSceneRequest,
+    SceneResponse,
+    TriggerSceneResponse,
+    CreateMacroRequest,
+    MacroResponse,
+    ChangeMacroRequest,
+    MacroValueResponse,
+    CreateCueRequest,
+    CueResponse,
+    FireCueResponse,
 )
 from api.schemas.common import success_response
 from api.message_bus_adapter import get_message_bus_adapter, MessageBusAdapter
@@ -24,14 +32,12 @@ router = APIRouter()
 @router.post("/record/start", response_model=dict)
 async def start_automation_recording(
     request: StartRecordingRequest,
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    adapter: MessageBusAdapter = Depends(get_message_bus_adapter),
 ):
     """Start automation recording"""
     try:
         response = await adapter.request(
-            "automation.record.start",
-            request.dict(),
-            timeout=2.0
+            "automation.record.start", request.dict(), timeout=2.0
         )
 
         return success_response(response)
@@ -45,15 +51,11 @@ async def start_automation_recording(
 
 @router.post("/record/stop", response_model=dict)
 async def stop_automation_recording(
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    adapter: MessageBusAdapter = Depends(get_message_bus_adapter),
 ):
     """Stop automation recording"""
     try:
-        response = await adapter.request(
-            "automation.record.stop",
-            {},
-            timeout=2.0
-        )
+        response = await adapter.request("automation.record.stop", {}, timeout=2.0)
 
         return success_response(response)
 
@@ -67,14 +69,12 @@ async def stop_automation_recording(
 @router.post("/playback/enable", response_model=dict)
 async def enable_automation_playback(
     request: EnablePlaybackRequest,
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    adapter: MessageBusAdapter = Depends(get_message_bus_adapter),
 ):
     """Enable/disable automation playback"""
     try:
         response = await adapter.request(
-            "automation.playback.enable",
-            request.dict(),
-            timeout=2.0
+            "automation.playback.enable", request.dict(), timeout=2.0
         )
 
         return success_response(response)
@@ -89,14 +89,12 @@ async def enable_automation_playback(
 @router.post("/scenes", response_model=dict, status_code=201)
 async def create_scene(
     request: CreateSceneRequest,
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    adapter: MessageBusAdapter = Depends(get_message_bus_adapter),
 ):
     """Create automation scene"""
     try:
         response = await adapter.request(
-            "automation.scene.create",
-            request.dict(),
-            timeout=3.0
+            "automation.scene.create", request.dict(), timeout=3.0
         )
 
         return success_response(response)
@@ -110,15 +108,12 @@ async def create_scene(
 
 @router.post("/scenes/{scene_id}/trigger", response_model=dict)
 async def trigger_scene(
-    scene_id: str,
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    scene_id: str, adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
 ):
     """Trigger automation scene"""
     try:
         response = await adapter.request(
-            "automation.scene.trigger",
-            {"scene_id": scene_id},
-            timeout=3.0
+            "automation.scene.trigger", {"scene_id": scene_id}, timeout=3.0
         )
 
         return success_response(response)
@@ -133,14 +128,12 @@ async def trigger_scene(
 @router.post("/macros", response_model=dict, status_code=201)
 async def create_macro(
     request: CreateMacroRequest,
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    adapter: MessageBusAdapter = Depends(get_message_bus_adapter),
 ):
     """Create macro control"""
     try:
         response = await adapter.request(
-            "automation.macro.create",
-            request.dict(),
-            timeout=3.0
+            "automation.macro.create", request.dict(), timeout=3.0
         )
 
         return success_response(response)
@@ -156,17 +149,14 @@ async def create_macro(
 async def change_macro_value(
     macro_id: str,
     request: ChangeMacroRequest,
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    adapter: MessageBusAdapter = Depends(get_message_bus_adapter),
 ):
     """Change macro value"""
     try:
         response = await adapter.request(
             "automation.macro.change",
-            {
-                "macro_id": macro_id,
-                "value": request.value
-            },
-            timeout=2.0
+            {"macro_id": macro_id, "value": request.value},
+            timeout=2.0,
         )
 
         return success_response(response)
@@ -181,14 +171,12 @@ async def change_macro_value(
 @router.post("/cues", response_model=dict, status_code=201)
 async def create_cue(
     request: CreateCueRequest,
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    adapter: MessageBusAdapter = Depends(get_message_bus_adapter),
 ):
     """Create performance cue"""
     try:
         response = await adapter.request(
-            "automation.cue.create",
-            request.dict(),
-            timeout=3.0
+            "automation.cue.create", request.dict(), timeout=3.0
         )
 
         return success_response(response)
@@ -202,15 +190,12 @@ async def create_cue(
 
 @router.post("/cues/{cue_id}/fire", response_model=dict)
 async def fire_cue(
-    cue_id: str,
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    cue_id: str, adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
 ):
     """Fire performance cue manually"""
     try:
         response = await adapter.request(
-            "automation.cue.fire",
-            {"cue_id": cue_id},
-            timeout=3.0
+            "automation.cue.fire", {"cue_id": cue_id}, timeout=3.0
         )
 
         return success_response(response)

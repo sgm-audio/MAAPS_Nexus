@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 class EffectType(Enum):
     """Available effect types"""
+
     COMPRESSOR = "compressor"
     LIMITER = "limiter"
     GATE = "gate"
@@ -55,6 +56,7 @@ class EffectProcessor:
 # DYNAMICS PROCESSORS
 # ============================================================================
 
+
 class CompressorProcessor(EffectProcessor):
     """Dynamic range compressor with automatic gain makeup"""
 
@@ -72,12 +74,12 @@ class CompressorProcessor(EffectProcessor):
         - knee: Soft knee width in dB (0 to 12, default: 0)
         - makeup_gain: Output gain in dB (0 to 24, default: 0)
         """
-        threshold = parameters.get('threshold', -20.0)
-        ratio = parameters.get('ratio', 4.0)
-        attack_ms = parameters.get('attack', 5.0)
-        release_ms = parameters.get('release', 50.0)
-        knee = parameters.get('knee', 0.0)
-        makeup_gain = parameters.get('makeup_gain', 0.0)
+        threshold = parameters.get("threshold", -20.0)
+        ratio = parameters.get("ratio", 4.0)
+        attack_ms = parameters.get("attack", 5.0)
+        release_ms = parameters.get("release", 50.0)
+        knee = parameters.get("knee", 0.0)
+        makeup_gain = parameters.get("makeup_gain", 0.0)
 
         # Convert times to coefficients
         attack_coef = np.exp(-1.0 / (self.sample_rate * attack_ms / 1000.0))
@@ -91,21 +93,25 @@ class CompressorProcessor(EffectProcessor):
 
             # Envelope follower
             if input_level > self.envelope:
-                self.envelope = attack_coef * self.envelope + (1 - attack_coef) * input_level
+                self.envelope = (
+                    attack_coef * self.envelope + (1 - attack_coef) * input_level
+                )
             else:
-                self.envelope = release_coef * self.envelope + (1 - release_coef) * input_level
+                self.envelope = (
+                    release_coef * self.envelope + (1 - release_coef) * input_level
+                )
 
             # Calculate gain reduction
             overshoot = self.envelope - threshold
 
-            if knee > 0 and overshoot > -knee/2 and overshoot < knee/2:
+            if knee > 0 and overshoot > -knee / 2 and overshoot < knee / 2:
                 # Soft knee
-                overshoot = overshoot + knee/2
-                overshoot = overshoot ** 2 / (2 * knee)
+                overshoot = overshoot + knee / 2
+                overshoot = overshoot**2 / (2 * knee)
             else:
                 overshoot = max(0, overshoot)
 
-            gain_reduction = -overshoot * (1 - 1/ratio)
+            gain_reduction = -overshoot * (1 - 1 / ratio)
 
             # Apply compression and makeup gain
             total_gain = gain_reduction + makeup_gain
@@ -123,8 +129,8 @@ class LimiterProcessor(EffectProcessor):
         - threshold: dB threshold (-12 to 0, default: -1)
         - release: Release time in ms (10 to 1000, default: 100)
         """
-        threshold = parameters.get('threshold', -1.0)
-        release_ms = parameters.get('release', 100.0)
+        threshold = parameters.get("threshold", -1.0)
+        release_ms = parameters.get("release", 100.0)
 
         # Convert threshold from dB to linear
         threshold_lin = 10 ** (threshold / 20)
@@ -153,10 +159,10 @@ class GateProcessor(EffectProcessor):
         - release: Release time in ms (10 to 1000, default: 100)
         - hold: Hold time in ms (0 to 500, default: 10)
         """
-        threshold = parameters.get('threshold', -40.0)
-        ratio = parameters.get('ratio', 10.0)
-        attack_ms = parameters.get('attack', 1.0)
-        release_ms = parameters.get('release', 100.0)
+        threshold = parameters.get("threshold", -40.0)
+        ratio = parameters.get("ratio", 10.0)
+        attack_ms = parameters.get("attack", 1.0)
+        release_ms = parameters.get("release", 100.0)
 
         threshold_lin = 10 ** (threshold / 20)
         attack_coef = np.exp(-1.0 / (self.sample_rate * attack_ms / 1000.0))
@@ -169,9 +175,13 @@ class GateProcessor(EffectProcessor):
 
             # Envelope follower
             if input_level > self.envelope:
-                self.envelope = attack_coef * self.envelope + (1 - attack_coef) * input_level
+                self.envelope = (
+                    attack_coef * self.envelope + (1 - attack_coef) * input_level
+                )
             else:
-                self.envelope = release_coef * self.envelope + (1 - release_coef) * input_level
+                self.envelope = (
+                    release_coef * self.envelope + (1 - release_coef) * input_level
+                )
 
             # Gate logic with hysteresis
             if self.envelope > threshold_lin:
@@ -199,10 +209,10 @@ class ExpanderProcessor(EffectProcessor):
         - attack: Attack time in ms (0.1 to 100, default: 10)
         - release: Release time in ms (10 to 1000, default: 100)
         """
-        threshold = parameters.get('threshold', -40.0)
-        ratio = parameters.get('ratio', 2.0)
-        attack_ms = parameters.get('attack', 10.0)
-        release_ms = parameters.get('release', 100.0)
+        threshold = parameters.get("threshold", -40.0)
+        ratio = parameters.get("ratio", 2.0)
+        attack_ms = parameters.get("attack", 10.0)
+        release_ms = parameters.get("release", 100.0)
 
         attack_coef = np.exp(-1.0 / (self.sample_rate * attack_ms / 1000.0))
         release_coef = np.exp(-1.0 / (self.sample_rate * release_ms / 1000.0))
@@ -214,9 +224,13 @@ class ExpanderProcessor(EffectProcessor):
 
             # Envelope follower
             if input_level > self.envelope:
-                self.envelope = attack_coef * self.envelope + (1 - attack_coef) * input_level
+                self.envelope = (
+                    attack_coef * self.envelope + (1 - attack_coef) * input_level
+                )
             else:
-                self.envelope = release_coef * self.envelope + (1 - release_coef) * input_level
+                self.envelope = (
+                    release_coef * self.envelope + (1 - release_coef) * input_level
+                )
 
             # Calculate expansion
             if self.envelope < threshold:
@@ -234,6 +248,7 @@ class ExpanderProcessor(EffectProcessor):
 # EQ PROCESSORS
 # ============================================================================
 
+
 class ParametricEQProcessor(EffectProcessor):
     """Multi-band parametric equalizer"""
 
@@ -248,9 +263,9 @@ class ParametricEQProcessor(EffectProcessor):
 
         # Process up to 4 bands
         for band in range(1, 5):
-            freq_key = f'freq{band}'
-            gain_key = f'gain{band}'
-            q_key = f'q{band}'
+            freq_key = f"freq{band}"
+            gain_key = f"gain{band}"
+            q_key = f"q{band}"
 
             if freq_key in parameters:
                 freq = parameters[freq_key]
@@ -272,8 +287,8 @@ class ParametricEQProcessor(EffectProcessor):
                     a2 = 1 - alpha / A
 
                     # Normalize
-                    b = np.array([b0/a0, b1/a0, b2/a0])
-                    a = np.array([1.0, a1/a0, a2/a0])
+                    b = np.array([b0 / a0, b1 / a0, b2 / a0])
+                    a = np.array([1.0, a1 / a0, a2 / a0])
 
                     # Apply filter
                     output = signal.lfilter(b, a, output)
@@ -285,9 +300,37 @@ class GraphicEQProcessor(EffectProcessor):
     """31-band graphic equalizer (ISO standard frequencies)"""
 
     ISO_FREQUENCIES = [
-        20, 25, 31.5, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500,
-        630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000,
-        10000, 12500, 16000, 20000
+        20,
+        25,
+        31.5,
+        40,
+        50,
+        63,
+        80,
+        100,
+        125,
+        160,
+        200,
+        250,
+        315,
+        400,
+        500,
+        630,
+        800,
+        1000,
+        1250,
+        1600,
+        2000,
+        2500,
+        3150,
+        4000,
+        5000,
+        6300,
+        8000,
+        10000,
+        12500,
+        16000,
+        20000,
     ]
 
     def process(self, audio: np.ndarray, parameters: Dict[str, float]) -> np.ndarray:
@@ -298,7 +341,7 @@ class GraphicEQProcessor(EffectProcessor):
         output = audio.copy()
 
         for i, freq in enumerate(self.ISO_FREQUENCIES):
-            band_key = f'band_{i}'
+            band_key = f"band_{i}"
             gain = parameters.get(band_key, 0.0)
 
             if abs(gain) > 0.1:
@@ -316,8 +359,8 @@ class GraphicEQProcessor(EffectProcessor):
                 a1 = -2 * np.cos(w0)
                 a2 = 1 - alpha / A
 
-                b = np.array([b0/a0, b1/a0, b2/a0])
-                a = np.array([1.0, a1/a0, a2/a0])
+                b = np.array([b0 / a0, b1 / a0, b2 / a0])
+                a = np.array([1.0, a1 / a0, a2 / a0])
 
                 output = signal.lfilter(b, a, output)
 
@@ -327,6 +370,7 @@ class GraphicEQProcessor(EffectProcessor):
 # ============================================================================
 # TIME-BASED EFFECTS
 # ============================================================================
+
 
 class DelayProcessor(EffectProcessor):
     """Digital delay with feedback"""
@@ -344,9 +388,9 @@ class DelayProcessor(EffectProcessor):
         - feedback: Feedback amount (0 to 0.95, default: 0.3)
         - mix: Wet/dry mix (0 to 1, default: 0.5)
         """
-        delay_ms = parameters.get('delay_time', 500.0)
-        feedback = parameters.get('feedback', 0.3)
-        mix = parameters.get('mix', 0.5)
+        delay_ms = parameters.get("delay_time", 500.0)
+        feedback = parameters.get("feedback", 0.3)
+        mix = parameters.get("mix", 0.5)
 
         delay_samples = int(delay_ms * self.sample_rate / 1000.0)
         delay_samples = min(delay_samples, len(self.buffer) - 1)
@@ -396,9 +440,9 @@ class ReverbProcessor(EffectProcessor):
         - damping: High frequency damping (0 to 1, default: 0.5)
         - wet_dry: Wet/dry mix (0 to 1, default: 0.3)
         """
-        room_size = parameters.get('room_size', 0.5)
-        damping = parameters.get('damping', 0.5)
-        wet_dry = parameters.get('wet_dry', 0.3)
+        room_size = parameters.get("room_size", 0.5)
+        damping = parameters.get("damping", 0.5)
+        wet_dry = parameters.get("wet_dry", 0.3)
 
         # Scale room size to feedback
         feedback = 0.7 + room_size * 0.28
@@ -413,11 +457,16 @@ class ReverbProcessor(EffectProcessor):
                 delayed = self.comb_buffers[j][self.comb_positions[j]]
 
                 # Apply damping filter (simple lowpass)
-                filtered = delayed * (1 - damping) + self.state.get(f'comb_lp_{j}', 0.0) * damping
-                self.state[f'comb_lp_{j}'] = filtered
+                filtered = (
+                    delayed * (1 - damping)
+                    + self.state.get(f"comb_lp_{j}", 0.0) * damping
+                )
+                self.state[f"comb_lp_{j}"] = filtered
 
                 # Write to buffer with feedback
-                self.comb_buffers[j][self.comb_positions[j]] = audio[i] + filtered * feedback
+                self.comb_buffers[j][self.comb_positions[j]] = (
+                    audio[i] + filtered * feedback
+                )
                 self.comb_positions[j] = (self.comb_positions[j] + 1) % delay
 
                 comb_sum += delayed
@@ -469,9 +518,9 @@ class ChorusProcessor(EffectProcessor):
         - depth: Modulation depth in ms (0 to 20, default: 5)
         - mix: Wet/dry mix (0 to 1, default: 0.5)
         """
-        rate = parameters.get('rate', 1.5)
-        depth_ms = parameters.get('depth', 5.0)
-        mix = parameters.get('mix', 0.5)
+        rate = parameters.get("rate", 1.5)
+        depth_ms = parameters.get("depth", 5.0)
+        mix = parameters.get("mix", 0.5)
 
         depth_samples = depth_ms * self.sample_rate / 1000.0
         base_delay_samples = depth_samples * 2  # Center delay
@@ -521,10 +570,10 @@ class FlangerProcessor(EffectProcessor):
         - feedback: Feedback amount (-0.95 to 0.95, default: 0.5)
         - mix: Wet/dry mix (0 to 1, default: 0.5)
         """
-        rate = parameters.get('rate', 0.5)
-        depth_ms = parameters.get('depth', 2.0)
-        feedback = parameters.get('feedback', 0.5)
-        mix = parameters.get('mix', 0.5)
+        rate = parameters.get("rate", 0.5)
+        depth_ms = parameters.get("depth", 2.0)
+        feedback = parameters.get("feedback", 0.5)
+        mix = parameters.get("mix", 0.5)
 
         depth_samples = depth_ms * self.sample_rate / 1000.0
         base_delay = 2.0 * self.sample_rate / 1000.0  # 2ms base
@@ -560,6 +609,7 @@ class FlangerProcessor(EffectProcessor):
 # MODULATION EFFECTS
 # ============================================================================
 
+
 class PhaserProcessor(EffectProcessor):
     """Multi-stage phaser with LFO"""
 
@@ -577,11 +627,11 @@ class PhaserProcessor(EffectProcessor):
         - stages: Number of allpass stages (2, 4, 6, default: 4)
         - mix: Wet/dry mix (0 to 1, default: 0.5)
         """
-        rate = parameters.get('rate', 0.5)
-        depth = parameters.get('depth', 0.8)
-        feedback = parameters.get('feedback', 0.5)
-        stages = int(parameters.get('stages', 4))
-        mix = parameters.get('mix', 0.5)
+        rate = parameters.get("rate", 0.5)
+        depth = parameters.get("depth", 0.8)
+        feedback = parameters.get("feedback", 0.5)
+        stages = int(parameters.get("stages", 4))
+        mix = parameters.get("mix", 0.5)
 
         output = np.zeros_like(audio)
 
@@ -625,17 +675,17 @@ class TremoloProcessor(EffectProcessor):
         - depth: Modulation depth (0 to 1, default: 0.5)
         - waveform: LFO waveform ('sine', 'triangle', 'square', default: 'sine')
         """
-        rate = parameters.get('rate', 5.0)
-        depth = parameters.get('depth', 0.5)
-        waveform = parameters.get('waveform', 'sine')
+        rate = parameters.get("rate", 5.0)
+        depth = parameters.get("depth", 0.5)
+        waveform = parameters.get("waveform", "sine")
 
         output = np.zeros_like(audio)
 
         for i in range(len(audio)):
             # Generate LFO
-            if waveform == 'triangle':
+            if waveform == "triangle":
                 lfo = 2 * np.abs(2 * (self.lfo_phase - 0.5)) - 1
-            elif waveform == 'square':
+            elif waveform == "square":
                 lfo = 1.0 if self.lfo_phase < 0.5 else -1.0
             else:  # sine
                 lfo = np.sin(2 * np.pi * self.lfo_phase)
@@ -667,8 +717,8 @@ class VibratoProcessor(EffectProcessor):
         - rate: LFO rate in Hz (0.1 to 15, default: 5)
         - depth: Pitch modulation depth in cents (0 to 50, default: 20)
         """
-        rate = parameters.get('rate', 5.0)
-        depth_cents = parameters.get('depth', 20.0)
+        rate = parameters.get("rate", 5.0)
+        depth_cents = parameters.get("depth", 20.0)
 
         # Convert cents to delay modulation (approximate)
         max_delay_ms = depth_cents / 100.0  # Rough approximation
@@ -702,6 +752,7 @@ class VibratoProcessor(EffectProcessor):
 # DISTORTION EFFECTS
 # ============================================================================
 
+
 class DistortionProcessor(EffectProcessor):
     """Waveshaping distortion"""
 
@@ -713,19 +764,19 @@ class DistortionProcessor(EffectProcessor):
         - output_gain: Output level (0 to 1, default: 0.5)
         - type: Distortion type ('hard', 'soft', 'tube', default: 'soft')
         """
-        drive = parameters.get('drive', 10.0)
-        tone = parameters.get('tone', 0.5)
-        output_gain = parameters.get('output_gain', 0.5)
-        dist_type = parameters.get('type', 'soft')
+        drive = parameters.get("drive", 10.0)
+        tone = parameters.get("tone", 0.5)
+        output_gain = parameters.get("output_gain", 0.5)
+        dist_type = parameters.get("type", "soft")
 
         # Apply drive
         driven = audio * drive
 
         # Apply waveshaping
-        if dist_type == 'hard':
+        if dist_type == "hard":
             # Hard clipping
             distorted = np.clip(driven, -1.0, 1.0)
-        elif dist_type == 'tube':
+        elif dist_type == "tube":
             # Tube-style soft clipping
             distorted = np.tanh(driven * 0.5) * 2.0
         else:  # soft
@@ -735,7 +786,9 @@ class DistortionProcessor(EffectProcessor):
         # Apply tone control (simple lowpass)
         if tone < 1.0:
             cutoff_freq = 500 + tone * 4500  # 500Hz to 5kHz
-            sos = signal.butter(2, cutoff_freq, 'low', fs=self.sample_rate, output='sos')
+            sos = signal.butter(
+                2, cutoff_freq, "low", fs=self.sample_rate, output="sos"
+            )
             distorted = signal.sosfilt(sos, distorted)
 
         # Apply output gain
@@ -753,8 +806,8 @@ class SaturationProcessor(EffectProcessor):
         - amount: Saturation amount (0 to 1, default: 0.5)
         - harmonics: Harmonic enhancement (0 to 1, default: 0.3)
         """
-        amount = parameters.get('amount', 0.5)
-        harmonics = parameters.get('harmonics', 0.3)
+        amount = parameters.get("amount", 0.5)
+        harmonics = parameters.get("harmonics", 0.3)
 
         # Soft saturation using tanh
         saturated = np.tanh(audio * (1 + amount * 2))
@@ -774,6 +827,7 @@ class SaturationProcessor(EffectProcessor):
 # ============================================================================
 # EFFECT PROCESSOR FACTORY
 # ============================================================================
+
 
 class EffectProcessorFactory:
     """Factory for creating effect processors"""
@@ -797,7 +851,9 @@ class EffectProcessorFactory:
     }
 
     @classmethod
-    def create(cls, effect_type: EffectType, sample_rate: int = 44100) -> EffectProcessor:
+    def create(
+        cls, effect_type: EffectType, sample_rate: int = 44100
+    ) -> EffectProcessor:
         """Create an effect processor instance"""
         processor_class = cls._processors.get(effect_type)
         if processor_class is None:

@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class PerformanceMetrics:
     """System performance metrics"""
+
     cpu_usage_percent: float
     memory_usage_percent: float
     disk_usage_percent: float
@@ -33,6 +34,7 @@ class PerformanceMetrics:
 @dataclass
 class AudioQualityMetrics:
     """Audio quality measurements"""
+
     lufs_integrated: float
     lufs_short_term: float
     lufs_momentary: float
@@ -47,6 +49,7 @@ class AudioQualityMetrics:
 @dataclass
 class PerformanceAlert:
     """Performance alert configuration"""
+
     alert_id: str
     metric: str
     threshold: float
@@ -62,7 +65,7 @@ class PerformanceMonitoringAgent(BaseAgent):
     def __init__(self):
         super().__init__(
             agent_id="performance_monitoring_agent",
-            agent_name="Performance Monitoring & Analytics Agent"
+            agent_name="Performance Monitoring & Analytics Agent",
         )
 
         # Metrics history
@@ -81,10 +84,10 @@ class PerformanceMonitoringAgent(BaseAgent):
 
         # Statistics
         self.stats = {
-            'measurements_taken': 0,
-            'alerts_triggered': 0,
-            'avg_cpu_usage': 0.0,
-            'avg_latency': 0.0
+            "measurements_taken": 0,
+            "alerts_triggered": 0,
+            "avg_cpu_usage": 0.0,
+            "avg_latency": 0.0,
         }
         self.stats_lock = threading.Lock()
 
@@ -124,38 +127,41 @@ class PerformanceMonitoringAgent(BaseAgent):
         """Handle metrics request"""
         metrics = self._get_current_performance_metrics()
 
-        self.respond(message, {
-            'success': True,
-            'metrics': {
-                'cpu_usage': metrics.cpu_usage_percent,
-                'memory_usage': metrics.memory_usage_percent,
-                'audio_latency': metrics.audio_latency_ms,
-                'buffer_load': metrics.buffer_load_percent
-            }
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "metrics": {
+                    "cpu_usage": metrics.cpu_usage_percent,
+                    "memory_usage": metrics.memory_usage_percent,
+                    "audio_latency": metrics.audio_latency_ms,
+                    "buffer_load": metrics.buffer_load_percent,
+                },
+            },
+        )
 
     def _handle_alert_create(self, message: Message):
         """Handle alert creation"""
         payload = message.payload
 
         alert = PerformanceAlert(
-            alert_id=payload.get('alert_id', f"alert_{time.time()}"),
-            metric=payload['metric'],
-            threshold=payload['threshold'],
-            comparison=payload.get('comparison', 'greater_than'),
-            callback_topic=payload.get('callback_topic', 'monitor.alert.triggered'),
-            enabled=payload.get('enabled', True)
+            alert_id=payload.get("alert_id", f"alert_{time.time()}"),
+            metric=payload["metric"],
+            threshold=payload["threshold"],
+            comparison=payload.get("comparison", "greater_than"),
+            callback_topic=payload.get("callback_topic", "monitor.alert.triggered"),
+            enabled=payload.get("enabled", True),
         )
 
         with self.alerts_lock:
             self.alerts[alert.alert_id] = alert
 
-        self.respond(message, {'success': True, 'alert_id': alert.alert_id})
+        self.respond(message, {"success": True, "alert_id": alert.alert_id})
 
     def _handle_alert_delete(self, message: Message):
         """Handle alert deletion"""
         payload = message.payload
-        alert_id = payload['alert_id']
+        alert_id = payload["alert_id"]
 
         with self.alerts_lock:
             if alert_id in self.alerts:
@@ -164,44 +170,44 @@ class PerformanceMonitoringAgent(BaseAgent):
             else:
                 success = False
 
-        self.respond(message, {'success': success, 'alert_id': alert_id})
+        self.respond(message, {"success": success, "alert_id": alert_id})
 
     def _handle_report_generate(self, message: Message):
         """Handle performance report generation"""
         payload = message.payload
-        duration_seconds = payload.get('duration_seconds', 60.0)
-        include_graphs = payload.get('include_graphs', False)
+        duration_seconds = payload.get("duration_seconds", 60.0)
+        include_graphs = payload.get("include_graphs", False)
 
         report = self._generate_performance_report(duration_seconds, include_graphs)
 
-        self.respond(message, {
-            'success': True,
-            'report': report
-        })
+        self.respond(message, {"success": True, "report": report})
 
     def _handle_audio_quality_analyze(self, message: Message):
         """Handle audio quality analysis"""
         payload = message.payload
-        audio_data = np.array(payload.get('audio_data', []))
-        sample_rate = payload.get('sample_rate', 48000)
+        audio_data = np.array(payload.get("audio_data", []))
+        sample_rate = payload.get("sample_rate", 48000)
 
         if len(audio_data) == 0:
-            self.respond(message, {'success': False, 'error': 'No audio data'})
+            self.respond(message, {"success": False, "error": "No audio data"})
             return
 
         metrics = self._analyze_audio_quality(audio_data, sample_rate)
 
-        self.respond(message, {
-            'success': True,
-            'metrics': {
-                'lufs_integrated': metrics.lufs_integrated,
-                'lufs_short_term': metrics.lufs_short_term,
-                'true_peak_db': metrics.true_peak_db,
-                'dynamic_range_db': metrics.dynamic_range_db,
-                'phase_correlation': metrics.phase_correlation,
-                'snr_db': metrics.snr_db
-            }
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "metrics": {
+                    "lufs_integrated": metrics.lufs_integrated,
+                    "lufs_short_term": metrics.lufs_short_term,
+                    "true_peak_db": metrics.true_peak_db,
+                    "dynamic_range_db": metrics.dynamic_range_db,
+                    "phase_correlation": metrics.phase_correlation,
+                    "snr_db": metrics.snr_db,
+                },
+            },
+        )
 
     def _start_monitoring_threads(self):
         """Start monitoring threads"""
@@ -211,7 +217,7 @@ class PerformanceMonitoringAgent(BaseAgent):
         self.perf_monitor_thread = threading.Thread(
             target=self._performance_monitor_worker,
             name=f"{self.agent_id}_perf_monitor",
-            daemon=True
+            daemon=True,
         )
         self.perf_monitor_thread.start()
 
@@ -219,7 +225,7 @@ class PerformanceMonitoringAgent(BaseAgent):
         self.audio_monitor_thread = threading.Thread(
             target=self._audio_monitor_worker,
             name=f"{self.agent_id}_audio_monitor",
-            daemon=True
+            daemon=True,
         )
         self.audio_monitor_thread.start()
 
@@ -247,15 +253,19 @@ class PerformanceMonitoringAgent(BaseAgent):
                 self._check_performance_alerts(metrics)
 
                 # Publish periodic update
-                self.publish("monitor.performance.cpu", {
-                    'cpu_usage': metrics.cpu_usage_percent,
-                    'memory_usage': metrics.memory_usage_percent
-                }, priority=Priority.LOW)
+                self.publish(
+                    "monitor.performance.cpu",
+                    {
+                        "cpu_usage": metrics.cpu_usage_percent,
+                        "memory_usage": metrics.memory_usage_percent,
+                    },
+                    priority=Priority.LOW,
+                )
 
                 # Update statistics
                 with self.stats_lock:
-                    self.stats['measurements_taken'] += 1
-                    self.stats['avg_cpu_usage'] = metrics.cpu_usage_percent
+                    self.stats["measurements_taken"] += 1
+                    self.stats["avg_cpu_usage"] = metrics.cpu_usage_percent
 
                 time.sleep(1.0)  # Update every second
 
@@ -279,7 +289,7 @@ class PerformanceMonitoringAgent(BaseAgent):
         try:
             cpu_percent = psutil.cpu_percent(interval=0.1)
             memory = psutil.virtual_memory()
-            disk = psutil.disk_usage('/')
+            disk = psutil.disk_usage("/")
 
             # Simulated audio-specific metrics
             audio_latency = np.random.uniform(2.0, 8.0)
@@ -292,7 +302,7 @@ class PerformanceMonitoringAgent(BaseAgent):
                 network_latency_ms=0.0,
                 audio_latency_ms=audio_latency,
                 buffer_load_percent=buffer_load,
-                timestamp=time.time()
+                timestamp=time.time(),
             )
         except:
             # Fallback if psutil not available
@@ -303,13 +313,15 @@ class PerformanceMonitoringAgent(BaseAgent):
                 network_latency_ms=0.0,
                 audio_latency_ms=5.0,
                 buffer_load_percent=50.0,
-                timestamp=time.time()
+                timestamp=time.time(),
             )
 
-    def _analyze_audio_quality(self, audio: np.ndarray, sample_rate: int) -> AudioQualityMetrics:
+    def _analyze_audio_quality(
+        self, audio: np.ndarray, sample_rate: int
+    ) -> AudioQualityMetrics:
         """Analyze audio quality metrics"""
         # Calculate RMS and peak levels
-        rms = np.sqrt(np.mean(audio ** 2))
+        rms = np.sqrt(np.mean(audio**2))
         peak = np.max(np.abs(audio))
 
         # Calculate LUFS (simplified - real implementation would use ITU-R BS.1770)
@@ -344,7 +356,7 @@ class PerformanceMonitoringAgent(BaseAgent):
             phase_correlation=phase_correlation,
             thd_plus_noise_percent=thd_plus_noise * 100,
             snr_db=snr_db,
-            timestamp=time.time()
+            timestamp=time.time(),
         )
 
     def _check_performance_alerts(self, metrics: PerformanceMetrics):
@@ -362,44 +374,77 @@ class PerformanceMonitoringAgent(BaseAgent):
                 # Check threshold
                 should_trigger = False
 
-                if alert.comparison == 'greater_than' and metric_value > alert.threshold:
+                if (
+                    alert.comparison == "greater_than"
+                    and metric_value > alert.threshold
+                ):
                     should_trigger = True
-                elif alert.comparison == 'less_than' and metric_value < alert.threshold:
+                elif alert.comparison == "less_than" and metric_value < alert.threshold:
                     should_trigger = True
-                elif alert.comparison == 'equals' and abs(metric_value - alert.threshold) < 0.01:
+                elif (
+                    alert.comparison == "equals"
+                    and abs(metric_value - alert.threshold) < 0.01
+                ):
                     should_trigger = True
 
                 if should_trigger and not alert.triggered:
                     alert.triggered = True
 
                     with self.stats_lock:
-                        self.stats['alerts_triggered'] += 1
+                        self.stats["alerts_triggered"] += 1
 
                     # Publish alert
-                    self.publish(alert.callback_topic, {
-                        'alert_id': alert.alert_id,
-                        'metric': alert.metric,
-                        'value': metric_value,
-                        'threshold': alert.threshold
-                    }, priority=Priority.CRITICAL)
+                    self.publish(
+                        alert.callback_topic,
+                        {
+                            "alert_id": alert.alert_id,
+                            "metric": alert.metric,
+                            "value": metric_value,
+                            "threshold": alert.threshold,
+                        },
+                        priority=Priority.CRITICAL,
+                    )
 
-                    self.publish("monitor.alert.critical", {
-                        'alert_id': alert.alert_id,
-                        'message': f"{alert.metric} exceeded threshold: {metric_value:.2f} > {alert.threshold:.2f}"
-                    }, priority=Priority.CRITICAL)
+                    self.publish(
+                        "monitor.alert.critical",
+                        {
+                            "alert_id": alert.alert_id,
+                            "message": f"{alert.metric} exceeded threshold: {metric_value:.2f} > {alert.threshold:.2f}",
+                        },
+                        priority=Priority.CRITICAL,
+                    )
+
+                    # Adaptive Latency Protection: Throttling
+                    if alert.metric in ["cpu_usage_percent", "audio_latency_ms"]:
+                        throttle_factor = (
+                            0.5 if alert.metric == "audio_latency_ms" else 0.25
+                        )
+                        self.publish(
+                            "system.throttle",
+                            {
+                                "reason": f"High {alert.metric}: {metric_value:.2f}",
+                                "throttle_factor": throttle_factor,
+                                "duration": 5.0,  # Throttle for 5 seconds
+                            },
+                            priority=Priority.CRITICAL,
+                        )
 
                 elif not should_trigger:
                     alert.triggered = False
 
-    def _generate_performance_report(self, duration_seconds: float, include_graphs: bool) -> Dict[str, Any]:
+    def _generate_performance_report(
+        self, duration_seconds: float, include_graphs: bool
+    ) -> Dict[str, Any]:
         """Generate performance report"""
         with self.history_lock:
             # Get recent metrics
             cutoff_time = time.time() - duration_seconds
-            recent_metrics = [m for m in self.performance_history if m.timestamp >= cutoff_time]
+            recent_metrics = [
+                m for m in self.performance_history if m.timestamp >= cutoff_time
+            ]
 
         if not recent_metrics:
-            return {'error': 'No data available'}
+            return {"error": "No data available"}
 
         # Calculate statistics
         cpu_values = [m.cpu_usage_percent for m in recent_metrics]
@@ -407,31 +452,35 @@ class PerformanceMonitoringAgent(BaseAgent):
         latency_values = [m.audio_latency_ms for m in recent_metrics]
 
         report = {
-            'duration_seconds': duration_seconds,
-            'measurements': len(recent_metrics),
-            'cpu': {
-                'avg': np.mean(cpu_values),
-                'max': np.max(cpu_values),
-                'min': np.min(cpu_values),
-                'std': np.std(cpu_values)
+            "duration_seconds": duration_seconds,
+            "measurements": len(recent_metrics),
+            "cpu": {
+                "avg": np.mean(cpu_values),
+                "max": np.max(cpu_values),
+                "min": np.min(cpu_values),
+                "std": np.std(cpu_values),
             },
-            'memory': {
-                'avg': np.mean(memory_values),
-                'max': np.max(memory_values),
-                'min': np.min(memory_values)
+            "memory": {
+                "avg": np.mean(memory_values),
+                "max": np.max(memory_values),
+                "min": np.min(memory_values),
             },
-            'audio_latency': {
-                'avg': np.mean(latency_values),
-                'max': np.max(latency_values),
-                'min': np.min(latency_values)
+            "audio_latency": {
+                "avg": np.mean(latency_values),
+                "max": np.max(latency_values),
+                "min": np.min(latency_values),
             },
-            'system_health': 'good' if np.mean(cpu_values) < 70 and np.mean(latency_values) < 10 else 'fair'
+            "system_health": (
+                "good"
+                if np.mean(cpu_values) < 70 and np.mean(latency_values) < 10
+                else "fair"
+            ),
         }
 
         if include_graphs:
-            report['graphs'] = {
-                'cpu_timeline': cpu_values,
-                'latency_timeline': latency_values
+            report["graphs"] = {
+                "cpu_timeline": cpu_values,
+                "latency_timeline": latency_values,
             }
 
         return report

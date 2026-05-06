@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ChannelConfig:
     """Audio channel configuration"""
+
     channel_id: int
     channel_name: str
     priority: int = 5  # 1-10, higher = more important
@@ -33,6 +34,7 @@ class ChannelConfig:
 @dataclass
 class DuckingConfig:
     """Ducking (sidechain compression) configuration"""
+
     ducking_id: str
     sidechain_channel: int
     target_channels: List[int]
@@ -46,6 +48,7 @@ class DuckingConfig:
 @dataclass
 class FeedbackFilter:
     """Feedback suppression filter"""
+
     filter_id: str
     channel_id: int
     frequency_hz: float
@@ -61,7 +64,7 @@ class LiveMixingDynamicsAgent(BaseAgent):
     def __init__(self):
         super().__init__(
             agent_id="live_mixing_dynamics_agent",
-            agent_name="Live Mixing & Dynamics Agent"
+            agent_name="Live Mixing & Dynamics Agent",
         )
 
         self.channels: Dict[int, ChannelConfig] = {}
@@ -83,9 +86,9 @@ class LiveMixingDynamicsAgent(BaseAgent):
         self.processing_active = False
 
         self.stats = {
-            'mix_adjustments': 0,
-            'ducking_events': 0,
-            'feedback_suppressions': 0
+            "mix_adjustments": 0,
+            "ducking_events": 0,
+            "feedback_suppressions": 0,
         }
         self.stats_lock = threading.Lock()
 
@@ -132,23 +135,25 @@ class LiveMixingDynamicsAgent(BaseAgent):
         payload = message.payload
 
         channel = ChannelConfig(
-            channel_id=payload['channel_id'],
-            channel_name=payload.get('channel_name', f"Channel {payload['channel_id']}"),
-            priority=payload.get('priority', 5),
-            volume=payload.get('volume', 1.0),
-            pan=payload.get('pan', 0.0)
+            channel_id=payload["channel_id"],
+            channel_name=payload.get(
+                "channel_name", f"Channel {payload['channel_id']}"
+            ),
+            priority=payload.get("priority", 5),
+            volume=payload.get("volume", 1.0),
+            pan=payload.get("pan", 0.0),
         )
 
         with self.channels_lock:
             self.channels[channel.channel_id] = channel
 
-        self.respond(message, {'success': True, 'channel_id': channel.channel_id})
+        self.respond(message, {"success": True, "channel_id": channel.channel_id})
 
     def _handle_channel_priority(self, message: Message):
         """Handle channel priority change"""
         payload = message.payload
-        channel_id = payload['channel_id']
-        priority = payload['priority']
+        channel_id = payload["channel_id"]
+        priority = payload["priority"]
 
         with self.channels_lock:
             if channel_id in self.channels:
@@ -157,55 +162,62 @@ class LiveMixingDynamicsAgent(BaseAgent):
             else:
                 success = False
 
-        self.respond(message, {'success': success, 'channel_id': channel_id, 'priority': priority})
+        self.respond(
+            message,
+            {"success": success, "channel_id": channel_id, "priority": priority},
+        )
 
     def _handle_automix_enable(self, message: Message):
         """Handle auto-mix enable"""
         payload = message.payload
-        enable = payload.get('enable', True)
-        input_channels = payload.get('input_channels', [])
-        sensitivity = payload.get('sensitivity', 0.7)
+        enable = payload.get("enable", True)
+        input_channels = payload.get("input_channels", [])
+        sensitivity = payload.get("sensitivity", 0.7)
 
         self.auto_mix_enabled = enable
         self.auto_mix_channels = input_channels
         self.auto_mix_sensitivity = sensitivity
 
-        self.respond(message, {
-            'success': True,
-            'auto_mix_enabled': self.auto_mix_enabled,
-            'channels': len(self.auto_mix_channels)
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "auto_mix_enabled": self.auto_mix_enabled,
+                "channels": len(self.auto_mix_channels),
+            },
+        )
 
-        self.publish("mix.automix.status", {
-            'enabled': self.auto_mix_enabled,
-            'channels': self.auto_mix_channels
-        }, priority=Priority.MEDIUM)
+        self.publish(
+            "mix.automix.status",
+            {"enabled": self.auto_mix_enabled, "channels": self.auto_mix_channels},
+            priority=Priority.MEDIUM,
+        )
 
     def _handle_ducking_configure(self, message: Message):
         """Handle ducking configuration"""
         payload = message.payload
 
         ducking = DuckingConfig(
-            ducking_id=payload.get('ducking_id', f"duck_{time.time()}"),
-            sidechain_channel=payload['sidechain_channel'],
-            target_channels=payload['target_channels'],
-            threshold_db=payload.get('threshold_db', -20.0),
-            ratio=payload.get('ratio', 4.0),
-            attack_ms=payload.get('attack_ms', 10.0),
-            release_ms=payload.get('release_ms', 300.0)
+            ducking_id=payload.get("ducking_id", f"duck_{time.time()}"),
+            sidechain_channel=payload["sidechain_channel"],
+            target_channels=payload["target_channels"],
+            threshold_db=payload.get("threshold_db", -20.0),
+            ratio=payload.get("ratio", 4.0),
+            attack_ms=payload.get("attack_ms", 10.0),
+            release_ms=payload.get("release_ms", 300.0),
         )
 
         with self.ducking_lock:
             self.ducking_configs[ducking.ducking_id] = ducking
 
-        self.respond(message, {'success': True, 'ducking_id': ducking.ducking_id})
+        self.respond(message, {"success": True, "ducking_id": ducking.ducking_id})
 
     def _handle_feedback_suppress(self, message: Message):
         """Handle feedback suppression"""
         payload = message.payload
-        channel_id = payload['channel_id']
-        num_filters = payload.get('num_filters', 12)
-        auto_adapt = payload.get('auto_adapt', True)
+        channel_id = payload["channel_id"]
+        num_filters = payload.get("num_filters", 12)
+        auto_adapt = payload.get("auto_adapt", True)
 
         # Create feedback suppression filters
         filters_created = []
@@ -217,7 +229,7 @@ class LiveMixingDynamicsAgent(BaseAgent):
                 frequency_hz=0.0,  # Will be set dynamically
                 bandwidth_hz=10.0,
                 attenuation_db=-12.0,
-                auto_adapt=auto_adapt
+                auto_adapt=auto_adapt,
             )
 
             with self.feedback_lock:
@@ -225,18 +237,21 @@ class LiveMixingDynamicsAgent(BaseAgent):
 
             filters_created.append(feedback_filter.filter_id)
 
-        self.respond(message, {
-            'success': True,
-            'channel_id': channel_id,
-            'filters_created': len(filters_created)
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "channel_id": channel_id,
+                "filters_created": len(filters_created),
+            },
+        )
 
     def _handle_spatial_position(self, message: Message):
         """Handle spatial positioning"""
         payload = message.payload
-        channel_id = payload['channel_id']
-        pan = payload.get('pan', 0.0)
-        width = payload.get('width', 1.0)
+        channel_id = payload["channel_id"]
+        pan = payload.get("pan", 0.0)
+        width = payload.get("width", 1.0)
 
         with self.channels_lock:
             if channel_id in self.channels:
@@ -245,12 +260,14 @@ class LiveMixingDynamicsAgent(BaseAgent):
             else:
                 success = False
 
-        self.respond(message, {'success': success, 'channel_id': channel_id, 'pan': pan})
+        self.respond(
+            message, {"success": success, "channel_id": channel_id, "pan": pan}
+        )
 
     def _handle_audio_input(self, message: Message):
         """Handle audio input for processing"""
         payload = message.payload
-        audio_data = payload.get('audio_data', [])
+        audio_data = payload.get("audio_data", [])
 
         if not audio_data or not self.auto_mix_enabled:
             return
@@ -270,7 +287,7 @@ class LiveMixingDynamicsAgent(BaseAgent):
         self.processing_thread = threading.Thread(
             target=self._processing_worker,
             name=f"{self.agent_id}_processor",
-            daemon=True
+            daemon=True,
         )
         self.processing_thread.start()
 
@@ -329,13 +346,19 @@ class LiveMixingDynamicsAgent(BaseAgent):
             for channel_id, level, priority in active_channels:
                 if channel_id in self.channels:
                     # Higher priority = higher volume when multiple channels active
-                    priority_factor = priority / total_priority_weight if total_priority_weight > 0 else 1.0
-                    new_volume = min(1.0, priority_factor * (1.0 / len(active_channels)) * 2.0)
+                    priority_factor = (
+                        priority / total_priority_weight
+                        if total_priority_weight > 0
+                        else 1.0
+                    )
+                    new_volume = min(
+                        1.0, priority_factor * (1.0 / len(active_channels)) * 2.0
+                    )
 
                     self.channels[channel_id].volume = new_volume
 
         with self.stats_lock:
-            self.stats['mix_adjustments'] += 1
+            self.stats["mix_adjustments"] += 1
 
     def _adjust_auto_mix_levels(self):
         """Periodic auto-mix level adjustment"""
@@ -354,7 +377,9 @@ class LiveMixingDynamicsAgent(BaseAgent):
 
                 if sidechain_level_db > ducking.threshold_db:
                     # Apply ducking to target channels
-                    reduction_db = (sidechain_level_db - ducking.threshold_db) / ducking.ratio
+                    reduction_db = (
+                        sidechain_level_db - ducking.threshold_db
+                    ) / ducking.ratio
 
                     with self.channels_lock:
                         for target_channel in ducking.target_channels:
@@ -364,7 +389,7 @@ class LiveMixingDynamicsAgent(BaseAgent):
                                 self.channels[target_channel].volume *= reduction_linear
 
                     with self.stats_lock:
-                        self.stats['ducking_events'] += 1
+                        self.stats["ducking_events"] += 1
 
     def _detect_and_suppress_feedback(self, audio_data: List[float]):
         """Detect and suppress feedback frequencies"""
@@ -380,10 +405,14 @@ class LiveMixingDynamicsAgent(BaseAgent):
                     feedback_filter.frequency_hz = feedback_freq
 
                     with self.stats_lock:
-                        self.stats['feedback_suppressions'] += 1
+                        self.stats["feedback_suppressions"] += 1
 
-                    self.publish("mix.feedback.detected", {
-                        'channel_id': feedback_filter.channel_id,
-                        'frequency': feedback_freq,
-                        'filter_id': feedback_filter.filter_id
-                    }, priority=Priority.HIGH)
+                    self.publish(
+                        "mix.feedback.detected",
+                        {
+                            "channel_id": feedback_filter.channel_id,
+                            "frequency": feedback_freq,
+                            "filter_id": feedback_filter.filter_id,
+                        },
+                        priority=Priority.HIGH,
+                    )

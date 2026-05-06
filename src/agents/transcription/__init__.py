@@ -8,53 +8,51 @@ harmonic analysis, rhythm analysis, and multi-track coordination.
 
 from .musical_analysis_agent import MusicalAnalysisAgent, MusicalAnalysis, Modulation
 from .audio_to_midi_agent import AudioToMIDIAgent, MIDINote, MIDITranscription
-from .tablature_generation_agent import TablatureGenerationAgent, TabNote, Tablature, ChordDiagram
+from .tablature_generation_agent import (
+    TablatureGenerationAgent,
+    TabNote,
+    Tablature,
+    ChordDiagram,
+)
 from .harmonic_analysis_agent import HarmonicAnalysisAgent, Chord, HarmonicAnalysis
 from .rhythm_analysis_agent import RhythmAnalysisAgent, BeatGrid, RhythmicAnalysis
 from .multitrack_coordinator_agent import (
     MultiTrackCoordinatorAgent,
     TrackTranscription,
-    MultiTrackTranscription
+    MultiTrackTranscription,
 )
-
 
 __all__ = [
     # Agents
-    'MusicalAnalysisAgent',
-    'AudioToMIDIAgent',
-    'TablatureGenerationAgent',
-    'HarmonicAnalysisAgent',
-    'RhythmAnalysisAgent',
-    'MultiTrackCoordinatorAgent',
-
+    "MusicalAnalysisAgent",
+    "AudioToMIDIAgent",
+    "TablatureGenerationAgent",
+    "HarmonicAnalysisAgent",
+    "RhythmAnalysisAgent",
+    "MultiTrackCoordinatorAgent",
     # Data structures - Musical Analysis
-    'MusicalAnalysis',
-    'Modulation',
-
+    "MusicalAnalysis",
+    "Modulation",
     # Data structures - MIDI Transcription
-    'MIDINote',
-    'MIDITranscription',
-
+    "MIDINote",
+    "MIDITranscription",
     # Data structures - Tablature
-    'TabNote',
-    'Tablature',
-    'ChordDiagram',
-
+    "TabNote",
+    "Tablature",
+    "ChordDiagram",
     # Data structures - Harmonic Analysis
-    'Chord',
-    'HarmonicAnalysis',
-
+    "Chord",
+    "HarmonicAnalysis",
     # Data structures - Rhythm Analysis
-    'BeatGrid',
-    'RhythmicAnalysis',
-
+    "BeatGrid",
+    "RhythmicAnalysis",
     # Data structures - Multi-track
-    'TrackTranscription',
-    'MultiTrackTranscription',
+    "TrackTranscription",
+    "MultiTrackTranscription",
 ]
 
 
 # Version info
-__version__ = '1.0.0'
-__author__ = 'Musical Analysis & Transcription Team'
-__description__ = 'Multi-agent system for musical analysis and transcription'
+__version__ = "1.0.0"
+__author__ = "Musical Analysis & Transcription Team"
+__description__ = "Multi-agent system for musical analysis and transcription"

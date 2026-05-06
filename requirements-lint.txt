@@ -1,0 +1,5 @@
+# Lightweight requirements for CI linting only (black, flake8, mypy)
+# The full ML stack is not needed to run code quality checks.
+black==25.11.0
+flake8==7.3.0
+mypy==1.18.2

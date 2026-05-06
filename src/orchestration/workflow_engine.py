@@ -14,13 +14,14 @@ from enum import Enum
 import logging
 import uuid
 
-from ..core import BaseAgent, Message, Topics, Priority
+from src.core import BaseAgent, Message, Topics, Priority
 
 logger = logging.getLogger(__name__)
 
 
 class StepStatus(Enum):
     """Workflow step status"""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -30,6 +31,7 @@ class StepStatus(Enum):
 
 class WorkflowStatus(Enum):
     """Workflow execution status"""
+
     CREATED = "created"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -40,6 +42,7 @@ class WorkflowStatus(Enum):
 @dataclass
 class WorkflowStep:
     """Individual step in a workflow"""
+
     step_id: str
     name: str
     agent_id: str
@@ -59,6 +62,7 @@ class WorkflowStep:
 @dataclass
 class Workflow:
     """Workflow definition"""
+
     workflow_id: str
     name: str
     description: str
@@ -84,8 +88,7 @@ class WorkflowEngine(BaseAgent):
 
     def __init__(self):
         super().__init__(
-            agent_id="workflow_engine",
-            agent_name="Workflow Orchestration Engine"
+            agent_id="workflow_engine", agent_name="Workflow Orchestration Engine"
         )
 
         # Active workflows
@@ -101,11 +104,11 @@ class WorkflowEngine(BaseAgent):
 
         # Statistics
         self.stats = {
-            'workflows_executed': 0,
-            'workflows_completed': 0,
-            'workflows_failed': 0,
-            'total_steps_executed': 0,
-            'avg_workflow_duration': 0.0
+            "workflows_executed": 0,
+            "workflows_completed": 0,
+            "workflows_failed": 0,
+            "total_steps_executed": 0,
+            "avg_workflow_duration": 0.0,
         }
         self.stats_lock = threading.Lock()
 
@@ -158,9 +161,9 @@ class WorkflowEngine(BaseAgent):
     def _handle_workflow_create(self, message: Message):
         """Handle workflow creation request"""
         payload = message.payload
-        workflow_name = payload.get('name', 'Untitled Workflow')
-        description = payload.get('description', '')
-        steps_data = payload.get('steps', [])
+        workflow_name = payload.get("name", "Untitled Workflow")
+        description = payload.get("description", "")
+        steps_data = payload.get("steps", [])
 
         # Create workflow
         workflow = self._create_workflow(workflow_name, description, steps_data)
@@ -169,48 +172,53 @@ class WorkflowEngine(BaseAgent):
         with self.workflows_lock:
             self.workflows[workflow.workflow_id] = workflow
 
-        self.respond(message, {
-            'success': True,
-            'workflow_id': workflow.workflow_id,
-            'workflow_name': workflow.name,
-            'num_steps': len(workflow.steps)
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "workflow_id": workflow.workflow_id,
+                "workflow_name": workflow.name,
+                "num_steps": len(workflow.steps),
+            },
+        )
 
     def _handle_workflow_execute(self, message: Message):
         """Handle workflow execution request"""
         payload = message.payload
-        workflow_id = payload.get('workflow_id')
+        workflow_id = payload.get("workflow_id")
 
         if not workflow_id:
-            self.respond(message, {
-                'success': False,
-                'error': 'No workflow_id provided'
-            })
+            self.respond(
+                message, {"success": False, "error": "No workflow_id provided"}
+            )
             return
 
         with self.workflows_lock:
             workflow = self.workflows.get(workflow_id)
 
         if not workflow:
-            self.respond(message, {
-                'success': False,
-                'error': f'Workflow {workflow_id} not found'
-            })
+            self.respond(
+                message,
+                {"success": False, "error": f"Workflow {workflow_id} not found"},
+            )
             return
 
         # Queue for execution
         self.execution_queue.put(workflow_id)
 
-        self.respond(message, {
-            'success': True,
-            'workflow_id': workflow_id,
-            'message': 'Workflow queued for execution'
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "workflow_id": workflow_id,
+                "message": "Workflow queued for execution",
+            },
+        )
 
     def _handle_workflow_cancel(self, message: Message):
         """Handle workflow cancellation request"""
         payload = message.payload
-        workflow_id = payload.get('workflow_id')
+        workflow_id = payload.get("workflow_id")
 
         with self.workflows_lock:
             workflow = self.workflows.get(workflow_id)
@@ -218,56 +226,57 @@ class WorkflowEngine(BaseAgent):
             if workflow and workflow.status == WorkflowStatus.RUNNING:
                 workflow.status = WorkflowStatus.CANCELLED
 
-                self.respond(message, {
-                    'success': True,
-                    'workflow_id': workflow_id,
-                    'message': 'Workflow cancelled'
-                })
+                self.respond(
+                    message,
+                    {
+                        "success": True,
+                        "workflow_id": workflow_id,
+                        "message": "Workflow cancelled",
+                    },
+                )
             else:
-                self.respond(message, {
-                    'success': False,
-                    'error': 'Workflow not found or not running'
-                })
+                self.respond(
+                    message,
+                    {"success": False, "error": "Workflow not found or not running"},
+                )
 
     def _handle_workflow_status(self, message: Message):
         """Handle workflow status request"""
         payload = message.payload
-        workflow_id = payload.get('workflow_id')
+        workflow_id = payload.get("workflow_id")
 
         with self.workflows_lock:
             workflow = self.workflows.get(workflow_id)
 
             if workflow:
                 status_info = {
-                    'workflow_id': workflow.workflow_id,
-                    'name': workflow.name,
-                    'status': workflow.status.value,
-                    'num_steps': len(workflow.steps),
-                    'completed_steps': sum(1 for s in workflow.steps if s.status == StepStatus.COMPLETED),
-                    'failed_steps': sum(1 for s in workflow.steps if s.status == StepStatus.FAILED),
-                    'created_at': workflow.created_at,
-                    'started_at': workflow.started_at,
-                    'completed_at': workflow.completed_at
+                    "workflow_id": workflow.workflow_id,
+                    "name": workflow.name,
+                    "status": workflow.status.value,
+                    "num_steps": len(workflow.steps),
+                    "completed_steps": sum(
+                        1 for s in workflow.steps if s.status == StepStatus.COMPLETED
+                    ),
+                    "failed_steps": sum(
+                        1 for s in workflow.steps if s.status == StepStatus.FAILED
+                    ),
+                    "created_at": workflow.created_at,
+                    "started_at": workflow.started_at,
+                    "completed_at": workflow.completed_at,
                 }
 
-                self.respond(message, {
-                    'success': True,
-                    'status': status_info
-                })
+                self.respond(message, {"success": True, "status": status_info})
             else:
-                self.respond(message, {
-                    'success': False,
-                    'error': 'Workflow not found'
-                })
+                self.respond(message, {"success": False, "error": "Workflow not found"})
 
     def _handle_step_result(self, message: Message):
         """Handle step execution result"""
         payload = message.payload
-        workflow_id = payload.get('workflow_id')
-        step_id = payload.get('step_id')
-        success = payload.get('success', False)
-        result = payload.get('result', {})
-        error = payload.get('error')
+        workflow_id = payload.get("workflow_id")
+        step_id = payload.get("step_id")
+        success = payload.get("success", False)
+        result = payload.get("result", {})
+        error = payload.get("error")
 
         with self.workflows_lock:
             workflow = self.workflows.get(workflow_id)
@@ -285,29 +294,28 @@ class WorkflowEngine(BaseAgent):
                         step.end_time = time.time()
                         break
 
-    def _create_workflow(self, name: str, description: str, steps_data: List[Dict]) -> Workflow:
+    def _create_workflow(
+        self, name: str, description: str, steps_data: List[Dict]
+    ) -> Workflow:
         """Create a new workflow from definition"""
         workflow_id = str(uuid.uuid4())
 
         steps = []
         for step_data in steps_data:
             step = WorkflowStep(
-                step_id=step_data.get('step_id', str(uuid.uuid4())),
-                name=step_data.get('name', 'Untitled Step'),
-                agent_id=step_data.get('agent_id', ''),
-                topic=step_data.get('topic', ''),
-                payload=step_data.get('payload', {}),
-                dependencies=step_data.get('dependencies', []),
-                timeout=step_data.get('timeout', 30.0),
-                max_retries=step_data.get('max_retries', 3)
+                step_id=step_data.get("step_id", str(uuid.uuid4())),
+                name=step_data.get("name", "Untitled Step"),
+                agent_id=step_data.get("agent_id", ""),
+                topic=step_data.get("topic", ""),
+                payload=step_data.get("payload", {}),
+                dependencies=step_data.get("dependencies", []),
+                timeout=step_data.get("timeout", 30.0),
+                max_retries=step_data.get("max_retries", 3),
             )
             steps.append(step)
 
         workflow = Workflow(
-            workflow_id=workflow_id,
-            name=name,
-            description=description,
-            steps=steps
+            workflow_id=workflow_id, name=name, description=description, steps=steps
         )
 
         return workflow
@@ -315,9 +323,7 @@ class WorkflowEngine(BaseAgent):
     def _start_executor(self):
         """Start workflow executor thread"""
         self.executor_thread = threading.Thread(
-            target=self._executor_loop,
-            name=f"{self.agent_id}_executor",
-            daemon=True
+            target=self._executor_loop, name=f"{self.agent_id}_executor", daemon=True
         )
         self.executor_thread.start()
 
@@ -358,17 +364,17 @@ class WorkflowEngine(BaseAgent):
         workflow.started_at = time.time()
 
         with self.stats_lock:
-            self.stats['workflows_executed'] += 1
+            self.stats["workflows_executed"] += 1
 
         # Publish workflow started event
         self.publish(
             "workflow.started",
             {
-                'workflow_id': workflow.workflow_id,
-                'workflow_name': workflow.name,
-                'num_steps': len(workflow.steps)
+                "workflow_id": workflow.workflow_id,
+                "workflow_name": workflow.name,
+                "num_steps": len(workflow.steps),
             },
-            priority=Priority.MEDIUM
+            priority=Priority.MEDIUM,
         )
 
         try:
@@ -380,7 +386,9 @@ class WorkflowEngine(BaseAgent):
                     break
 
                 # Find next executable steps
-                executable_steps = self._find_executable_steps(workflow, completed_steps)
+                executable_steps = self._find_executable_steps(
+                    workflow, completed_steps
+                )
 
                 if not executable_steps:
                     # Check if we're stuck (no executable steps but not all completed)
@@ -399,7 +407,9 @@ class WorkflowEngine(BaseAgent):
                         completed_steps.add(step.step_id)
                     elif step.status == StepStatus.FAILED:
                         # Check if we should continue on failure
-                        if step.step_id not in [s.step_id for s in workflow.steps if s.dependencies]:
+                        if step.step_id not in [
+                            s.step_id for s in workflow.steps if s.dependencies
+                        ]:
                             # This step has no dependents, mark as completed
                             completed_steps.add(step.step_id)
                         else:
@@ -414,38 +424,40 @@ class WorkflowEngine(BaseAgent):
             if workflow.status == WorkflowStatus.RUNNING:
                 workflow.status = WorkflowStatus.COMPLETED
                 with self.stats_lock:
-                    self.stats['workflows_completed'] += 1
+                    self.stats["workflows_completed"] += 1
 
             elif workflow.status == WorkflowStatus.FAILED:
                 with self.stats_lock:
-                    self.stats['workflows_failed'] += 1
+                    self.stats["workflows_failed"] += 1
 
             workflow.completed_at = time.time()
 
             # Update stats
             with self.stats_lock:
                 duration = workflow.completed_at - workflow.started_at
-                self.stats['total_steps_executed'] += len(completed_steps)
+                self.stats["total_steps_executed"] += len(completed_steps)
 
                 # Update average duration
-                total_workflows = self.stats['workflows_completed'] + self.stats['workflows_failed']
+                total_workflows = (
+                    self.stats["workflows_completed"] + self.stats["workflows_failed"]
+                )
                 if total_workflows > 0:
-                    self.stats['avg_workflow_duration'] = (
-                        (self.stats['avg_workflow_duration'] * (total_workflows - 1) + duration) /
-                        total_workflows
-                    )
+                    self.stats["avg_workflow_duration"] = (
+                        self.stats["avg_workflow_duration"] * (total_workflows - 1)
+                        + duration
+                    ) / total_workflows
 
             # Publish workflow completed event
             self.publish(
                 "workflow.completed",
                 {
-                    'workflow_id': workflow.workflow_id,
-                    'status': workflow.status.value,
-                    'duration_seconds': workflow.completed_at - workflow.started_at,
-                    'steps_completed': len(completed_steps),
-                    'steps_total': len(workflow.steps)
+                    "workflow_id": workflow.workflow_id,
+                    "status": workflow.status.value,
+                    "duration_seconds": workflow.completed_at - workflow.started_at,
+                    "steps_completed": len(completed_steps),
+                    "steps_total": len(workflow.steps),
                 },
-                priority=Priority.MEDIUM
+                priority=Priority.MEDIUM,
             )
 
         except Exception as e:
@@ -454,15 +466,21 @@ class WorkflowEngine(BaseAgent):
             workflow.completed_at = time.time()
 
             with self.stats_lock:
-                self.stats['workflows_failed'] += 1
+                self.stats["workflows_failed"] += 1
 
-    def _find_executable_steps(self, workflow: Workflow, completed_steps: set) -> List[WorkflowStep]:
+    def _find_executable_steps(
+        self, workflow: Workflow, completed_steps: set
+    ) -> List[WorkflowStep]:
         """Find steps that can be executed now"""
         executable = []
 
         for step in workflow.steps:
             # Skip if already processed
-            if step.status in [StepStatus.COMPLETED, StepStatus.FAILED, StepStatus.RUNNING]:
+            if step.status in [
+                StepStatus.COMPLETED,
+                StepStatus.FAILED,
+                StepStatus.RUNNING,
+            ]:
                 continue
 
             # Check if dependencies are satisfied
@@ -475,6 +493,71 @@ class WorkflowEngine(BaseAgent):
 
         return executable
 
+    def _resolve_payload(
+        self, payload: Dict[str, Any], context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Resolve payload placeholders using workflow context.
+        Supports syntax: {{step_id.key}}
+        """
+        resolved_payload = payload.copy()
+
+        for key, value in resolved_payload.items():
+            if (
+                isinstance(value, str)
+                and value.startswith("{{")
+                and value.endswith("}}")
+            ):
+                # Extract path: {{step_id.result.key}} -> step_id.result.key
+                path = value[2:-2].strip()
+                parts = path.split(".")
+
+                # Navigate context
+                current = context
+                found = True
+                for part in parts:
+                    if isinstance(current, dict) and part in current:
+                        current = current[part]
+                    else:
+                        found = False
+                        break
+
+                if found:
+                    resolved_payload[key] = current
+            elif isinstance(value, dict):
+                resolved_payload[key] = self._resolve_payload(value, context)
+            elif isinstance(value, list):
+                # Handle lists of dicts or strings
+                resolved_list = []
+                for item in value:
+                    if isinstance(item, dict):
+                        resolved_list.append(self._resolve_payload(item, context))
+                    elif (
+                        isinstance(item, str)
+                        and item.startswith("{{")
+                        and item.endswith("}}")
+                    ):
+                        # Same logic as above for list items
+                        path = item[2:-2].strip()
+                        parts = path.split(".")
+                        current = context
+                        found = True
+                        for part in parts:
+                            if isinstance(current, dict) and part in current:
+                                current = current[part]
+                            else:
+                                found = False
+                                break
+                        if found:
+                            resolved_list.append(current)
+                        else:
+                            resolved_list.append(item)
+                    else:
+                        resolved_list.append(item)
+                resolved_payload[key] = resolved_list
+
+        return resolved_payload
+
     def _execute_step(self, workflow: Workflow, step: WorkflowStep):
         """Execute a single workflow step"""
         step.status = StepStatus.RUNNING
@@ -484,34 +567,42 @@ class WorkflowEngine(BaseAgent):
         self.publish(
             "workflow.step.started",
             {
-                'workflow_id': workflow.workflow_id,
-                'step_id': step.step_id,
-                'step_name': step.name
+                "workflow_id": workflow.workflow_id,
+                "step_id": step.step_id,
+                "step_name": step.name,
             },
-            priority=Priority.LOW
+            priority=Priority.LOW,
         )
 
         try:
+            # Resolve payload with context data
+            resolved_payload = self._resolve_payload(step.payload, workflow.context)
+
             # Send request to agent
             response = self.request(
                 step.topic,
                 {
-                    **step.payload,
-                    'workflow_id': workflow.workflow_id,
-                    'step_id': step.step_id
+                    **resolved_payload,
+                    "workflow_id": workflow.workflow_id,
+                    "step_id": step.step_id,
                 },
                 timeout=step.timeout,
-                priority=Priority.MEDIUM
+                priority=Priority.MEDIUM,
             )
 
             if response:
                 # Process response
-                if response.payload.get('success', False):
+                if response.payload.get("success", False):
                     step.status = StepStatus.COMPLETED
                     step.result = response.payload
+
+                    # Update workflow context with result
+                    with self.workflows_lock:
+                        workflow.context[step.step_id] = step.result
+
                 else:
                     step.status = StepStatus.FAILED
-                    step.error = response.payload.get('error', 'Unknown error')
+                    step.error = response.payload.get("error", "Unknown error")
             else:
                 # Timeout
                 step.status = StepStatus.FAILED
@@ -521,7 +612,9 @@ class WorkflowEngine(BaseAgent):
                 if step.retry_count < step.max_retries:
                     step.retry_count += 1
                     step.status = StepStatus.PENDING
-                    logger.warning(f"Retrying step {step.step_id} (attempt {step.retry_count}/{step.max_retries})")
+                    logger.warning(
+                        f"Retrying step {step.step_id} (attempt {step.retry_count}/{step.max_retries})"
+                    )
 
         except Exception as e:
             step.status = StepStatus.FAILED
@@ -534,137 +627,137 @@ class WorkflowEngine(BaseAgent):
         self.publish(
             "workflow.step.completed",
             {
-                'workflow_id': workflow.workflow_id,
-                'step_id': step.step_id,
-                'step_name': step.name,
-                'status': step.status.value,
-                'duration_seconds': step.end_time - step.start_time if step.start_time else 0
+                "workflow_id": workflow.workflow_id,
+                "step_id": step.step_id,
+                "step_name": step.name,
+                "status": step.status.value,
+                "duration_seconds": (
+                    step.end_time - step.start_time if step.start_time else 0
+                ),
             },
-            priority=Priority.LOW
+            priority=Priority.LOW,
         )
 
 
-def create_audio_enhancement_workflow(audio_data: Any, sample_rate: int = 44100) -> Dict:
+def create_audio_enhancement_workflow(
+    audio_data: Any, sample_rate: int = 44100
+) -> Dict:
     """
     Create a workflow for comprehensive audio enhancement.
 
     This is an example workflow that demonstrates cross-agent coordination.
     """
     return {
-        'name': 'Comprehensive Audio Enhancement',
-        'description': 'Full audio enhancement pipeline with metadata extraction',
-        'steps': [
+        "name": "Comprehensive Audio Enhancement",
+        "description": "Full audio enhancement pipeline with metadata extraction",
+        "steps": [
             {
-                'step_id': 'metadata_extract',
-                'name': 'Extract Metadata',
-                'agent_id': 'metadata_management_agent',
-                'topic': 'metadata.extract.request',
-                'payload': {
-                    'audio_data': audio_data,
-                    'sample_rate': sample_rate,
-                    'deep_analysis': True
+                "step_id": "metadata_extract",
+                "name": "Extract Metadata",
+                "agent_id": "metadata_management_agent",
+                "topic": "metadata.extract.request",
+                "payload": {
+                    "audio_data": audio_data,
+                    "sample_rate": sample_rate,
+                    "deep_analysis": True,
                 },
-                'dependencies': [],
-                'timeout': 30.0
+                "dependencies": [],
+                "timeout": 30.0,
             },
             {
-                'step_id': 'noise_reduction',
-                'name': 'Reduce Noise',
-                'agent_id': 'audio_enhancement_agent',
-                'topic': 'audio.noise.reduction.request',
-                'payload': {
-                    'audio_data': audio_data,
-                    'sample_rate': sample_rate,
-                    'reduction_amount': 0.8
+                "step_id": "noise_reduction",
+                "name": "Reduce Noise",
+                "agent_id": "audio_enhancement_agent",
+                "topic": "audio.noise.reduction.request",
+                "payload": {
+                    "audio_data": audio_data,
+                    "sample_rate": sample_rate,
+                    "reduction_amount": 0.8,
                 },
-                'dependencies': [],
-                'timeout': 60.0
+                "dependencies": [],
+                "timeout": 60.0,
             },
             {
-                'step_id': 'restoration',
-                'name': 'Restore Audio',
-                'agent_id': 'audio_enhancement_agent',
-                'topic': 'audio.restoration.request',
-                'payload': {
-                    'audio_data': audio_data,
-                    'sample_rate': sample_rate,
-                    'restoration_type': 'auto'
+                "step_id": "restoration",
+                "name": "Restore Audio",
+                "agent_id": "audio_enhancement_agent",
+                "topic": "audio.restoration.request",
+                "payload": {
+                    "audio_data": audio_data,
+                    "sample_rate": sample_rate,
+                    "restoration_type": "auto",
                 },
-                'dependencies': ['noise_reduction'],
-                'timeout': 60.0
+                "dependencies": ["noise_reduction"],
+                "timeout": 60.0,
             },
             {
-                'step_id': 'tag_generation',
-                'name': 'Generate Tags',
-                'agent_id': 'metadata_management_agent',
-                'topic': 'tags.generate.request',
-                'payload': {
-                    'metadata': {}  # Will be populated from metadata_extract result
+                "step_id": "tag_generation",
+                "name": "Generate Tags",
+                "agent_id": "metadata_management_agent",
+                "topic": "tags.generate.request",
+                "payload": {
+                    "metadata": {}  # Will be populated from metadata_extract result
                 },
-                'dependencies': ['metadata_extract'],
-                'timeout': 10.0
-            }
-        ]
+                "dependencies": ["metadata_extract"],
+                "timeout": 10.0,
+            },
+        ],
     }
 
 
-def create_music_production_workflow(existing_stems: Dict, musical_context: Dict) -> Dict:
+def create_music_production_workflow(
+    existing_stems: Dict, musical_context: Dict
+) -> Dict:
     """
     Create a workflow for AI-assisted music production.
 
     This workflow demonstrates content generation and enhancement.
     """
     return {
-        'name': 'AI Music Production',
-        'description': 'Generate missing musical elements and enhance arrangement',
-        'steps': [
+        "name": "AI Music Production",
+        "description": "Generate missing musical elements and enhance arrangement",
+        "steps": [
             {
-                'step_id': 'analyze_arrangement',
-                'name': 'Analyze Existing Arrangement',
-                'agent_id': 'content_generation_agent',
-                'topic': 'music.generation.arrangement.request',
-                'payload': {
-                    'existing_stems': existing_stems,
-                    'params': {}
-                },
-                'dependencies': [],
-                'timeout': 20.0
+                "step_id": "analyze_arrangement",
+                "name": "Analyze Existing Arrangement",
+                "agent_id": "content_generation_agent",
+                "topic": "music.generation.arrangement.request",
+                "payload": {"existing_stems": existing_stems, "params": {}},
+                "dependencies": [],
+                "timeout": 20.0,
             },
             {
-                'step_id': 'generate_drums',
-                'name': 'Generate Drum Pattern',
-                'agent_id': 'content_generation_agent',
-                'topic': 'music.generation.drums.request',
-                'payload': {
+                "step_id": "generate_drums",
+                "name": "Generate Drum Pattern",
+                "agent_id": "content_generation_agent",
+                "topic": "music.generation.drums.request",
+                "payload": {**musical_context, "params": {"complexity": "medium"}},
+                "dependencies": ["analyze_arrangement"],
+                "timeout": 30.0,
+            },
+            {
+                "step_id": "generate_bass",
+                "name": "Generate Bass Line",
+                "agent_id": "content_generation_agent",
+                "topic": "music.generation.bass.request",
+                "payload": {
                     **musical_context,
-                    'params': {'complexity': 'medium'}
+                    "params": {"pattern_style": "root_fifth"},
                 },
-                'dependencies': ['analyze_arrangement'],
-                'timeout': 30.0
+                "dependencies": ["analyze_arrangement"],
+                "timeout": 30.0,
             },
             {
-                'step_id': 'generate_bass',
-                'name': 'Generate Bass Line',
-                'agent_id': 'content_generation_agent',
-                'topic': 'music.generation.bass.request',
-                'payload': {
-                    **musical_context,
-                    'params': {'pattern_style': 'root_fifth'}
+                "step_id": "enhance_audio",
+                "name": "Enhance Generated Audio",
+                "agent_id": "audio_enhancement_agent",
+                "topic": "audio.enhancement.request",
+                "payload": {
+                    "audio_data": None,  # Will be populated from generation results
+                    "params": {"enhancement_profile": "balanced"},
                 },
-                'dependencies': ['analyze_arrangement'],
-                'timeout': 30.0
+                "dependencies": ["generate_drums", "generate_bass"],
+                "timeout": 60.0,
             },
-            {
-                'step_id': 'enhance_audio',
-                'name': 'Enhance Generated Audio',
-                'agent_id': 'audio_enhancement_agent',
-                'topic': 'audio.enhancement.request',
-                'payload': {
-                    'audio_data': None,  # Will be populated from generation results
-                    'params': {'enhancement_profile': 'balanced'}
-                },
-                'dependencies': ['generate_drums', 'generate_bass'],
-                'timeout': 60.0
-            }
-        ]
+        ],
     }

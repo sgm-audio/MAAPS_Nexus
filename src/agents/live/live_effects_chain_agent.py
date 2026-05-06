@@ -14,12 +14,13 @@ from dataclasses import dataclass, field
 from enum import Enum
 import logging
 import copy
+import uuid
 
 from ...core import BaseAgent, Message, Topics, Priority
 from .effects_processors import (
     EffectProcessorFactory,
     EffectProcessor,
-    EffectType as ProcessorEffectType
+    EffectType as ProcessorEffectType,
 )
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 class EffectType(Enum):
     """Available effect types"""
+
     COMPRESSOR = "compressor"
     LIMITER = "limiter"
     GATE = "gate"
@@ -48,6 +50,7 @@ class EffectType(Enum):
 @dataclass
 class Effect:
     """Single effect in a chain"""
+
     effect_id: str
     effect_type: EffectType
     parameters: Dict[str, float]
@@ -59,6 +62,7 @@ class Effect:
 @dataclass
 class EffectChain:
     """Chain of effects"""
+
     chain_id: str
     chain_name: str
     effects: List[Effect] = field(default_factory=list)
@@ -71,6 +75,7 @@ class EffectChain:
 @dataclass
 class Preset:
     """Effect chain preset"""
+
     preset_id: str
     preset_name: str
     chain_states: Dict[str, EffectChain]
@@ -81,6 +86,7 @@ class Preset:
 @dataclass
 class Scene:
     """Performance scene with effect states"""
+
     scene_id: str
     scene_name: str
     effect_states: Dict[str, Dict[str, Any]]  # effect_id -> parameters
@@ -91,6 +97,7 @@ class Scene:
 @dataclass
 class ParameterAutomation:
     """Parameter automation data"""
+
     automation_id: str
     effect_id: str
     parameter: str
@@ -116,8 +123,7 @@ class LiveEffectsChainAgent(BaseAgent):
 
     def __init__(self, sample_rate: int = 44100):
         super().__init__(
-            agent_id="live_effects_chain_agent",
-            agent_name="Live Effects Chain Agent"
+            agent_id="live_effects_chain_agent", agent_name="Live Effects Chain Agent"
         )
 
         # Audio configuration
@@ -137,7 +143,7 @@ class LiveEffectsChainAgent(BaseAgent):
 
         # Current states
         self.current_scene_id: Optional[str] = None
-        self.ab_state: Dict[str, Any] = {'a': None, 'b': None, 'current': 'a'}
+        self.ab_state: Dict[str, Any] = {"a": None, "b": None, "current": "a"}
 
         # Active automations
         self.active_automations: List[ParameterAutomation] = []
@@ -153,12 +159,12 @@ class LiveEffectsChainAgent(BaseAgent):
 
         # Statistics
         self.stats = {
-            'effects_processed': 0,
-            'preset_recalls': 0,
-            'scene_changes': 0,
-            'automations_completed': 0,
-            'total_processing_time_ms': 0.0,
-            'peak_latency_ms': 0.0
+            "effects_processed": 0,
+            "preset_recalls": 0,
+            "scene_changes": 0,
+            "automations_completed": 0,
+            "total_processing_time_ms": 0.0,
+            "peak_latency_ms": 0.0,
         }
         self.stats_lock = threading.Lock()
 
@@ -235,24 +241,24 @@ class LiveEffectsChainAgent(BaseAgent):
         payload = message.payload
 
         chain = EffectChain(
-            chain_id=payload.get('chain_id', f"chain_{time.time()}"),
-            chain_name=payload['chain_name'],
+            chain_id=payload.get("chain_id", f"chain_{uuid.uuid4()}"),
+            chain_name=payload["chain_name"],
             effects=[],
-            routing=payload.get('routing', 'series'),
-            enabled=payload.get('enabled', True),
-            input_gain=payload.get('input_gain', 1.0),
-            output_gain=payload.get('output_gain', 1.0)
+            routing=payload.get("routing", "series"),
+            enabled=payload.get("enabled", True),
+            input_gain=payload.get("input_gain", 1.0),
+            output_gain=payload.get("output_gain", 1.0),
         )
 
         # Add effects to chain
-        for effect_data in payload.get('effects', []):
+        for effect_data in payload.get("effects", []):
             effect = Effect(
-                effect_id=effect_data.get('effect_id', f"effect_{time.time()}_{len(chain.effects)}"),
-                effect_type=EffectType(effect_data['type']),
-                parameters=effect_data.get('parameters', {}),
-                bypassed=effect_data.get('bypassed', False),
-                wet_dry_mix=effect_data.get('wet_dry_mix', 1.0),
-                position=effect_data.get('position', len(chain.effects))
+                effect_id=effect_data.get("effect_id", f"effect_{uuid.uuid4()}"),
+                effect_type=EffectType(effect_data["type"]),
+                parameters=effect_data.get("parameters", {}),
+                bypassed=effect_data.get("bypassed", False),
+                wet_dry_mix=effect_data.get("wet_dry_mix", 1.0),
+                position=effect_data.get("position", len(chain.effects)),
             )
             chain.effects.append(effect)
 
@@ -262,43 +268,47 @@ class LiveEffectsChainAgent(BaseAgent):
         with self.chains_lock:
             self.effect_chains[chain.chain_id] = chain
 
-        self.respond(message, {
-            'success': True,
-            'chain_id': chain.chain_id,
-            'num_effects': len(chain.effects)
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "chain_id": chain.chain_id,
+                "num_effects": len(chain.effects),
+            },
+        )
 
-        self.publish("effects.chain.created", {
-            'chain_id': chain.chain_id,
-            'chain_name': chain.chain_name
-        }, priority=Priority.MEDIUM)
+        self.publish(
+            "effects.chain.created",
+            {"chain_id": chain.chain_id, "chain_name": chain.chain_name},
+            priority=Priority.MEDIUM,
+        )
 
     def _handle_chain_update(self, message: Message):
         """Handle effect chain update"""
         payload = message.payload
-        chain_id = payload['chain_id']
+        chain_id = payload["chain_id"]
 
         with self.chains_lock:
             if chain_id not in self.effect_chains:
-                self.respond(message, {'success': False, 'error': 'Chain not found'})
+                self.respond(message, {"success": False, "error": "Chain not found"})
                 return
 
             chain = self.effect_chains[chain_id]
 
             # Update chain properties
-            if 'enabled' in payload:
-                chain.enabled = payload['enabled']
-            if 'input_gain' in payload:
-                chain.input_gain = payload['input_gain']
-            if 'output_gain' in payload:
-                chain.output_gain = payload['output_gain']
+            if "enabled" in payload:
+                chain.enabled = payload["enabled"]
+            if "input_gain" in payload:
+                chain.input_gain = payload["input_gain"]
+            if "output_gain" in payload:
+                chain.output_gain = payload["output_gain"]
 
-        self.respond(message, {'success': True, 'chain_id': chain_id})
+        self.respond(message, {"success": True, "chain_id": chain_id})
 
     def _handle_chain_delete(self, message: Message):
         """Handle effect chain deletion"""
         payload = message.payload
-        chain_id = payload['chain_id']
+        chain_id = payload["chain_id"]
 
         with self.chains_lock:
             if chain_id in self.effect_chains:
@@ -311,13 +321,13 @@ class LiveEffectsChainAgent(BaseAgent):
         if success:
             self._cleanup_processors()
 
-        self.respond(message, {'success': success, 'chain_id': chain_id})
+        self.respond(message, {"success": success, "chain_id": chain_id})
 
     def _handle_preset_recall(self, message: Message):
         """Handle preset recall"""
         payload = message.payload
-        preset_name = payload['preset_name']
-        transition_time = payload.get('transition_time', 0.0)
+        preset_name = payload["preset_name"]
+        transition_time = payload.get("transition_time", 0.0)
 
         with self.presets_lock:
             preset = None
@@ -327,7 +337,7 @@ class LiveEffectsChainAgent(BaseAgent):
                     break
 
             if preset is None:
-                self.respond(message, {'success': False, 'error': 'Preset not found'})
+                self.respond(message, {"success": False, "error": "Preset not found"})
                 return
 
             # Apply preset
@@ -342,57 +352,65 @@ class LiveEffectsChainAgent(BaseAgent):
                 self._animate_preset_transition(preset, transition_time)
 
         with self.stats_lock:
-            self.stats['preset_recalls'] += 1
+            self.stats["preset_recalls"] += 1
 
-        self.respond(message, {
-            'success': True,
-            'preset_name': preset_name,
-            'transition_time': transition_time
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "preset_name": preset_name,
+                "transition_time": transition_time,
+            },
+        )
 
-        self.publish("effects.preset.recalled", {
-            'preset_name': preset_name
-        }, priority=Priority.MEDIUM)
+        self.publish(
+            "effects.preset.recalled",
+            {"preset_name": preset_name},
+            priority=Priority.MEDIUM,
+        )
 
     def _handle_preset_save(self, message: Message):
         """Handle preset save"""
         payload = message.payload
-        preset_name = payload['preset_name']
+        preset_name = payload["preset_name"]
 
         # Capture current chain states
         with self.chains_lock:
             chain_states = copy.deepcopy(self.effect_chains)
 
         preset = Preset(
-            preset_id=f"preset_{time.time()}",
+            preset_id=f"preset_{uuid.uuid4()}",
             preset_name=preset_name,
             chain_states=chain_states,
-            description=payload.get('description', ''),
-            tags=payload.get('tags', [])
+            description=payload.get("description", ""),
+            tags=payload.get("tags", []),
         )
 
         with self.presets_lock:
             self.presets[preset.preset_id] = preset
 
-        self.respond(message, {
-            'success': True,
-            'preset_id': preset.preset_id,
-            'preset_name': preset_name
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "preset_id": preset.preset_id,
+                "preset_name": preset_name,
+            },
+        )
 
     def _handle_parameter_change(self, message: Message):
         """Handle effect parameter change"""
         payload = message.payload
-        effect_id = payload['effect_id']
-        parameter = payload['parameter']
-        value = payload['value']
-        ramp_time = payload.get('ramp_time', 0.0)
+        effect_id = payload["effect_id"]
+        parameter = payload["parameter"]
+        value = payload["value"]
+        ramp_time = payload.get("ramp_time", 0.0)
 
         # Find the effect
         effect = self._find_effect(effect_id)
 
         if effect is None:
-            self.respond(message, {'success': False, 'error': 'Effect not found'})
+            self.respond(message, {"success": False, "error": "Effect not found"})
             return
 
         if ramp_time == 0:
@@ -402,13 +420,13 @@ class LiveEffectsChainAgent(BaseAgent):
         else:
             # Animated change
             automation = ParameterAutomation(
-                automation_id=f"auto_{time.time()}",
+                automation_id=f"auto_{uuid.uuid4()}",
                 effect_id=effect_id,
                 parameter=parameter,
                 target_value=value,
                 ramp_time=ramp_time,
-                curve=payload.get('curve', 'linear'),
-                start_time=time.time()
+                curve=payload.get("curve", "linear"),
+                start_time=time.time(),
             )
 
             with self.automation_lock:
@@ -416,23 +434,26 @@ class LiveEffectsChainAgent(BaseAgent):
 
             success = True
 
-        self.respond(message, {
-            'success': success,
-            'effect_id': effect_id,
-            'parameter': parameter,
-            'value': value
-        })
+        self.respond(
+            message,
+            {
+                "success": success,
+                "effect_id": effect_id,
+                "parameter": parameter,
+                "value": value,
+            },
+        )
 
     def _handle_bypass_toggle(self, message: Message):
         """Handle effect bypass toggle"""
         payload = message.payload
-        effect_id = payload['effect_id']
-        bypassed = payload.get('bypassed')  # None = toggle
+        effect_id = payload["effect_id"]
+        bypassed = payload.get("bypassed")  # None = toggle
 
         effect = self._find_effect(effect_id)
 
         if effect is None:
-            self.respond(message, {'success': False, 'error': 'Effect not found'})
+            self.respond(message, {"success": False, "error": "Effect not found"})
             return
 
         if bypassed is None:
@@ -440,21 +461,20 @@ class LiveEffectsChainAgent(BaseAgent):
         else:
             effect.bypassed = bypassed
 
-        self.respond(message, {
-            'success': True,
-            'effect_id': effect_id,
-            'bypassed': effect.bypassed
-        })
+        self.respond(
+            message,
+            {"success": True, "effect_id": effect_id, "bypassed": effect.bypassed},
+        )
 
     def _handle_scene_change(self, message: Message):
         """Handle scene change"""
         payload = message.payload
-        scene_id = payload['scene_id']
-        transition_time = payload.get('transition_time', 0.0)
+        scene_id = payload["scene_id"]
+        transition_time = payload.get("transition_time", 0.0)
 
         with self.scenes_lock:
             if scene_id not in self.scenes:
-                self.respond(message, {'success': False, 'error': 'Scene not found'})
+                self.respond(message, {"success": False, "error": "Scene not found"})
                 return
 
             scene = self.scenes[scene_id]
@@ -464,18 +484,18 @@ class LiveEffectsChainAgent(BaseAgent):
             self.current_scene_id = scene_id
 
         with self.stats_lock:
-            self.stats['scene_changes'] += 1
+            self.stats["scene_changes"] += 1
 
-        self.respond(message, {
-            'success': True,
-            'scene_id': scene_id,
-            'scene_name': scene.scene_name
-        })
+        self.respond(
+            message,
+            {"success": True, "scene_id": scene_id, "scene_name": scene.scene_name},
+        )
 
-        self.publish("effects.scene.changed", {
-            'scene_id': scene_id,
-            'scene_name': scene.scene_name
-        }, priority=Priority.HIGH)
+        self.publish(
+            "effects.scene.changed",
+            {"scene_id": scene_id, "scene_name": scene.scene_name},
+            priority=Priority.HIGH,
+        )
 
     def _handle_scene_create(self, message: Message):
         """Handle scene creation"""
@@ -487,109 +507,127 @@ class LiveEffectsChainAgent(BaseAgent):
             for chain in self.effect_chains.values():
                 for effect in chain.effects:
                     effect_states[effect.effect_id] = {
-                        'parameters': copy.deepcopy(effect.parameters),
-                        'bypassed': effect.bypassed,
-                        'wet_dry_mix': effect.wet_dry_mix
+                        "parameters": copy.deepcopy(effect.parameters),
+                        "bypassed": effect.bypassed,
+                        "wet_dry_mix": effect.wet_dry_mix,
                     }
 
         scene = Scene(
-            scene_id=payload.get('scene_id', f"scene_{time.time()}"),
-            scene_name=payload['scene_name'],
-            effect_states=payload.get('effect_states', effect_states),
-            transitions=payload.get('transitions', {}),
-            description=payload.get('description', '')
+            scene_id=payload.get("scene_id", f"scene_{uuid.uuid4()}"),
+            scene_name=payload["scene_name"],
+            effect_states=payload.get("effect_states", effect_states),
+            transitions=payload.get("transitions", {}),
+            description=payload.get("description", ""),
         )
 
         with self.scenes_lock:
             self.scenes[scene.scene_id] = scene
 
-        self.respond(message, {
-            'success': True,
-            'scene_id': scene.scene_id,
-            'scene_name': scene.scene_name
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "scene_id": scene.scene_id,
+                "scene_name": scene.scene_name,
+            },
+        )
 
     def _handle_morph_start(self, message: Message):
         """Handle preset morphing"""
         payload = message.payload
-        preset_a = payload['preset_a']
-        preset_b = payload['preset_b']
-        morph_position = payload.get('morph_position', 0.5)  # 0.0 = A, 1.0 = B
+        preset_a = payload["preset_a"]
+        preset_b = payload["preset_b"]
+        morph_position = payload.get("morph_position", 0.5)  # 0.0 = A, 1.0 = B
 
         # Get presets
         with self.presets_lock:
-            pa = next((p for p in self.presets.values() if p.preset_name == preset_a), None)
-            pb = next((p for p in self.presets.values() if p.preset_name == preset_b), None)
+            pa = next(
+                (p for p in self.presets.values() if p.preset_name == preset_a), None
+            )
+            pb = next(
+                (p for p in self.presets.values() if p.preset_name == preset_b), None
+            )
 
             if pa is None or pb is None:
-                self.respond(message, {'success': False, 'error': 'Preset not found'})
+                self.respond(message, {"success": False, "error": "Preset not found"})
                 return
 
             # Morph between presets
             self._morph_presets(pa, pb, morph_position)
 
-        self.respond(message, {
-            'success': True,
-            'preset_a': preset_a,
-            'preset_b': preset_b,
-            'morph_position': morph_position
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "preset_a": preset_a,
+                "preset_b": preset_b,
+                "morph_position": morph_position,
+            },
+        )
 
     def _handle_ab_compare(self, message: Message):
         """Handle A/B comparison"""
         payload = message.payload
-        action = payload.get('action', 'toggle')  # toggle, set_a, set_b, recall_a, recall_b
+        action = payload.get(
+            "action", "toggle"
+        )  # toggle, set_a, set_b, recall_a, recall_b
 
-        if action == 'set_a':
+        if action == "set_a":
             with self.chains_lock:
-                self.ab_state['a'] = copy.deepcopy(self.effect_chains)
-        elif action == 'set_b':
+                self.ab_state["a"] = copy.deepcopy(self.effect_chains)
+        elif action == "set_b":
             with self.chains_lock:
-                self.ab_state['b'] = copy.deepcopy(self.effect_chains)
-        elif action == 'toggle':
-            current = self.ab_state['current']
-            new_state = 'b' if current == 'a' else 'a'
+                self.ab_state["b"] = copy.deepcopy(self.effect_chains)
+        elif action == "toggle":
+            current = self.ab_state["current"]
+            new_state = "b" if current == "a" else "a"
             if self.ab_state[new_state] is not None:
                 with self.chains_lock:
                     self.effect_chains = copy.deepcopy(self.ab_state[new_state])
-                self.ab_state['current'] = new_state
-        elif action == 'recall_a':
-            if self.ab_state['a'] is not None:
+                self.ab_state["current"] = new_state
+        elif action == "recall_a":
+            if self.ab_state["a"] is not None:
                 with self.chains_lock:
-                    self.effect_chains = copy.deepcopy(self.ab_state['a'])
-                self.ab_state['current'] = 'a'
-        elif action == 'recall_b':
-            if self.ab_state['b'] is not None:
+                    self.effect_chains = copy.deepcopy(self.ab_state["a"])
+                self.ab_state["current"] = "a"
+        elif action == "recall_b":
+            if self.ab_state["b"] is not None:
                 with self.chains_lock:
-                    self.effect_chains = copy.deepcopy(self.ab_state['b'])
-                self.ab_state['current'] = 'b'
+                    self.effect_chains = copy.deepcopy(self.ab_state["b"])
+                self.ab_state["current"] = "b"
 
-        self.respond(message, {
-            'success': True,
-            'current_state': self.ab_state['current'],
-            'action': action
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "current_state": self.ab_state["current"],
+                "action": action,
+            },
+        )
 
     def _handle_audio_process(self, message: Message):
         """Handle audio processing request"""
         payload = message.payload
-        audio_data = np.array(payload.get('audio_data', []))
+        audio_data = np.array(payload.get("audio_data", []))
 
         if len(audio_data) == 0:
-            self.respond(message, {'success': False, 'error': 'No audio data'})
+            self.respond(message, {"success": False, "error": "No audio data"})
             return
 
         # Process through effect chains
         processed_audio = self._process_audio(audio_data)
 
         with self.stats_lock:
-            self.stats['effects_processed'] += 1
+            self.stats["effects_processed"] += 1
 
-        self.respond(message, {
-            'success': True,
-            'processed_audio': processed_audio.tolist(),
-            'num_chains': len(self.effect_chains)
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "processed_audio": processed_audio.tolist(),
+                "num_chains": len(self.effect_chains),
+            },
+        )
 
     def _process_audio(self, audio: np.ndarray) -> np.ndarray:
         """Process audio through effect chains with real DSP"""
@@ -613,8 +651,8 @@ class LiveEffectsChainAgent(BaseAgent):
 
                         # Track latency
                         with self.stats_lock:
-                            if effect_time > self.stats['peak_latency_ms']:
-                                self.stats['peak_latency_ms'] = effect_time
+                            if effect_time > self.stats["peak_latency_ms"]:
+                                self.stats["peak_latency_ms"] = effect_time
 
                 # Apply output gain
                 processed = chain_audio * chain.output_gain
@@ -622,7 +660,7 @@ class LiveEffectsChainAgent(BaseAgent):
         # Track total processing time
         total_time = (time.perf_counter() - start_time) * 1000  # ms
         with self.stats_lock:
-            self.stats['total_processing_time_ms'] += total_time
+            self.stats["total_processing_time_ms"] += total_time
 
         return processed
 
@@ -650,7 +688,9 @@ class LiveEffectsChainAgent(BaseAgent):
             logger.error(f"Error processing effect {effect.effect_id}: {e}")
             return audio  # Return dry signal on error
 
-    def _get_processor(self, effect_id: str, effect_type: EffectType) -> Optional[EffectProcessor]:
+    def _get_processor(
+        self, effect_id: str, effect_type: EffectType
+    ) -> Optional[EffectProcessor]:
         """Get or create an effect processor instance"""
         with self.processors_lock:
             if effect_id in self.processors:
@@ -660,7 +700,9 @@ class LiveEffectsChainAgent(BaseAgent):
             try:
                 # Convert EffectType to ProcessorEffectType
                 processor_type = ProcessorEffectType(effect_type.value)
-                processor = EffectProcessorFactory.create(processor_type, self.sample_rate)
+                processor = EffectProcessorFactory.create(
+                    processor_type, self.sample_rate
+                )
                 self.processors[effect_id] = processor
                 return processor
 
@@ -706,24 +748,24 @@ class LiveEffectsChainAgent(BaseAgent):
             for effect_id, state in scene.effect_states.items():
                 effect = self._find_effect(effect_id)
                 if effect:
-                    effect.parameters.update(state.get('parameters', {}))
-                    effect.bypassed = state.get('bypassed', effect.bypassed)
-                    effect.wet_dry_mix = state.get('wet_dry_mix', effect.wet_dry_mix)
+                    effect.parameters.update(state.get("parameters", {}))
+                    effect.bypassed = state.get("bypassed", effect.bypassed)
+                    effect.wet_dry_mix = state.get("wet_dry_mix", effect.wet_dry_mix)
         else:
             # Animated transition
             for effect_id, state in scene.effect_states.items():
                 effect = self._find_effect(effect_id)
                 if effect:
                     # Create automations for each parameter
-                    for param, value in state.get('parameters', {}).items():
+                    for param, value in state.get("parameters", {}).items():
                         ramp_time = scene.transitions.get(param, transition_time)
                         automation = ParameterAutomation(
-                            automation_id=f"scene_auto_{time.time()}_{param}",
+                            automation_id=f"scene_auto_{uuid.uuid4()}",
                             effect_id=effect_id,
                             parameter=param,
                             target_value=value,
                             ramp_time=ramp_time,
-                            start_time=time.time()
+                            start_time=time.time(),
                         )
                         with self.automation_lock:
                             self.active_automations.append(automation)
@@ -738,12 +780,12 @@ class LiveEffectsChainAgent(BaseAgent):
                     if current_effect:
                         for param, value in effect.parameters.items():
                             automation = ParameterAutomation(
-                                automation_id=f"preset_auto_{time.time()}_{param}",
+                                automation_id=f"preset_auto_{uuid.uuid4()}",
                                 effect_id=effect.effect_id,
                                 parameter=param,
                                 target_value=value,
                                 ramp_time=transition_time,
-                                start_time=time.time()
+                                start_time=time.time(),
                             )
                             with self.automation_lock:
                                 self.active_automations.append(automation)
@@ -767,7 +809,9 @@ class LiveEffectsChainAgent(BaseAgent):
                                 if param in effect_b.parameters:
                                     val_a = effect_a.parameters[param]
                                     val_b = effect_b.parameters[param]
-                                    morphed_val = val_a * (1.0 - position) + val_b * position
+                                    morphed_val = (
+                                        val_a * (1.0 - position) + val_b * position
+                                    )
                                     current_effect.parameters[param] = morphed_val
 
     def _start_automation_thread(self):
@@ -776,7 +820,7 @@ class LiveEffectsChainAgent(BaseAgent):
         self.automation_thread = threading.Thread(
             target=self._automation_worker,
             name=f"{self.agent_id}_automation",
-            daemon=True
+            daemon=True,
         )
         self.automation_thread.start()
 
@@ -801,29 +845,36 @@ class LiveEffectsChainAgent(BaseAgent):
                             # Automation complete
                             effect = self._find_effect(automation.effect_id)
                             if effect:
-                                effect.parameters[automation.parameter] = automation.target_value
+                                effect.parameters[automation.parameter] = (
+                                    automation.target_value
+                                )
                             completed.append(automation)
                         else:
                             # Update parameter
                             progress = elapsed / automation.ramp_time
                             effect = self._find_effect(automation.effect_id)
                             if effect:
-                                current_val = effect.parameters.get(automation.parameter, 0.0)
+                                current_val = effect.parameters.get(
+                                    automation.parameter, 0.0
+                                )
 
                                 # Apply curve
                                 if automation.curve == "exponential":
-                                    progress = progress ** 2
+                                    progress = progress**2
                                 elif automation.curve == "logarithmic":
                                     progress = np.sqrt(progress)
 
-                                new_val = current_val + (automation.target_value - current_val) * progress
+                                new_val = (
+                                    current_val
+                                    + (automation.target_value - current_val) * progress
+                                )
                                 effect.parameters[automation.parameter] = new_val
 
                     # Remove completed automations
                     for auto in completed:
                         self.active_automations.remove(auto)
                         with self.stats_lock:
-                            self.stats['automations_completed'] += 1
+                            self.stats["automations_completed"] += 1
 
                 time.sleep(0.01)  # 10ms update rate
 
@@ -837,25 +888,36 @@ class LiveEffectsChainAgent(BaseAgent):
             topic="effects.chain.create",
             sender="system",
             payload={
-                'chain_name': 'Vocal Chain',
-                'effects': [
+                "chain_name": "Vocal Chain",
+                "effects": [
+                    {"type": "gate", "parameters": {"threshold": -40.0, "ratio": 10.0}},
                     {
-                        'type': 'gate',
-                        'parameters': {'threshold': -40.0, 'ratio': 10.0}
+                        "type": "compressor",
+                        "parameters": {
+                            "threshold": -20.0,
+                            "ratio": 4.0,
+                            "attack": 5.0,
+                            "release": 50.0,
+                        },
                     },
                     {
-                        'type': 'compressor',
-                        'parameters': {'threshold': -20.0, 'ratio': 4.0, 'attack': 5.0, 'release': 50.0}
+                        "type": "eq_parametric",
+                        "parameters": {
+                            "freq1": 100.0,
+                            "gain1": -3.0,
+                            "freq2": 3000.0,
+                            "gain2": 2.0,
+                        },
                     },
                     {
-                        'type': 'eq_parametric',
-                        'parameters': {'freq1': 100.0, 'gain1': -3.0, 'freq2': 3000.0, 'gain2': 2.0}
+                        "type": "reverb",
+                        "parameters": {
+                            "room_size": 0.5,
+                            "damping": 0.7,
+                            "wet_dry": 0.3,
+                        },
                     },
-                    {
-                        'type': 'reverb',
-                        'parameters': {'room_size': 0.5, 'damping': 0.7, 'wet_dry': 0.3}
-                    }
-                ]
-            }
+                ],
+            },
         )
         self._handle_chain_create(vocal_chain_msg)

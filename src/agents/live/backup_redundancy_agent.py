@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 class SystemMode(Enum):
     """System operating mode"""
+
     PRIMARY = "primary"
     BACKUP = "backup"
     FAILOVER = "failover"
@@ -29,6 +30,7 @@ class SystemMode(Enum):
 @dataclass
 class BackupConfig:
     """Backup system configuration"""
+
     primary_interface: str
     backup_interface: str
     sync_interval_ms: int = 100
@@ -40,6 +42,7 @@ class BackupConfig:
 @dataclass
 class SystemState:
     """Complete system state snapshot"""
+
     timestamp: float
     mode: SystemMode
     active_agents: List[str] = field(default_factory=list)
@@ -53,6 +56,7 @@ class SystemState:
 @dataclass
 class PerformanceRecording:
     """Performance recording metadata"""
+
     recording_id: str
     output_path: str
     format: str
@@ -69,8 +73,7 @@ class BackupRedundancyAgent(BaseAgent):
 
     def __init__(self):
         super().__init__(
-            agent_id="backup_redundancy_agent",
-            agent_name="Backup & Redundancy Agent"
+            agent_id="backup_redundancy_agent", agent_name="Backup & Redundancy Agent"
         )
 
         # Backup configuration
@@ -78,10 +81,7 @@ class BackupRedundancyAgent(BaseAgent):
         self.config_lock = threading.Lock()
 
         # System state
-        self.current_state = SystemState(
-            timestamp=time.time(),
-            mode=SystemMode.PRIMARY
-        )
+        self.current_state = SystemState(timestamp=time.time(), mode=SystemMode.PRIMARY)
         self.backup_state: Optional[SystemState] = None
         self.state_lock = threading.Lock()
 
@@ -105,10 +105,10 @@ class BackupRedundancyAgent(BaseAgent):
 
         # Statistics
         self.stats = {
-            'state_syncs': 0,
-            'failover_events': 0,
-            'recoveries': 0,
-            'recordings_saved': 0
+            "state_syncs": 0,
+            "failover_events": 0,
+            "recoveries": 0,
+            "recordings_saved": 0,
         }
         self.stats_lock = threading.Lock()
 
@@ -168,14 +168,14 @@ class BackupRedundancyAgent(BaseAgent):
     def _handle_backup_enable(self, message: Message):
         """Handle backup enable"""
         payload = message.payload
-        enable = payload.get('enable', True)
+        enable = payload.get("enable", True)
 
         if enable:
             self._start_sync_thread()
         else:
             self._stop_sync_thread()
 
-        self.respond(message, {'success': True, 'backup_enabled': enable})
+        self.respond(message, {"success": True, "backup_enabled": enable})
 
     def _handle_backup_configure(self, message: Message):
         """Handle backup configuration"""
@@ -183,39 +183,36 @@ class BackupRedundancyAgent(BaseAgent):
 
         with self.config_lock:
             self.backup_config = BackupConfig(
-                primary_interface=payload['primary_interface'],
-                backup_interface=payload['backup_interface'],
-                sync_interval_ms=payload.get('sync_interval_ms', 100),
-                auto_failover=payload.get('auto_failover', True),
-                failover_threshold_ms=payload.get('failover_threshold_ms', 50),
-                auto_recover=payload.get('auto_recover', True)
+                primary_interface=payload["primary_interface"],
+                backup_interface=payload["backup_interface"],
+                sync_interval_ms=payload.get("sync_interval_ms", 100),
+                auto_failover=payload.get("auto_failover", True),
+                failover_threshold_ms=payload.get("failover_threshold_ms", 50),
+                auto_recover=payload.get("auto_recover", True),
             )
 
-        self.respond(message, {
-            'success': True,
-            'config': asdict(self.backup_config)
-        })
+        self.respond(message, {"success": True, "config": asdict(self.backup_config)})
 
-        self.publish("backup.system.status", {
-            'status': 'configured',
-            'mode': self.current_state.mode.value
-        }, priority=Priority.MEDIUM)
+        self.publish(
+            "backup.system.status",
+            {"status": "configured", "mode": self.current_state.mode.value},
+            priority=Priority.MEDIUM,
+        )
 
     def _handle_failover_trigger(self, message: Message):
         """Handle manual failover trigger"""
         payload = message.payload
-        trigger_conditions = payload.get('trigger_conditions', {})
+        trigger_conditions = payload.get("trigger_conditions", {})
 
         success = self._execute_failover()
 
         with self.stats_lock:
             if success:
-                self.stats['failover_events'] += 1
+                self.stats["failover_events"] += 1
 
-        self.respond(message, {
-            'success': success,
-            'new_mode': self.current_state.mode.value
-        })
+        self.respond(
+            message, {"success": success, "new_mode": self.current_state.mode.value}
+        )
 
     def _handle_state_sync(self, message: Message):
         """Handle state sync request"""
@@ -223,12 +220,12 @@ class BackupRedundancyAgent(BaseAgent):
 
         # Update system state from message
         with self.state_lock:
-            if 'effect_chains' in payload:
-                self.current_state.effect_chains = payload['effect_chains']
-            if 'loop_tracks' in payload:
-                self.current_state.loop_tracks = payload['loop_tracks']
-            if 'scenes' in payload:
-                self.current_state.scenes = payload['scenes']
+            if "effect_chains" in payload:
+                self.current_state.effect_chains = payload["effect_chains"]
+            if "loop_tracks" in payload:
+                self.current_state.loop_tracks = payload["loop_tracks"]
+            if "scenes" in payload:
+                self.current_state.scenes = payload["scenes"]
 
             self.current_state.timestamp = time.time()
 
@@ -236,15 +233,15 @@ class BackupRedundancyAgent(BaseAgent):
             self.backup_state = copy.deepcopy(self.current_state)
 
         with self.stats_lock:
-            self.stats['state_syncs'] += 1
+            self.stats["state_syncs"] += 1
 
-        self.respond(message, {'success': True})
+        self.respond(message, {"success": True})
 
     def _handle_state_save(self, message: Message):
         """Handle state save request"""
         payload = message.payload
-        state_name = payload['state_name']
-        include_audio = payload.get('include_audio', False)
+        state_name = payload["state_name"]
+        include_audio = payload.get("include_audio", False)
 
         state_id = f"state_{time.time()}"
 
@@ -254,63 +251,71 @@ class BackupRedundancyAgent(BaseAgent):
 
         # Store in history
         with self.history_lock:
-            self.state_history.append({
-                'state_id': state_id,
-                'state_name': state_name,
-                'timestamp': time.time(),
-                'state': state_snapshot
-            })
+            self.state_history.append(
+                {
+                    "state_id": state_id,
+                    "state_name": state_name,
+                    "timestamp": time.time(),
+                    "state": state_snapshot,
+                }
+            )
 
             # Limit history size
             if len(self.state_history) > self.max_history_size:
                 self.state_history.pop(0)
 
-        self.respond(message, {
-            'success': True,
-            'state_id': state_id,
-            'state_name': state_name
-        })
+        self.respond(
+            message, {"success": True, "state_id": state_id, "state_name": state_name}
+        )
 
         self.log("INFO", f"State saved: {state_name}")
 
     def _handle_state_restore(self, message: Message):
         """Handle state restore request"""
         payload = message.payload
-        state_id = payload.get('state_id')
-        state_name = payload.get('state_name')
+        state_id = payload.get("state_id")
+        state_name = payload.get("state_name")
 
         # Find state in history
         with self.history_lock:
             state_record = None
 
             for record in reversed(self.state_history):
-                if (state_id and record['state_id'] == state_id) or \
-                   (state_name and record['state_name'] == state_name):
+                if (state_id and record["state_id"] == state_id) or (
+                    state_name and record["state_name"] == state_name
+                ):
                     state_record = record
                     break
 
             if state_record is None:
-                self.respond(message, {'success': False, 'error': 'State not found'})
+                self.respond(message, {"success": False, "error": "State not found"})
                 return
 
             # Restore state
             with self.state_lock:
-                self.current_state = copy.deepcopy(state_record['state'])
+                self.current_state = copy.deepcopy(state_record["state"])
 
         with self.stats_lock:
-            self.stats['recoveries'] += 1
+            self.stats["recoveries"] += 1
 
-        self.respond(message, {
-            'success': True,
-            'state_id': state_record['state_id'],
-            'state_name': state_record['state_name']
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "state_id": state_record["state_id"],
+                "state_name": state_record["state_name"],
+            },
+        )
 
         # Publish restore event
-        self.publish("backup.restore.state", {
-            'state_id': state_record['state_id'],
-            'state_name': state_record['state_name']
-        }, priority=Priority.HIGH)
+        self.publish(
+            "backup.restore.state",
+            {
+                "state_id": state_record["state_id"],
+                "state_name": state_record["state_name"],
+            },
+            priority=Priority.HIGH,
+        )
 
         self.log("INFO", f"State restored: {state_record['state_name']}")
 
@@ -319,33 +324,30 @@ class BackupRedundancyAgent(BaseAgent):
         payload = message.payload
 
         recording = PerformanceRecording(
-            recording_id=payload.get('recording_id', f"rec_{time.time()}"),
-            output_path=payload['output_path'],
-            format=payload.get('format', 'wav'),
-            bit_depth=payload.get('bit_depth', 24),
-            sample_rate=payload.get('sample_rate', 48000),
+            recording_id=payload.get("recording_id", f"rec_{time.time()}"),
+            output_path=payload["output_path"],
+            format=payload.get("format", "wav"),
+            bit_depth=payload.get("bit_depth", 24),
+            sample_rate=payload.get("sample_rate", 48000),
             start_time=time.time(),
-            include_video=payload.get('include_video', False)
+            include_video=payload.get("include_video", False),
         )
 
         with self.recordings_lock:
             self.active_recordings[recording.recording_id] = recording
 
-        self.respond(message, {
-            'success': True,
-            'recording_id': recording.recording_id
-        })
+        self.respond(message, {"success": True, "recording_id": recording.recording_id})
 
         self.log("INFO", f"Recording started: {recording.recording_id}")
 
     def _handle_recording_stop(self, message: Message):
         """Handle performance recording stop"""
         payload = message.payload
-        recording_id = payload['recording_id']
+        recording_id = payload["recording_id"]
 
         success = self._stop_recording(recording_id)
 
-        self.respond(message, {'success': success, 'recording_id': recording_id})
+        self.respond(message, {"success": success, "recording_id": recording_id})
 
     def _handle_state_changed(self, message: Message):
         """Handle system state change notification"""
@@ -353,8 +355,8 @@ class BackupRedundancyAgent(BaseAgent):
         payload = message.payload
 
         with self.state_lock:
-            if 'agent_id' in payload:
-                agent_id = payload['agent_id']
+            if "agent_id" in payload:
+                agent_id = payload["agent_id"]
                 if agent_id not in self.current_state.active_agents:
                     self.current_state.active_agents.append(agent_id)
 
@@ -363,7 +365,7 @@ class BackupRedundancyAgent(BaseAgent):
     def _handle_agent_heartbeat(self, message: Message):
         """Handle agent heartbeat for health monitoring"""
         payload = message.payload
-        agent_id = payload.get('agent_id')
+        agent_id = payload.get("agent_id")
 
         if agent_id == "realtime_audio_io_agent":
             # Monitor primary audio interface health
@@ -377,9 +379,7 @@ class BackupRedundancyAgent(BaseAgent):
 
         self.sync_active = True
         self.sync_thread = threading.Thread(
-            target=self._sync_worker,
-            name=f"{self.agent_id}_sync",
-            daemon=True
+            target=self._sync_worker, name=f"{self.agent_id}_sync", daemon=True
         )
         self.sync_thread.start()
 
@@ -397,16 +397,25 @@ class BackupRedundancyAgent(BaseAgent):
                 if self.backup_config and self.backup_config.auto_failover:
                     time_since_heartbeat = time.time() - self.last_primary_heartbeat
 
-                    if time_since_heartbeat > (self.backup_config.failover_threshold_ms / 1000.0):
+                    if time_since_heartbeat > (
+                        self.backup_config.failover_threshold_ms / 1000.0
+                    ):
                         if not self.failover_active:
-                            self.log("WARNING", "Primary system unresponsive, initiating failover")
+                            self.log(
+                                "WARNING",
+                                "Primary system unresponsive, initiating failover",
+                            )
                             self._execute_failover()
 
                 # Sync state to backup
                 self._sync_state_to_backup()
 
                 # Sleep for sync interval
-                sleep_time = self.backup_config.sync_interval_ms / 1000.0 if self.backup_config else 0.1
+                sleep_time = (
+                    self.backup_config.sync_interval_ms / 1000.0
+                    if self.backup_config
+                    else 0.1
+                )
                 time.sleep(sleep_time)
 
             except Exception as e:
@@ -418,10 +427,14 @@ class BackupRedundancyAgent(BaseAgent):
             self.backup_state = copy.deepcopy(self.current_state)
 
         # Publish sync event
-        self.publish("backup.state.sync", {
-            'timestamp': self.current_state.timestamp,
-            'mode': self.current_state.mode.value
-        }, priority=Priority.LOW)
+        self.publish(
+            "backup.state.sync",
+            {
+                "timestamp": self.current_state.timestamp,
+                "mode": self.current_state.mode.value,
+            },
+            priority=Priority.LOW,
+        )
 
     def _execute_failover(self) -> bool:
         """Execute failover to backup system"""
@@ -437,11 +450,15 @@ class BackupRedundancyAgent(BaseAgent):
                         self.current_state.mode = SystemMode.FAILOVER
 
             # Publish failover event
-            self.publish("backup.failover.trigger", {
-                'timestamp': time.time(),
-                'reason': 'primary_failure',
-                'new_mode': self.current_state.mode.value
-            }, priority=Priority.CRITICAL)
+            self.publish(
+                "backup.failover.trigger",
+                {
+                    "timestamp": time.time(),
+                    "reason": "primary_failure",
+                    "new_mode": self.current_state.mode.value,
+                },
+                priority=Priority.CRITICAL,
+            )
 
             self.log("INFO", "Failover executed successfully")
             return True
@@ -465,13 +482,20 @@ class BackupRedundancyAgent(BaseAgent):
             del self.active_recordings[recording_id]
 
         with self.stats_lock:
-            self.stats['recordings_saved'] += 1
+            self.stats["recordings_saved"] += 1
 
-        self.publish("backup.recording.save", {
-            'recording_id': recording_id,
-            'duration': recording.duration,
-            'output_path': recording.output_path
-        }, priority=Priority.MEDIUM)
+        self.publish(
+            "backup.recording.save",
+            {
+                "recording_id": recording_id,
+                "duration": recording.duration,
+                "output_path": recording.output_path,
+            },
+            priority=Priority.MEDIUM,
+        )
 
-        self.log("INFO", f"Recording stopped: {recording_id}, Duration: {recording.duration:.1f}s")
+        self.log(
+            "INFO",
+            f"Recording stopped: {recording_id}, Duration: {recording.duration:.1f}s",
+        )
         return True

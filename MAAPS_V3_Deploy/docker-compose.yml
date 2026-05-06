@@ -1,0 +1,117 @@
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # 1. ORCHESTRATION: n8n
+  # ---------------------------------------------------------------------------
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: maaps_n8n
+    restart: always
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASS}
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - GENERIC_TIMEZONE=UTC
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - maaps_net
+    depends_on:
+      - postgres
+
+  # ---------------------------------------------------------------------------
+  # 2. DATABASE: Postgres
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: maaps_postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - maaps_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # 3. MEMORY: Qdrant (Vector DB)
+  # ---------------------------------------------------------------------------
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: maaps_qdrant
+    restart: always
+    ports:
+      - "6333:6333"
+    environment:
+      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY}
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - maaps_net
+
+  # ---------------------------------------------------------------------------
+  # 4. SCRAPING: Selenium (Chrome Standalone)
+  # ---------------------------------------------------------------------------
+  selenium:
+    image: selenium/standalone-chrome:latest
+    container_name: maaps_selenium
+    restart: always
+    ports:
+      - "4444:4444"
+      - "7900:7900" # VNC
+    shm_size: "2gb" # Crucial for stability
+    networks:
+      - maaps_net
+
+  # ---------------------------------------------------------------------------
+  # 5. WORKER: Audio Intelligence (PyTorch + GPU)
+  # ---------------------------------------------------------------------------
+  audio_worker:
+    build: 
+      context: ./worker
+      dockerfile: Dockerfile
+    container_name: maaps_audio_worker
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - PYTHONPATH=/app
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - maaps_net
+    depends_on:
+      - qdrant
+
+networks:
+  maaps_net:
+    driver: bridge
+
+volumes:
+  n8n_data:
+  postgres_data:
+  qdrant_data:

@@ -14,7 +14,7 @@ import sys
 import os
 
 # Add parent directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from src.system import create_system
 from src.agents.audio_enhancement_agent import AudioEnhancementAgent
@@ -45,7 +45,9 @@ class PerformanceBenchmark:
             self.system.stop()
         print("Cleanup complete")
 
-    def measure(self, name: str, func: Callable, iterations: int = 10) -> Dict[str, Any]:
+    def measure(
+        self, name: str, func: Callable, iterations: int = 10
+    ) -> Dict[str, Any]:
         """Measure execution time and resource usage"""
         print(f"Benchmarking: {name}")
         print(f"  Running {iterations} iterations...")
@@ -95,18 +97,18 @@ class PerformanceBenchmark:
 
         # Calculate statistics
         result = {
-            'name': name,
-            'iterations': len(times),
-            'time_avg': np.mean(times),
-            'time_std': np.std(times),
-            'time_min': np.min(times),
-            'time_max': np.max(times),
-            'time_p50': np.percentile(times, 50),
-            'time_p95': np.percentile(times, 95),
-            'time_p99': np.percentile(times, 99),
-            'cpu_avg': np.mean(cpu_usage),
-            'memory_avg': np.mean(memory_usage),
-            'throughput': 1.0 / np.mean(times) if np.mean(times) > 0 else 0
+            "name": name,
+            "iterations": len(times),
+            "time_avg": np.mean(times),
+            "time_std": np.std(times),
+            "time_min": np.min(times),
+            "time_max": np.max(times),
+            "time_p50": np.percentile(times, 50),
+            "time_p95": np.percentile(times, 95),
+            "time_p99": np.percentile(times, 99),
+            "cpu_avg": np.mean(cpu_usage),
+            "memory_avg": np.mean(memory_usage),
+            "throughput": 1.0 / np.mean(times) if np.mean(times) > 0 else 0,
         }
 
         print(f"  Average: {result['time_avg']*1000:.2f}ms")
@@ -118,9 +120,9 @@ class PerformanceBenchmark:
 
     def benchmark_audio_enhancement(self):
         """Benchmark audio enhancement operations"""
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("AUDIO ENHANCEMENT BENCHMARKS")
-        print("="*60 + "\n")
+        print("=" * 60 + "\n")
 
         # Generate test audio
         sample_rate = 44100
@@ -140,9 +142,9 @@ class PerformanceBenchmark:
             lambda: self.system.enhance_audio(
                 audio_data=audio_1s,
                 sample_rate=sample_rate,
-                params={'noise_reduction_amount': 0.7}
+                params={"noise_reduction_amount": 0.7},
             ),
-            iterations=20
+            iterations=20,
         )
 
         self.measure(
@@ -150,9 +152,9 @@ class PerformanceBenchmark:
             lambda: self.system.enhance_audio(
                 audio_data=audio_5s,
                 sample_rate=sample_rate,
-                params={'noise_reduction_amount': 0.7}
+                params={"noise_reduction_amount": 0.7},
             ),
-            iterations=10
+            iterations=10,
         )
 
         self.measure(
@@ -160,55 +162,46 @@ class PerformanceBenchmark:
             lambda: self.system.enhance_audio(
                 audio_data=audio_10s,
                 sample_rate=sample_rate,
-                params={'noise_reduction_amount': 0.7}
+                params={"noise_reduction_amount": 0.7},
             ),
-            iterations=5
+            iterations=5,
         )
 
     def benchmark_music_generation(self):
         """Benchmark music generation operations"""
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("MUSIC GENERATION BENCHMARKS")
-        print("="*60 + "\n")
+        print("=" * 60 + "\n")
 
         self.measure(
             "Generate Melody (2s)",
             lambda: self.system.generate_music(
-                instrument="piano",
-                key="C",
-                tempo=120,
-                duration=2.0
+                instrument="piano", key="C", tempo=120, duration=2.0
             ),
-            iterations=15
+            iterations=15,
         )
 
         self.measure(
             "Generate Melody (5s)",
             lambda: self.system.generate_music(
-                instrument="synth",
-                key="G",
-                tempo=140,
-                duration=5.0
+                instrument="synth", key="G", tempo=140, duration=5.0
             ),
-            iterations=10
+            iterations=10,
         )
 
         self.measure(
             "Generate Drums (4s)",
             lambda: self.system.generate_music(
-                instrument="drums",
-                tempo=120,
-                duration=4.0,
-                complexity=0.7
+                instrument="drums", tempo=120, duration=4.0, complexity=0.7
             ),
-            iterations=10
+            iterations=10,
         )
 
     def benchmark_metadata_extraction(self):
         """Benchmark metadata extraction operations"""
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("METADATA EXTRACTION BENCHMARKS")
-        print("="*60 + "\n")
+        print("=" * 60 + "\n")
 
         sample_rate = 44100
         audio_5s = np.random.randn(sample_rate * 5).astype(np.float32)
@@ -220,9 +213,9 @@ class PerformanceBenchmark:
                 sample_rate=sample_rate,
                 include_spectral=False,
                 include_temporal=True,
-                include_harmonic=False
+                include_harmonic=False,
             ),
-            iterations=15
+            iterations=15,
         )
 
         self.measure(
@@ -232,50 +225,50 @@ class PerformanceBenchmark:
                 sample_rate=sample_rate,
                 include_spectral=True,
                 include_temporal=True,
-                include_harmonic=True
+                include_harmonic=True,
             ),
-            iterations=10
+            iterations=10,
         )
 
     def benchmark_workflows(self):
         """Benchmark complete workflow execution"""
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("WORKFLOW BENCHMARKS")
-        print("="*60 + "\n")
+        print("=" * 60 + "\n")
 
         sample_rate = 44100
         audio_3s = np.random.randn(sample_rate * 3).astype(np.float32)
 
         workflow_def = {
-            'name': 'benchmark_workflow',
-            'steps': [
+            "name": "benchmark_workflow",
+            "steps": [
                 {
-                    'agent': 'audio_enhancement',
-                    'operation': 'enhance',
-                    'params': {'noise_reduction_amount': 0.7}
+                    "agent": "audio_enhancement",
+                    "operation": "enhance",
+                    "params": {"noise_reduction_amount": 0.7},
                 },
                 {
-                    'agent': 'metadata_management',
-                    'operation': 'extract_features',
-                    'params': {}
-                }
-            ]
+                    "agent": "metadata_management",
+                    "operation": "extract_features",
+                    "params": {},
+                },
+            ],
         }
 
         self.measure(
             "Complete Workflow (Enhancement + Metadata)",
             lambda: self.system.execute_workflow(
                 workflow=workflow_def,
-                input_data={'audio_data': audio_3s, 'sample_rate': sample_rate}
+                input_data={"audio_data": audio_3s, "sample_rate": sample_rate},
             ),
-            iterations=10
+            iterations=10,
         )
 
     def benchmark_concurrent_operations(self):
         """Benchmark concurrent processing"""
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("CONCURRENCY BENCHMARKS")
-        print("="*60 + "\n")
+        print("=" * 60 + "\n")
 
         import concurrent.futures
 
@@ -290,7 +283,7 @@ class PerformanceBenchmark:
                         self.system.enhance_audio,
                         audio_data=audio_2s,
                         sample_rate=sample_rate,
-                        params={'noise_reduction_amount': 0.7}
+                        params={"noise_reduction_amount": 0.7},
                     )
                     for _ in range(n_tasks)
                 ]
@@ -300,42 +293,44 @@ class PerformanceBenchmark:
         self.measure(
             "Concurrent Enhancement (2 tasks)",
             lambda: concurrent_enhance(2),
-            iterations=8
+            iterations=8,
         )
 
         self.measure(
             "Concurrent Enhancement (4 tasks)",
             lambda: concurrent_enhance(4),
-            iterations=5
+            iterations=5,
         )
 
         self.measure(
             "Concurrent Enhancement (8 tasks)",
             lambda: concurrent_enhance(8),
-            iterations=3
+            iterations=3,
         )
 
     def print_summary(self):
         """Print benchmark summary"""
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("BENCHMARK SUMMARY")
-        print("="*60 + "\n")
+        print("=" * 60 + "\n")
 
         if not self.results:
             print("No results to display")
             return
 
         # Sort by average time
-        sorted_results = sorted(self.results, key=lambda x: x['time_avg'])
+        sorted_results = sorted(self.results, key=lambda x: x["time_avg"])
 
         print(f"{'Benchmark':<45} {'Avg (ms)':<12} {'P95 (ms)':<12} {'Ops/sec':<10}")
         print("-" * 80)
 
         for result in sorted_results:
-            print(f"{result['name']:<45} "
-                  f"{result['time_avg']*1000:>10.2f}  "
-                  f"{result['time_p95']*1000:>10.2f}  "
-                  f"{result['throughput']:>10.2f}")
+            print(
+                f"{result['name']:<45} "
+                f"{result['time_avg']*1000:>10.2f}  "
+                f"{result['time_p95']*1000:>10.2f}  "
+                f"{result['throughput']:>10.2f}"
+            )
 
         print("\nPerformance Tiers:")
         print("  Excellent: < 100ms")
@@ -344,10 +339,10 @@ class PerformanceBenchmark:
         print("  Slow:      > 1000ms")
 
         # Performance analysis
-        excellent = sum(1 for r in self.results if r['time_avg'] < 0.1)
-        good = sum(1 for r in self.results if 0.1 <= r['time_avg'] < 0.5)
-        acceptable = sum(1 for r in self.results if 0.5 <= r['time_avg'] < 1.0)
-        slow = sum(1 for r in self.results if r['time_avg'] >= 1.0)
+        excellent = sum(1 for r in self.results if r["time_avg"] < 0.1)
+        good = sum(1 for r in self.results if 0.1 <= r["time_avg"] < 0.5)
+        acceptable = sum(1 for r in self.results if 0.5 <= r["time_avg"] < 1.0)
+        slow = sum(1 for r in self.results if r["time_avg"] >= 1.0)
 
         print(f"\nResults Distribution:")
         print(f"  Excellent:  {excellent}")
@@ -360,11 +355,15 @@ class PerformanceBenchmark:
         filepath = os.path.join("tests", "performance", filename)
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
-        with open(filepath, 'w') as f:
-            json.dump({
-                'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
-                'results': self.results
-            }, f, indent=2)
+        with open(filepath, "w") as f:
+            json.dump(
+                {
+                    "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "results": self.results,
+                },
+                f,
+                indent=2,
+            )
 
         print(f"\nResults saved to: {filepath}")
 
@@ -387,14 +386,16 @@ class PerformanceBenchmark:
 
 
 if __name__ == "__main__":
-    print("""
+    print(
+        """
 MAAPS Performance Benchmark Suite
 ==================================
 
 This will benchmark all core operations and save results.
 Estimated time: 3-5 minutes
 
-""")
+"""
+    )
 
     benchmark = PerformanceBenchmark()
     benchmark.run_all()

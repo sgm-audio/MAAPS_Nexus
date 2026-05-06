@@ -21,13 +21,13 @@ except ImportError as e:
 from ...core.base_agent import BaseAgent
 from ...core.message_types import Message, Priority, Topics
 
-
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class Chord:
     """Represents a detected chord"""
+
     root: str  # "C", "F#", etc.
     quality: str  # "major", "minor", "diminished", "augmented"
     extensions: List[str] = field(default_factory=list)  # ["7", "9", "sus4"]
@@ -42,12 +42,15 @@ class Chord:
 @dataclass
 class HarmonicAnalysis:
     """Complete harmonic analysis results"""
+
     chords: List[Chord]
     key: str
     chord_progression: List[str]  # ["I", "IV", "V", "I"]
     harmonic_rhythm: float  # Average chord change frequency (chords per measure)
     complexity_score: float  # 0.0 (simple) to 1.0 (complex)
-    common_progressions: List[str] = field(default_factory=list)  # "I-V-vi-IV", "ii-V-I"
+    common_progressions: List[str] = field(
+        default_factory=list
+    )  # "I-V-vi-IV", "ii-V-I"
 
 
 class HarmonicAnalysisAgent(BaseAgent):
@@ -65,45 +68,44 @@ class HarmonicAnalysisAgent(BaseAgent):
 
     # Chord templates (pitch class profiles)
     CHORD_TEMPLATES = {
-        'major': [1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0],
-        'minor': [1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0],
-        'diminished': [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0],
-        'augmented': [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
-        'major7': [1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1],
-        'minor7': [1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0],
-        'dominant7': [1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0],
-        'sus2': [1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-        'sus4': [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0],
+        "major": [1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0],
+        "minor": [1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0],
+        "diminished": [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0],
+        "augmented": [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+        "major7": [1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1],
+        "minor7": [1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0],
+        "dominant7": [1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0],
+        "sus2": [1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+        "sus4": [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0],
     }
 
-    NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+    NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
     # Common progressions
     COMMON_PROGRESSIONS = {
-        'I-V-vi-IV': ['pop', 'contemporary'],
-        'I-IV-V-I': ['classical', 'traditional'],
-        'ii-V-I': ['jazz', 'standard'],
-        'I-vi-IV-V': ['50s', 'doo-wop'],
-        'I-IV-I-V': ['blues', 'rock'],
-        'vi-IV-I-V': ['pop', 'modern'],
-        'I-V-IV-V': ['rock', 'alternative'],
-        'ii-V-I-VI': ['jazz', 'turnaround'],
+        "I-V-vi-IV": ["pop", "contemporary"],
+        "I-IV-V-I": ["classical", "traditional"],
+        "ii-V-I": ["jazz", "standard"],
+        "I-vi-IV-V": ["50s", "doo-wop"],
+        "I-IV-I-V": ["blues", "rock"],
+        "vi-IV-I-V": ["pop", "modern"],
+        "I-V-IV-V": ["rock", "alternative"],
+        "ii-V-I-VI": ["jazz", "turnaround"],
     }
 
     def __init__(self):
         super().__init__(
-            agent_id="harmonic_analysis_agent",
-            agent_name="Harmonic Analysis Agent"
+            agent_id="harmonic_analysis_agent", agent_name="Harmonic Analysis Agent"
         )
 
         self._lock = threading.Lock()
 
         # Statistics
         self._stats = {
-            'analyses_performed': 0,
-            'chords_identified': 0,
-            'progressions_analyzed': 0,
-            'errors': 0
+            "analyses_performed": 0,
+            "chords_identified": 0,
+            "progressions_analyzed": 0,
+            "errors": 0,
         }
 
     def setup(self):
@@ -138,7 +140,7 @@ class HarmonicAnalysisAgent(BaseAgent):
             elif topic == "harmonic.voice_leading":
                 result = self._analyze_voice_leading(payload)
             else:
-                result = {'success': False, 'error': f'Unknown topic: {topic}'}
+                result = {"success": False, "error": f"Unknown topic: {topic}"}
 
             # Send response
             self.respond(message, result)
@@ -146,18 +148,18 @@ class HarmonicAnalysisAgent(BaseAgent):
         except Exception as e:
             logger.error(f"Error handling message: {e}", exc_info=True)
             with self._lock:
-                self._stats['errors'] += 1
-            self.respond(message, {'success': False, 'error': str(e)})
+                self._stats["errors"] += 1
+            self.respond(message, {"success": False, "error": str(e)})
 
     def _identify_chords(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Identify chords from audio"""
         try:
-            audio = payload.get('audio')
-            sr = payload.get('sample_rate', 22050)
-            key = payload.get('key', 'C major')
+            audio = payload.get("audio")
+            sr = payload.get("sample_rate", 22050)
+            key = payload.get("key", "C major")
 
             if audio is None:
-                return {'success': False, 'error': 'No audio data provided'}
+                return {"success": False, "error": "No audio data provided"}
 
             # Convert to mono if stereo
             if len(audio.shape) > 1:
@@ -170,27 +172,27 @@ class HarmonicAnalysisAgent(BaseAgent):
             chords = self._add_harmonic_context(chords, key)
 
             with self._lock:
-                self._stats['chords_identified'] += len(chords)
+                self._stats["chords_identified"] += len(chords)
 
             return {
-                'success': True,
-                'chords': [self._chord_to_dict(chord) for chord in chords],
-                'key': key
+                "success": True,
+                "chords": [self._chord_to_dict(chord) for chord in chords],
+                "key": key,
             }
 
         except Exception as e:
             logger.error(f"Error identifying chords: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
     def _analyze_progression(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze chord progression"""
         try:
-            audio = payload.get('audio')
-            sr = payload.get('sample_rate', 22050)
-            key = payload.get('key')
+            audio = payload.get("audio")
+            sr = payload.get("sample_rate", 22050)
+            key = payload.get("key")
 
             if audio is None:
-                return {'success': False, 'error': 'No audio data provided'}
+                return {"success": False, "error": "No audio data provided"}
 
             if len(audio.shape) > 1:
                 audio = librosa.to_mono(audio)
@@ -204,12 +206,16 @@ class HarmonicAnalysisAgent(BaseAgent):
             chords = self._add_harmonic_context(chords, key)
 
             # Build progression
-            progression = [chord.roman_numeral for chord in chords if chord.roman_numeral]
+            progression = [
+                chord.roman_numeral for chord in chords if chord.roman_numeral
+            ]
 
             # Calculate harmonic rhythm
             if len(chords) > 0 and chords[-1].start_time > 0:
                 duration = chords[-1].start_time + chords[-1].duration
-                harmonic_rhythm = len(chords) / (duration / 4)  # Chords per 4 seconds (approx measure)
+                harmonic_rhythm = len(chords) / (
+                    duration / 4
+                )  # Chords per 4 seconds (approx measure)
             else:
                 harmonic_rhythm = 1.0
 
@@ -225,34 +231,34 @@ class HarmonicAnalysisAgent(BaseAgent):
                 chord_progression=progression,
                 harmonic_rhythm=float(harmonic_rhythm),
                 complexity_score=float(complexity),
-                common_progressions=common
+                common_progressions=common,
             )
 
             with self._lock:
-                self._stats['analyses_performed'] += 1
-                self._stats['progressions_analyzed'] += 1
+                self._stats["analyses_performed"] += 1
+                self._stats["progressions_analyzed"] += 1
 
             return {
-                'success': True,
-                'analysis': {
-                    'chords': [self._chord_to_dict(c) for c in analysis.chords],
-                    'key': analysis.key,
-                    'chord_progression': analysis.chord_progression,
-                    'harmonic_rhythm': float(analysis.harmonic_rhythm),
-                    'complexity_score': float(analysis.complexity_score),
-                    'common_progressions': analysis.common_progressions
-                }
+                "success": True,
+                "analysis": {
+                    "chords": [self._chord_to_dict(c) for c in analysis.chords],
+                    "key": analysis.key,
+                    "chord_progression": analysis.chord_progression,
+                    "harmonic_rhythm": float(analysis.harmonic_rhythm),
+                    "complexity_score": float(analysis.complexity_score),
+                    "common_progressions": analysis.common_progressions,
+                },
             }
 
         except Exception as e:
             logger.error(f"Error analyzing progression: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
     def _analyze_function(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze harmonic function of chords"""
         try:
-            chords_data = payload.get('chords', [])
-            key = payload.get('key', 'C major')
+            chords_data = payload.get("chords", [])
+            key = payload.get("key", "C major")
 
             # Convert dict to Chord objects
             chords = [self._dict_to_chord(c) for c in chords_data]
@@ -261,21 +267,24 @@ class HarmonicAnalysisAgent(BaseAgent):
             chords = self._add_harmonic_context(chords, key)
 
             return {
-                'success': True,
-                'chords': [self._chord_to_dict(chord) for chord in chords]
+                "success": True,
+                "chords": [self._chord_to_dict(chord) for chord in chords],
             }
 
         except Exception as e:
             logger.error(f"Error analyzing function: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
     def _analyze_voice_leading(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze voice leading between chords"""
         try:
-            chords_data = payload.get('chords', [])
+            chords_data = payload.get("chords", [])
 
             if len(chords_data) < 2:
-                return {'success': False, 'error': 'Need at least 2 chords for voice leading analysis'}
+                return {
+                    "success": False,
+                    "error": "Need at least 2 chords for voice leading analysis",
+                }
 
             chords = [self._dict_to_chord(c) for c in chords_data]
 
@@ -288,21 +297,21 @@ class HarmonicAnalysisAgent(BaseAgent):
                 # Calculate voice movement
                 movement = self._calculate_voice_movement(current, next_chord)
 
-                voice_leading_analysis.append({
-                    'from': f"{current.root}{current.quality}",
-                    'to': f"{next_chord.root}{next_chord.quality}",
-                    'movement': movement,
-                    'smooth': movement['total_movement'] < 5  # Smooth if less than 5 semitones total
-                })
+                voice_leading_analysis.append(
+                    {
+                        "from": f"{current.root}{current.quality}",
+                        "to": f"{next_chord.root}{next_chord.quality}",
+                        "movement": movement,
+                        "smooth": movement["total_movement"]
+                        < 5,  # Smooth if less than 5 semitones total
+                    }
+                )
 
-            return {
-                'success': True,
-                'voice_leading': voice_leading_analysis
-            }
+            return {"success": True, "voice_leading": voice_leading_analysis}
 
         except Exception as e:
             logger.error(f"Error analyzing voice leading: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
     def _extract_chords(self, audio: np.ndarray, sr: int) -> List[Chord]:
         """Extract chords from audio using chromagram"""
@@ -344,6 +353,7 @@ class HarmonicAnalysisAgent(BaseAgent):
 
         # Smooth
         from scipy.ndimage import gaussian_filter1d
+
         chroma_diff_smooth = gaussian_filter1d(chroma_diff, sigma=2)
 
         # Find peaks
@@ -393,19 +403,21 @@ class HarmonicAnalysisAgent(BaseAgent):
             base_quality = quality
             extensions = []
 
-            if '7' in quality:
-                extensions.append('7')
-                base_quality = quality.replace('7', '')
+            if "7" in quality:
+                extensions.append("7")
+                base_quality = quality.replace("7", "")
 
-            if 'sus' in quality:
+            if "sus" in quality:
                 extensions.append(quality)
-                base_quality = quality.split('sus')[0] if quality.split('sus')[0] else 'major'
+                base_quality = (
+                    quality.split("sus")[0] if quality.split("sus")[0] else "major"
+                )
 
             return Chord(
                 root=self.NOTE_NAMES[root],
-                quality=base_quality if base_quality else 'major',
+                quality=base_quality if base_quality else "major",
                 extensions=extensions,
-                confidence=float(best_score)
+                confidence=float(best_score),
             )
 
         return None
@@ -419,7 +431,7 @@ class HarmonicAnalysisAgent(BaseAgent):
             mode = key_parts[1].lower()
         else:
             tonic = key
-            mode = 'major'
+            mode = "major"
 
         # Get tonic pitch class
         try:
@@ -428,12 +440,28 @@ class HarmonicAnalysisAgent(BaseAgent):
             tonic_pc = 0
 
         # Scale degrees for major and minor
-        if mode == 'major':
-            scale_qualities = ['major', 'minor', 'minor', 'major', 'major', 'minor', 'diminished']
+        if mode == "major":
+            scale_qualities = [
+                "major",
+                "minor",
+                "minor",
+                "major",
+                "major",
+                "minor",
+                "diminished",
+            ]
         else:  # minor
-            scale_qualities = ['minor', 'diminished', 'major', 'minor', 'minor', 'major', 'major']
+            scale_qualities = [
+                "minor",
+                "diminished",
+                "major",
+                "minor",
+                "minor",
+                "major",
+                "major",
+            ]
 
-        roman_numerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII']
+        roman_numerals = ["I", "II", "III", "IV", "V", "VI", "VII"]
 
         for chord in chords:
             # Calculate scale degree
@@ -455,34 +483,34 @@ class HarmonicAnalysisAgent(BaseAgent):
                 numeral = roman_numerals[scale_degree]
 
                 # Use lowercase for minor/diminished in major keys
-                if mode == 'major' and expected_quality in ['minor', 'diminished']:
+                if mode == "major" and expected_quality in ["minor", "diminished"]:
                     numeral = numeral.lower()
-                elif mode == 'minor' and expected_quality == 'major':
+                elif mode == "minor" and expected_quality == "major":
                     numeral = numeral.upper()
 
                 # Add extensions
                 if chord.extensions:
-                    numeral += ''.join(chord.extensions)
+                    numeral += "".join(chord.extensions)
 
                 chord.roman_numeral = numeral
 
                 # Harmonic function
                 if scale_degree in [0]:  # I
-                    chord.function = 'tonic'
+                    chord.function = "tonic"
                 elif scale_degree in [3]:  # IV
-                    chord.function = 'subdominant'
+                    chord.function = "subdominant"
                 elif scale_degree in [4]:  # V
-                    chord.function = 'dominant'
+                    chord.function = "dominant"
                 elif scale_degree in [2, 5]:  # iii, vi
-                    chord.function = 'tonic'
+                    chord.function = "tonic"
                 elif scale_degree in [1]:  # ii
-                    chord.function = 'subdominant'
+                    chord.function = "subdominant"
                 elif scale_degree in [6]:  # vii
-                    chord.function = 'dominant'
+                    chord.function = "dominant"
             else:
                 # Chromatic chord
                 chord.roman_numeral = f"#{chord.root}"
-                chord.function = 'chromatic'
+                chord.function = "chromatic"
 
         return chords
 
@@ -514,7 +542,7 @@ class HarmonicAnalysisAgent(BaseAgent):
         complexity_factors.append(extension_ratio)
 
         # Factor 3: Chromatic chords
-        chromatic = sum(1 for c in chords if c.function == 'chromatic')
+        chromatic = sum(1 for c in chords if c.function == "chromatic")
         chromatic_ratio = chromatic / len(chords)
         complexity_factors.append(chromatic_ratio)
 
@@ -536,7 +564,7 @@ class HarmonicAnalysisAgent(BaseAgent):
 
         # Check for common 4-chord progressions
         for i in range(len(progression) - 3):
-            segment = '-'.join(progression[i:i+4])
+            segment = "-".join(progression[i : i + 4])
 
             for pattern, genres in self.COMMON_PROGRESSIONS.items():
                 if segment == pattern:
@@ -544,7 +572,7 @@ class HarmonicAnalysisAgent(BaseAgent):
 
         # Check for 3-chord progressions (e.g., ii-V-I)
         for i in range(len(progression) - 2):
-            segment = '-'.join(progression[i:i+3])
+            segment = "-".join(progression[i : i + 3])
 
             for pattern, genres in self.COMMON_PROGRESSIONS.items():
                 if segment in pattern:
@@ -574,9 +602,9 @@ class HarmonicAnalysisAgent(BaseAgent):
             movements.append(min_dist)
 
         return {
-            'total_movement': total_movement,
-            'individual_movements': movements,
-            'average_movement': total_movement / len(pc1) if pc1 else 0
+            "total_movement": total_movement,
+            "individual_movements": movements,
+            "average_movement": total_movement / len(pc1) if pc1 else 0,
         }
 
     def _chord_to_pitch_classes(self, chord: Chord) -> List[int]:
@@ -589,18 +617,18 @@ class HarmonicAnalysisAgent(BaseAgent):
         pitch_classes = [root]
 
         # Add third and fifth based on quality
-        if chord.quality == 'major':
+        if chord.quality == "major":
             pitch_classes.extend([(root + 4) % 12, (root + 7) % 12])
-        elif chord.quality == 'minor':
+        elif chord.quality == "minor":
             pitch_classes.extend([(root + 3) % 12, (root + 7) % 12])
-        elif chord.quality == 'diminished':
+        elif chord.quality == "diminished":
             pitch_classes.extend([(root + 3) % 12, (root + 6) % 12])
-        elif chord.quality == 'augmented':
+        elif chord.quality == "augmented":
             pitch_classes.extend([(root + 4) % 12, (root + 8) % 12])
 
         # Add extensions
-        if '7' in chord.extensions:
-            if chord.quality == 'major':
+        if "7" in chord.extensions:
+            if chord.quality == "major":
                 pitch_classes.append((root + 11) % 12)  # Major 7th
             else:
                 pitch_classes.append((root + 10) % 12)  # Minor 7th
@@ -610,27 +638,27 @@ class HarmonicAnalysisAgent(BaseAgent):
     def _chord_to_dict(self, chord: Chord) -> Dict[str, Any]:
         """Convert chord to dictionary"""
         return {
-            'root': chord.root,
-            'quality': chord.quality,
-            'extensions': chord.extensions,
-            'bass_note': chord.bass_note,
-            'start_time': float(chord.start_time),
-            'duration': float(chord.duration),
-            'roman_numeral': chord.roman_numeral,
-            'function': chord.function,
-            'confidence': float(chord.confidence)
+            "root": chord.root,
+            "quality": chord.quality,
+            "extensions": chord.extensions,
+            "bass_note": chord.bass_note,
+            "start_time": float(chord.start_time),
+            "duration": float(chord.duration),
+            "roman_numeral": chord.roman_numeral,
+            "function": chord.function,
+            "confidence": float(chord.confidence),
         }
 
     def _dict_to_chord(self, data: Dict[str, Any]) -> Chord:
         """Convert dictionary to Chord object"""
         return Chord(
-            root=data.get('root', 'C'),
-            quality=data.get('quality', 'major'),
-            extensions=data.get('extensions', []),
-            bass_note=data.get('bass_note'),
-            start_time=data.get('start_time', 0.0),
-            duration=data.get('duration', 0.0),
-            roman_numeral=data.get('roman_numeral', ''),
-            function=data.get('function', ''),
-            confidence=data.get('confidence', 1.0)
+            root=data.get("root", "C"),
+            quality=data.get("quality", "major"),
+            extensions=data.get("extensions", []),
+            bass_note=data.get("bass_note"),
+            start_time=data.get("start_time", 0.0),
+            duration=data.get("duration", 0.0),
+            roman_numeral=data.get("roman_numeral", ""),
+            function=data.get("function", ""),
+            confidence=data.get("confidence", 1.0),
         )

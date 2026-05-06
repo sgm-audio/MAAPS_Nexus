@@ -20,17 +20,21 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DMXFixture:
     """DMX lighting fixture"""
+
     fixture_id: str
     fixture_name: str
     fixture_type: str  # "par", "moving_head", "led_strip", etc.
     dmx_start_address: int
     num_channels: int
-    current_values: Dict[int, int] = field(default_factory=dict)  # channel -> value (0-255)
+    current_values: Dict[int, int] = field(
+        default_factory=dict
+    )  # channel -> value (0-255)
 
 
 @dataclass
 class LightingScene:
     """Lighting scene"""
+
     scene_id: str
     scene_name: str
     fixture_states: Dict[str, Dict[int, int]]  # fixture_id -> channel_values
@@ -41,6 +45,7 @@ class LightingScene:
 @dataclass
 class AudioReactiveMapping:
     """Audio to lighting mapping"""
+
     mapping_id: str
     frequency_band: Tuple[float, float]  # Hz range
     target_fixture: str
@@ -57,7 +62,7 @@ class VisualLightingControlAgent(BaseAgent):
     def __init__(self):
         super().__init__(
             agent_id="visual_lighting_control_agent",
-            agent_name="Visual & Lighting Control Agent"
+            agent_name="Visual & Lighting Control Agent",
         )
 
         self.fixtures: Dict[str, DMXFixture] = {}
@@ -81,7 +86,7 @@ class VisualLightingControlAgent(BaseAgent):
         self.output_thread: Optional[threading.Thread] = None
         self.output_active = False
 
-        self.stats = {'scenes_triggered': 0, 'beats_detected': 0, 'dmx_updates': 0}
+        self.stats = {"scenes_triggered": 0, "beats_detected": 0, "dmx_updates": 0}
         self.stats_lock = threading.Lock()
 
     def setup(self):
@@ -130,28 +135,28 @@ class VisualLightingControlAgent(BaseAgent):
         payload = message.payload
 
         fixture = DMXFixture(
-            fixture_id=payload.get('fixture_id', f"fix_{time.time()}"),
-            fixture_name=payload['fixture_name'],
-            fixture_type=payload['fixture_type'],
-            dmx_start_address=payload['dmx_start_address'],
-            num_channels=payload['num_channels']
+            fixture_id=payload.get("fixture_id", f"fix_{time.time()}"),
+            fixture_name=payload["fixture_name"],
+            fixture_type=payload["fixture_type"],
+            dmx_start_address=payload["dmx_start_address"],
+            num_channels=payload["num_channels"],
         )
 
         with self.fixtures_lock:
             self.fixtures[fixture.fixture_id] = fixture
 
-        self.respond(message, {'success': True, 'fixture_id': fixture.fixture_id})
+        self.respond(message, {"success": True, "fixture_id": fixture.fixture_id})
 
     def _handle_fixture_control(self, message: Message):
         """Handle fixture control"""
         payload = message.payload
-        fixture_id = payload['fixture_id']
-        channels = payload['channels']  # {channel: value}
-        fade_time = payload.get('fade_time', 0.0)
+        fixture_id = payload["fixture_id"]
+        channels = payload["channels"]  # {channel: value}
+        fade_time = payload.get("fade_time", 0.0)
 
         with self.fixtures_lock:
             if fixture_id not in self.fixtures:
-                self.respond(message, {'success': False, 'error': 'Fixture not found'})
+                self.respond(message, {"success": False, "error": "Fixture not found"})
                 return
 
             fixture = self.fixtures[fixture_id]
@@ -170,40 +175,41 @@ class VisualLightingControlAgent(BaseAgent):
                     fixture.current_values[channel] = value
 
         with self.stats_lock:
-            self.stats['dmx_updates'] += 1
+            self.stats["dmx_updates"] += 1
 
-        self.respond(message, {'success': True, 'fixture_id': fixture_id})
+        self.respond(message, {"success": True, "fixture_id": fixture_id})
 
-        self.publish("visual.dmx.update", {
-            'fixture_id': fixture_id,
-            'channels': channels
-        }, priority=Priority.MEDIUM)
+        self.publish(
+            "visual.dmx.update",
+            {"fixture_id": fixture_id, "channels": channels},
+            priority=Priority.MEDIUM,
+        )
 
     def _handle_scene_create(self, message: Message):
         """Handle lighting scene creation"""
         payload = message.payload
 
         scene = LightingScene(
-            scene_id=payload.get('scene_id', f"scene_{time.time()}"),
-            scene_name=payload['scene_name'],
-            fixture_states=payload.get('fixture_states', {}),
-            sync_to_beat=payload.get('sync_to_beat', False),
-            fade_time=payload.get('fade_time', 0.0)
+            scene_id=payload.get("scene_id", f"scene_{time.time()}"),
+            scene_name=payload["scene_name"],
+            fixture_states=payload.get("fixture_states", {}),
+            sync_to_beat=payload.get("sync_to_beat", False),
+            fade_time=payload.get("fade_time", 0.0),
         )
 
         with self.scenes_lock:
             self.scenes[scene.scene_id] = scene
 
-        self.respond(message, {'success': True, 'scene_id': scene.scene_id})
+        self.respond(message, {"success": True, "scene_id": scene.scene_id})
 
     def _handle_scene_trigger(self, message: Message):
         """Handle scene trigger"""
         payload = message.payload
-        scene_id = payload['scene_id']
+        scene_id = payload["scene_id"]
 
         with self.scenes_lock:
             if scene_id not in self.scenes:
-                self.respond(message, {'success': False, 'error': 'Scene not found'})
+                self.respond(message, {"success": False, "error": "Scene not found"})
                 return
 
             scene = self.scenes[scene_id]
@@ -211,46 +217,49 @@ class VisualLightingControlAgent(BaseAgent):
             # Apply scene to fixtures
             for fixture_id, channel_values in scene.fixture_states.items():
                 if fixture_id in self.fixtures:
-                    self._apply_fixture_values(fixture_id, channel_values, scene.fade_time)
+                    self._apply_fixture_values(
+                        fixture_id, channel_values, scene.fade_time
+                    )
 
         with self.stats_lock:
-            self.stats['scenes_triggered'] += 1
+            self.stats["scenes_triggered"] += 1
 
-        self.respond(message, {'success': True, 'scene_id': scene_id})
+        self.respond(message, {"success": True, "scene_id": scene_id})
 
-        self.publish("visual.lighting.scene", {
-            'scene_id': scene_id,
-            'scene_name': scene.scene_name
-        }, priority=Priority.HIGH)
+        self.publish(
+            "visual.lighting.scene",
+            {"scene_id": scene_id, "scene_name": scene.scene_name},
+            priority=Priority.HIGH,
+        )
 
     def _handle_audio_mapping_create(self, message: Message):
         """Handle audio-reactive mapping creation"""
         payload = message.payload
 
         mapping = AudioReactiveMapping(
-            mapping_id=payload.get('mapping_id', f"map_{time.time()}"),
-            frequency_band=tuple(payload['frequency_band']),
-            target_fixture=payload['target_fixture'],
-            target_channel=payload['target_channel'],
-            response_curve=payload.get('response_curve', 'linear'),
-            min_value=payload.get('min_value', 0),
-            max_value=payload.get('max_value', 255)
+            mapping_id=payload.get("mapping_id", f"map_{time.time()}"),
+            frequency_band=tuple(payload["frequency_band"]),
+            target_fixture=payload["target_fixture"],
+            target_channel=payload["target_channel"],
+            response_curve=payload.get("response_curve", "linear"),
+            min_value=payload.get("min_value", 0),
+            max_value=payload.get("max_value", 255),
         )
 
         with self.mappings_lock:
             self.audio_mappings.append(mapping)
 
-        self.respond(message, {'success': True, 'mapping_id': mapping.mapping_id})
+        self.respond(message, {"success": True, "mapping_id": mapping.mapping_id})
 
     def _handle_beat_trigger(self, message: Message):
         """Handle beat detection trigger"""
         payload = message.payload
-        beat_number = payload.get('beat_number', 0)
+        beat_number = payload.get("beat_number", 0)
 
         self.last_beat_time = time.time()
 
         with self.stats_lock:
-            self.stats['beats_detected'] += 1
+            self.stats["beats_detected"] += 1
 
         # Trigger beat-synced scenes
         with self.scenes_lock:
@@ -259,12 +268,14 @@ class VisualLightingControlAgent(BaseAgent):
                     for fixture_id, channel_values in scene.fixture_states.items():
                         self._apply_fixture_values(fixture_id, channel_values, 0.1)
 
-        self.publish("visual.beat.detected", {'beat_number': beat_number}, priority=Priority.HIGH)
+        self.publish(
+            "visual.beat.detected", {"beat_number": beat_number}, priority=Priority.HIGH
+        )
 
     def _handle_audio_analysis(self, message: Message):
         """Handle audio spectrum analysis"""
         payload = message.payload
-        spectrum = payload.get('spectrum', [])
+        spectrum = payload.get("spectrum", [])
 
         if not spectrum:
             return
@@ -280,29 +291,44 @@ class VisualLightingControlAgent(BaseAgent):
 
                 # Map to DMX value
                 if mapping.response_curve == "linear":
-                    value = int(mapping.min_value + (mapping.max_value - mapping.min_value) * energy)
+                    value = int(
+                        mapping.min_value
+                        + (mapping.max_value - mapping.min_value) * energy
+                    )
                 elif mapping.response_curve == "exponential":
-                    value = int(mapping.min_value + (mapping.max_value - mapping.min_value) * (energy ** 2))
+                    value = int(
+                        mapping.min_value
+                        + (mapping.max_value - mapping.min_value) * (energy**2)
+                    )
                 else:
-                    value = int(mapping.min_value + (mapping.max_value - mapping.min_value) * energy)
+                    value = int(
+                        mapping.min_value
+                        + (mapping.max_value - mapping.min_value) * energy
+                    )
 
                 # Apply to fixture
-                self._apply_fixture_values(mapping.target_fixture, {mapping.target_channel: value}, 0.0)
+                self._apply_fixture_values(
+                    mapping.target_fixture, {mapping.target_channel: value}, 0.0
+                )
 
     def _handle_clock_position(self, message: Message):
         """Handle clock position for beat detection"""
         payload = message.payload
-        beat = payload.get('beat', 0.0)
+        beat = payload.get("beat", 0.0)
 
         # Detect beat transitions
         if int(beat) != int(beat - 0.1):  # Beat just occurred
-            self._handle_beat_trigger(Message(
-                topic="visual.beat.trigger",
-                sender="sync",
-                payload={'beat_number': int(beat)}
-            ))
+            self._handle_beat_trigger(
+                Message(
+                    topic="visual.beat.trigger",
+                    sender="sync",
+                    payload={"beat_number": int(beat)},
+                )
+            )
 
-    def _apply_fixture_values(self, fixture_id: str, channel_values: Dict[int, int], fade_time: float):
+    def _apply_fixture_values(
+        self, fixture_id: str, channel_values: Dict[int, int], fade_time: float
+    ):
         """Apply values to a fixture"""
         with self.fixtures_lock:
             if fixture_id not in self.fixtures:
@@ -317,7 +343,9 @@ class VisualLightingControlAgent(BaseAgent):
                         self.dmx_universe[dmx_address] = value
                     fixture.current_values[channel] = value
 
-    def _calculate_band_energy(self, spectrum: List[float], frequency_band: Tuple[float, float]) -> float:
+    def _calculate_band_energy(
+        self, spectrum: List[float], frequency_band: Tuple[float, float]
+    ) -> float:
         """Calculate energy in frequency band"""
         # Simplified energy calculation
         if not spectrum:
@@ -341,9 +369,7 @@ class VisualLightingControlAgent(BaseAgent):
         """Start DMX output thread"""
         self.output_active = True
         self.output_thread = threading.Thread(
-            target=self._output_worker,
-            name=f"{self.agent_id}_output",
-            daemon=True
+            target=self._output_worker, name=f"{self.agent_id}_output", daemon=True
         )
         self.output_thread.start()
 

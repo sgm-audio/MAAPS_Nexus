@@ -21,13 +21,13 @@ except ImportError as e:
 from ...core.base_agent import BaseAgent
 from ...core.message_types import Message, Priority, Topics
 
-
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class MIDINote:
     """Represents a detected MIDI note"""
+
     pitch: int  # MIDI note number (0-127)
     start_time: float  # seconds
     duration: float  # seconds
@@ -39,6 +39,7 @@ class MIDINote:
 @dataclass
 class MIDITranscription:
     """Complete MIDI transcription result"""
+
     notes: List[MIDINote]
     tempo_bpm: float
     time_signature: str
@@ -66,18 +67,18 @@ class AudioToMIDIAgent(BaseAgent):
     def __init__(self):
         super().__init__(
             agent_id="audio_to_midi_agent",
-            agent_name="Audio-to-MIDI Transcription Agent"
+            agent_name="Audio-to-MIDI Transcription Agent",
         )
 
         self._lock = threading.Lock()
 
         # Statistics
         self._stats = {
-            'transcriptions_performed': 0,
-            'monophonic_transcriptions': 0,
-            'polyphonic_transcriptions': 0,
-            'total_notes_detected': 0,
-            'errors': 0
+            "transcriptions_performed": 0,
+            "monophonic_transcriptions": 0,
+            "polyphonic_transcriptions": 0,
+            "total_notes_detected": 0,
+            "errors": 0,
         }
 
     def setup(self):
@@ -113,7 +114,7 @@ class AudioToMIDIAgent(BaseAgent):
             elif topic == "transcription.realtime":
                 result = self._transcribe_realtime(payload)
             else:
-                result = {'success': False, 'error': f'Unknown topic: {topic}'}
+                result = {"success": False, "error": f"Unknown topic: {topic}"}
 
             # Send response
             self.respond(message, result)
@@ -121,18 +122,18 @@ class AudioToMIDIAgent(BaseAgent):
         except Exception as e:
             logger.error(f"Error handling message: {e}", exc_info=True)
             with self._lock:
-                self._stats['errors'] += 1
-            self.respond(message, {'success': False, 'error': str(e)})
+                self._stats["errors"] += 1
+            self.respond(message, {"success": False, "error": str(e)})
 
     def _transcribe_audio(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Automatically detect and transcribe audio (mono or poly)"""
         try:
-            audio = payload.get('audio')
-            sr = payload.get('sample_rate', 22050)
-            instrument_type = payload.get('instrument_type', 'unknown')
+            audio = payload.get("audio")
+            sr = payload.get("sample_rate", 22050)
+            instrument_type = payload.get("instrument_type", "unknown")
 
             if audio is None:
-                return {'success': False, 'error': 'No audio data provided'}
+                return {"success": False, "error": "No audio data provided"}
 
             # Convert to mono if stereo
             if len(audio.shape) > 1:
@@ -142,94 +143,102 @@ class AudioToMIDIAgent(BaseAgent):
             is_polyphonic = self._detect_polyphony(audio, sr)
 
             if is_polyphonic:
-                transcription = self._transcribe_polyphonic_internal(audio, sr, instrument_type)
+                transcription = self._transcribe_polyphonic_internal(
+                    audio, sr, instrument_type
+                )
                 with self._lock:
-                    self._stats['polyphonic_transcriptions'] += 1
+                    self._stats["polyphonic_transcriptions"] += 1
             else:
-                transcription = self._transcribe_monophonic_internal(audio, sr, instrument_type)
+                transcription = self._transcribe_monophonic_internal(
+                    audio, sr, instrument_type
+                )
                 with self._lock:
-                    self._stats['monophonic_transcriptions'] += 1
+                    self._stats["monophonic_transcriptions"] += 1
 
             with self._lock:
-                self._stats['transcriptions_performed'] += 1
-                self._stats['total_notes_detected'] += len(transcription.notes)
+                self._stats["transcriptions_performed"] += 1
+                self._stats["total_notes_detected"] += len(transcription.notes)
 
             return {
-                'success': True,
-                'transcription': self._transcription_to_dict(transcription)
+                "success": True,
+                "transcription": self._transcription_to_dict(transcription),
             }
 
         except Exception as e:
             logger.error(f"Error transcribing audio: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
     def _transcribe_monophonic(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Transcribe monophonic audio"""
         try:
-            audio = payload.get('audio')
-            sr = payload.get('sample_rate', 22050)
-            instrument_type = payload.get('instrument_type', 'unknown')
+            audio = payload.get("audio")
+            sr = payload.get("sample_rate", 22050)
+            instrument_type = payload.get("instrument_type", "unknown")
 
             if audio is None:
-                return {'success': False, 'error': 'No audio data provided'}
+                return {"success": False, "error": "No audio data provided"}
 
             if len(audio.shape) > 1:
                 audio = librosa.to_mono(audio)
 
-            transcription = self._transcribe_monophonic_internal(audio, sr, instrument_type)
+            transcription = self._transcribe_monophonic_internal(
+                audio, sr, instrument_type
+            )
 
             with self._lock:
-                self._stats['transcriptions_performed'] += 1
-                self._stats['monophonic_transcriptions'] += 1
-                self._stats['total_notes_detected'] += len(transcription.notes)
+                self._stats["transcriptions_performed"] += 1
+                self._stats["monophonic_transcriptions"] += 1
+                self._stats["total_notes_detected"] += len(transcription.notes)
 
             return {
-                'success': True,
-                'transcription': self._transcription_to_dict(transcription)
+                "success": True,
+                "transcription": self._transcription_to_dict(transcription),
             }
 
         except Exception as e:
             logger.error(f"Error in monophonic transcription: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
     def _transcribe_polyphonic(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Transcribe polyphonic audio"""
         try:
-            audio = payload.get('audio')
-            sr = payload.get('sample_rate', 22050)
-            instrument_type = payload.get('instrument_type', 'unknown')
+            audio = payload.get("audio")
+            sr = payload.get("sample_rate", 22050)
+            instrument_type = payload.get("instrument_type", "unknown")
 
             if audio is None:
-                return {'success': False, 'error': 'No audio data provided'}
+                return {"success": False, "error": "No audio data provided"}
 
             if len(audio.shape) > 1:
                 audio = librosa.to_mono(audio)
 
-            transcription = self._transcribe_polyphonic_internal(audio, sr, instrument_type)
+            transcription = self._transcribe_polyphonic_internal(
+                audio, sr, instrument_type
+            )
 
             with self._lock:
-                self._stats['transcriptions_performed'] += 1
-                self._stats['polyphonic_transcriptions'] += 1
-                self._stats['total_notes_detected'] += len(transcription.notes)
+                self._stats["transcriptions_performed"] += 1
+                self._stats["polyphonic_transcriptions"] += 1
+                self._stats["total_notes_detected"] += len(transcription.notes)
 
             return {
-                'success': True,
-                'transcription': self._transcription_to_dict(transcription)
+                "success": True,
+                "transcription": self._transcription_to_dict(transcription),
             }
 
         except Exception as e:
             logger.error(f"Error in polyphonic transcription: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
     def _transcribe_realtime(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Transcribe audio in real-time mode (optimized for low latency)"""
         try:
-            audio = payload.get('audio')
-            sr = payload.get('sample_rate', 22050)
-            instrument_type = payload.get('instrument_type', 'unknown')
+            audio = payload.get("audio")
+            sr = payload.get("sample_rate", 22050)
+            instrument_type = payload.get("instrument_type", "unknown")
 
             if audio is None:
-                return {'success': False, 'error': 'No audio data provided'}
+                return {"success": False, "error": "No audio data provided"}
 
             if len(audio.shape) > 1:
                 audio = librosa.to_mono(audio)
@@ -240,14 +249,14 @@ class AudioToMIDIAgent(BaseAgent):
             )
 
             return {
-                'success': True,
-                'transcription': self._transcription_to_dict(transcription),
-                'latency_optimized': True
+                "success": True,
+                "transcription": self._transcription_to_dict(transcription),
+                "latency_optimized": True,
             }
 
         except Exception as e:
             logger.error(f"Error in real-time transcription: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
     def _detect_polyphony(self, audio: np.ndarray, sr: int) -> bool:
         """Detect if audio contains polyphonic content"""
@@ -264,29 +273,22 @@ class AudioToMIDIAgent(BaseAgent):
         return avg_active > 1.5
 
     def _transcribe_monophonic_internal(
-        self,
-        audio: np.ndarray,
-        sr: int,
-        instrument_type: str,
-        realtime: bool = False
+        self, audio: np.ndarray, sr: int, instrument_type: str, realtime: bool = False
     ) -> MIDITranscription:
         """Internal monophonic transcription using PYIN algorithm"""
 
         # Extract pitch using PYIN (probabilistic YIN)
         f0, voiced_flag, voiced_probs = librosa.pyin(
             audio,
-            fmin=librosa.note_to_hz('C2'),
-            fmax=librosa.note_to_hz('C7'),
+            fmin=librosa.note_to_hz("C2"),
+            fmax=librosa.note_to_hz("C7"),
             sr=sr,
-            frame_length=2048 if realtime else 4096
+            frame_length=2048 if realtime else 4096,
         )
 
         # Detect onsets
         onset_frames = librosa.onset.onset_detect(
-            y=audio,
-            sr=sr,
-            backtrack=True,
-            units='frames'
+            y=audio, sr=sr, backtrack=True, units="frames"
         )
 
         # Convert to times
@@ -310,14 +312,11 @@ class AudioToMIDIAgent(BaseAgent):
             track_name=f"{instrument_type}_track",
             instrument_type=instrument_type,
             polyphony_detected=False,
-            accuracy_estimate=self._estimate_accuracy(notes, voiced_probs)
+            accuracy_estimate=self._estimate_accuracy(notes, voiced_probs),
         )
 
     def _transcribe_polyphonic_internal(
-        self,
-        audio: np.ndarray,
-        sr: int,
-        instrument_type: str
+        self, audio: np.ndarray, sr: int, instrument_type: str
     ) -> MIDITranscription:
         """Internal polyphonic transcription using chromagram"""
 
@@ -327,13 +326,13 @@ class AudioToMIDIAgent(BaseAgent):
         # Get onset strength
         onset_env = librosa.onset.onset_strength(y=audio, sr=sr)
         onset_frames = librosa.onset.onset_detect(
-            onset_envelope=onset_env,
-            sr=sr,
-            backtrack=True
+            onset_envelope=onset_env, sr=sr, backtrack=True
         )
 
         # Convert frames to time
-        times = librosa.frames_to_time(np.arange(chroma.shape[1]), sr=sr, hop_length=512)
+        times = librosa.frames_to_time(
+            np.arange(chroma.shape[1]), sr=sr, hop_length=512
+        )
         onset_times = librosa.frames_to_time(onset_frames, sr=sr)
 
         # Extract notes from chromagram
@@ -351,7 +350,7 @@ class AudioToMIDIAgent(BaseAgent):
             track_name=f"{instrument_type}_track",
             instrument_type=instrument_type,
             polyphony_detected=True,
-            accuracy_estimate=self._estimate_accuracy_polyphonic(notes, chroma)
+            accuracy_estimate=self._estimate_accuracy_polyphonic(notes, chroma),
         )
 
     def _extract_notes_from_f0(
@@ -362,7 +361,7 @@ class AudioToMIDIAgent(BaseAgent):
         times: np.ndarray,
         onset_times: np.ndarray,
         audio: np.ndarray,
-        sr: int
+        sr: int,
     ) -> List[MIDINote]:
         """Extract MIDI notes from F0 contour"""
         notes = []
@@ -393,7 +392,9 @@ class AudioToMIDIAgent(BaseAgent):
                     note_audio = audio[start_frame:end_frame]
 
                     if len(note_audio) > 0:
-                        velocity = int(np.clip(np.sqrt(np.mean(note_audio ** 2)) * 127 * 10, 1, 127))
+                        velocity = int(
+                            np.clip(np.sqrt(np.mean(note_audio**2)) * 127 * 10, 1, 127)
+                        )
                     else:
                         velocity = 64
 
@@ -401,13 +402,19 @@ class AudioToMIDIAgent(BaseAgent):
 
                     # Only add notes with reasonable duration
                     if duration > 0.05 and 0 <= midi_note <= 127:
-                        notes.append(MIDINote(
-                            pitch=midi_note,
-                            start_time=note_start,
-                            duration=duration,
-                            velocity=velocity,
-                            confidence=float(np.mean(voiced_probs[max(0, i-len(note_pitches)):i]))
-                        ))
+                        notes.append(
+                            MIDINote(
+                                pitch=midi_note,
+                                start_time=note_start,
+                                duration=duration,
+                                velocity=velocity,
+                                confidence=float(
+                                    np.mean(
+                                        voiced_probs[max(0, i - len(note_pitches)) : i]
+                                    )
+                                ),
+                            )
+                        )
 
                     note_start = None
                     note_pitches = []
@@ -418,13 +425,15 @@ class AudioToMIDIAgent(BaseAgent):
             midi_note = int(np.round(librosa.hz_to_midi(median_hz)))
 
             if 0 <= midi_note <= 127:
-                notes.append(MIDINote(
-                    pitch=midi_note,
-                    start_time=note_start,
-                    duration=times[-1] - note_start,
-                    velocity=64,
-                    confidence=0.8
-                ))
+                notes.append(
+                    MIDINote(
+                        pitch=midi_note,
+                        start_time=note_start,
+                        duration=times[-1] - note_start,
+                        velocity=64,
+                        confidence=0.8,
+                    )
+                )
 
         return notes
 
@@ -434,7 +443,7 @@ class AudioToMIDIAgent(BaseAgent):
         times: np.ndarray,
         onset_times: np.ndarray,
         audio: np.ndarray,
-        sr: int
+        sr: int,
     ) -> List[MIDINote]:
         """Extract MIDI notes from chromagram (polyphonic)"""
         notes = []
@@ -487,18 +496,26 @@ class AudioToMIDIAgent(BaseAgent):
                             note_audio = audio[start_frame:end_frame]
 
                             if len(note_audio) > 0:
-                                velocity = int(np.clip(np.sqrt(np.mean(note_audio ** 2)) * 127 * 10, 1, 127))
+                                velocity = int(
+                                    np.clip(
+                                        np.sqrt(np.mean(note_audio**2)) * 127 * 10,
+                                        1,
+                                        127,
+                                    )
+                                )
                             else:
                                 velocity = 64
 
                             if 0 <= midi_note <= 127:
-                                notes.append(MIDINote(
-                                    pitch=midi_note,
-                                    start_time=start_time,
-                                    duration=duration,
-                                    velocity=velocity,
-                                    confidence=0.7
-                                ))
+                                notes.append(
+                                    MIDINote(
+                                        pitch=midi_note,
+                                        start_time=start_time,
+                                        duration=duration,
+                                        velocity=velocity,
+                                        confidence=0.7,
+                                    )
+                                )
 
                     del active_notes[pitch_class]
 
@@ -511,13 +528,15 @@ class AudioToMIDIAgent(BaseAgent):
                     if duration > 0.05:
                         midi_note = pitch_class + (octave * 12)
                         if 0 <= midi_note <= 127:
-                            notes.append(MIDINote(
-                                pitch=midi_note,
-                                start_time=start_time,
-                                duration=duration,
-                                velocity=64,
-                                confidence=0.6
-                            ))
+                            notes.append(
+                                MIDINote(
+                                    pitch=midi_note,
+                                    start_time=start_time,
+                                    duration=duration,
+                                    velocity=64,
+                                    confidence=0.6,
+                                )
+                            )
 
         return notes
 
@@ -535,12 +554,14 @@ class AudioToMIDIAgent(BaseAgent):
             chroma = librosa.feature.chroma_cqt(y=audio, sr=sr)
             chroma_mean = np.mean(chroma, axis=1)
             key_idx = np.argmax(chroma_mean)
-            keys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+            keys = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
             return f"{keys[key_idx]} major"
         except:
             return "C major"
 
-    def _estimate_accuracy(self, notes: List[MIDINote], voiced_probs: np.ndarray) -> float:
+    def _estimate_accuracy(
+        self, notes: List[MIDINote], voiced_probs: np.ndarray
+    ) -> float:
         """Estimate transcription accuracy"""
         if len(notes) == 0:
             return 0.0
@@ -553,7 +574,9 @@ class AudioToMIDIAgent(BaseAgent):
 
         return float((avg_confidence + avg_voicing) / 2)
 
-    def _estimate_accuracy_polyphonic(self, notes: List[MIDINote], chroma: np.ndarray) -> float:
+    def _estimate_accuracy_polyphonic(
+        self, notes: List[MIDINote], chroma: np.ndarray
+    ) -> float:
         """Estimate polyphonic transcription accuracy"""
         if len(notes) == 0:
             return 0.0
@@ -566,29 +589,33 @@ class AudioToMIDIAgent(BaseAgent):
 
         return float(min(1.0, (avg_confidence + avg_energy) / 2))
 
-    def _transcription_to_dict(self, transcription: MIDITranscription) -> Dict[str, Any]:
+    def _transcription_to_dict(
+        self, transcription: MIDITranscription
+    ) -> Dict[str, Any]:
         """Convert transcription to dictionary"""
         return {
-            'notes': [
+            "notes": [
                 {
-                    'pitch': note.pitch,
-                    'start_time': float(note.start_time),
-                    'duration': float(note.duration),
-                    'velocity': note.velocity,
-                    'confidence': float(note.confidence)
+                    "pitch": note.pitch,
+                    "start_time": float(note.start_time),
+                    "duration": float(note.duration),
+                    "velocity": note.velocity,
+                    "confidence": float(note.confidence),
                 }
                 for note in transcription.notes
             ],
-            'tempo_bpm': float(transcription.tempo_bpm),
-            'time_signature': transcription.time_signature,
-            'key': transcription.key,
-            'track_name': transcription.track_name,
-            'instrument_type': transcription.instrument_type,
-            'polyphony_detected': transcription.polyphony_detected,
-            'accuracy_estimate': float(transcription.accuracy_estimate)
+            "tempo_bpm": float(transcription.tempo_bpm),
+            "time_signature": transcription.time_signature,
+            "key": transcription.key,
+            "track_name": transcription.track_name,
+            "instrument_type": transcription.instrument_type,
+            "polyphony_detected": transcription.polyphony_detected,
+            "accuracy_estimate": float(transcription.accuracy_estimate),
         }
 
-    def create_midi_file(self, transcription: MIDITranscription, output_path: str) -> bool:
+    def create_midi_file(
+        self, transcription: MIDITranscription, output_path: str
+    ) -> bool:
         """Create a MIDI file from transcription"""
         try:
             midi = pretty_midi.PrettyMIDI(initial_tempo=transcription.tempo_bpm)
@@ -603,7 +630,7 @@ class AudioToMIDIAgent(BaseAgent):
                     velocity=note.velocity,
                     pitch=note.pitch,
                     start=note.start_time,
-                    end=note.start_time + note.duration
+                    end=note.start_time + note.duration,
                 )
                 instrument.notes.append(midi_note)
 
@@ -621,15 +648,15 @@ class AudioToMIDIAgent(BaseAgent):
     def _get_midi_program(self, instrument_type: str) -> int:
         """Get MIDI program number for instrument type"""
         program_map = {
-            'piano': 0,
-            'guitar': 24,
-            'bass': 32,
-            'violin': 40,
-            'trumpet': 56,
-            'saxophone': 64,
-            'flute': 73,
-            'synth': 80,
-            'vocals': 53,
-            'drums': 0  # Channel 10
+            "piano": 0,
+            "guitar": 24,
+            "bass": 32,
+            "violin": 40,
+            "trumpet": 56,
+            "saxophone": 64,
+            "flute": 73,
+            "synth": 80,
+            "vocals": 53,
+            "drums": 0,  # Channel 10
         }
         return program_map.get(instrument_type.lower(), 0)
