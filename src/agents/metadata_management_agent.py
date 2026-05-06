@@ -784,17 +784,20 @@ class MetadataManagementAgent(BaseAgent):
             cursor = conn.cursor()
 
             # Create metadata table
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS metadata (
                     checksum TEXT PRIMARY KEY,
                     filename TEXT,
                     data TEXT,
                     created_at TEXT
                 )
-            """)
+            """
+            )
 
             # Create projects table
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS projects (
                     project_id TEXT PRIMARY KEY,
                     project_name TEXT,
@@ -802,10 +805,12 @@ class MetadataManagementAgent(BaseAgent):
                     created_at TEXT,
                     modified_at TEXT
                 )
-            """)
+            """
+            )
 
             # Create versions table
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS versions (
                     version_id TEXT PRIMARY KEY,
                     project_id TEXT,
@@ -813,7 +818,8 @@ class MetadataManagementAgent(BaseAgent):
                     data TEXT,
                     created_at TEXT
                 )
-            """)
+            """
+            )
 
             conn.commit()
             conn.close()

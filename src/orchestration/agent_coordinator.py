@@ -15,7 +15,6 @@ from ..core import (
     get_agent_registry,
     get_message_bus,
     AgentState,
-    AgentFactory,
 )
 
 logger = logging.getLogger(__name__)
@@ -137,6 +136,10 @@ class AgentCoordinator:
 
     def _create_core_agents(self):
         """Create and register core system agents using AgentFactory"""
+        from ..core.agent_factory import (
+            AgentFactory,
+        )  # deferred to break circular import
+
         agent_types = [
             "audio_enhancement",
             "content_generation",

@@ -5,7 +5,10 @@ Uses Locust for simulating concurrent users and measuring API performance.
 Run with: locust -f tests/performance/load_test.py --host=http://localhost:8000
 """
 
-from locust import HttpUser, task, between, events
+import pytest
+
+locust = pytest.importorskip("locust", reason="locust not installed")
+from locust import HttpUser, task, between, events  # noqa: E402
 import random
 import json
 import base64
@@ -247,7 +250,8 @@ def on_test_stop(environment, **kwargs):
 
 
 if __name__ == "__main__":
-    print("""
+    print(
+        """
 MAAPS Load Testing Suite
 ========================
 
@@ -269,4 +273,5 @@ Example:
     --run-time 3m \\
     --headless \\
     --csv=results/load_test
-""")
+"""
+    )
