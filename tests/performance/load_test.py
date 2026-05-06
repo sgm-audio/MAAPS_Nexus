@@ -5,7 +5,10 @@ Uses Locust for simulating concurrent users and measuring API performance.
 Run with: locust -f tests/performance/load_test.py --host=http://localhost:8000
 """
 
-from locust import HttpUser, task, between, events
+import pytest
+
+locust = pytest.importorskip("locust", reason="locust not installed")
+from locust import HttpUser, task, between, events  # noqa: E402
 import random
 import json
 import base64
