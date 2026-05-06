@@ -88,3 +88,10 @@ __all__ = [
     "AudioProcessingException",
     "ErrorSeverity",
 ]
+
+# Deferred import to avoid circular dependency
+def __getattr__(name):
+    if name == "AgentFactory":
+        from .agent_factory import AgentFactory
+        return AgentFactory
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
