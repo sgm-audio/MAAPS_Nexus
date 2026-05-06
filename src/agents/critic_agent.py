@@ -1,479 +1,525 @@
 """
-Critic Agent for Multi-Agent Audio Processing System (MAAPS)
+Critic Agent - Audio Quality Judge
 
-The Critic is the evaluator that judges audio quality based on the ontology.
-It predicts user satisfaction and provides reward signals for RL agents.
-
-This is the FIRST agent to build - before the EQ and Dynamics agents can learn,
-they need feedback from the Critic.
+This agent predicts user satisfaction with audio quality by analyzing
+audio features and mapping them to the audio ontology. It serves as
+the reward function for reinforcement learning agents.
 """
 
-import ray
 import numpy as np
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from typing import Dict, List, Optional, Tuple
+import librosa
+from typing import Dict, Any, List, Tuple, Optional
 import logging
 from dataclasses import dataclass
-import librosa
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
-from src.core.audio_ontology import (
-    AudioState,
-    AudioGoal,
-    AudioAttribute,
-    AudioOntologyManager,
-)
+from src.core.base_agent import BaseAgent, AgentCapability
+from src.core.audio_ontology import get_audio_ontology, AudioOntology, FrequencyRange
+from src.core.types import Message, MessageType
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class CriticEvaluation:
-    """Result of critic evaluation."""
+class AudioFeatures:
+    """Extracted audio features for critic analysis"""
+    # Spectral features
+    spectral_centroid: float = 0.0
+    spectral_rolloff: float = 0.0
+    spectral_bandwidth: float = 0.0
+    spectral_flatness: float = 0.0
 
-    satisfaction_score: float  # Overall score 0-1
-    attribute_scores: Dict[AudioAttribute, float]  # Individual attribute scores
-    reward: float  # RL reward signal (-1 to 1)
-    confidence: float  # Confidence in evaluation
-    feedback: str  # Human-readable feedback
+    # Energy features by frequency band
+    sub_bass_energy: float = 0.0
+    bass_energy: float = 0.0
+    low_mid_energy: float = 0.0
+    mid_energy: float = 0.0
+    high_mid_energy: float = 0.0
+    presence_energy: float = 0.0
+    brilliance_energy: float = 0.0
+
+    # Dynamic features
+    rms_energy: float = 0.0
+    dynamic_range: float = 0.0
+    crest_factor: float = 0.0
+
+    # Temporal features
+    zero_crossing_rate: float = 0.0
+    tempo: float = 0.0
+
+    # Harmonic features
+    harmonic_ratio: float = 0.0
+
+    def to_vector(self) -> np.ndarray:
+        """Convert features to numpy vector"""
+        return np.array([
+            self.spectral_centroid,
+            self.spectral_rolloff,
+            self.spectral_bandwidth,
+            self.spectral_flatness,
+            self.sub_bass_energy,
+            self.bass_energy,
+            self.low_mid_energy,
+            self.mid_energy,
+            self.high_mid_energy,
+            self.presence_energy,
+            self.brilliance_energy,
+            self.rms_energy,
+            self.dynamic_range,
+            self.crest_factor,
+            self.zero_crossing_rate,
+            self.tempo,
+            self.harmonic_ratio,
+        ])
+
+
+@dataclass
+class CriticJudgment:
+    """Critic's judgment of audio quality"""
+    satisfaction_score: float  # -1.0 to 1.0
+    detected_concepts: List[str]
+    positive_concepts: List[str]
+    negative_concepts: List[str]
+    frequency_balance: Dict[str, float]
+    suggested_corrections: Dict[str, List[Tuple[FrequencyRange, float]]]
+    confidence: float  # 0.0 to 1.0
 
 
 class CriticNetwork(nn.Module):
     """
-    Neural network for audio quality evaluation.
-    Takes audio features + ontology state -> satisfaction prediction.
+    Neural network for predicting audio satisfaction.
+
+    This is a simple feed-forward network that can be trained
+    to predict user satisfaction from audio features.
     """
 
-    def __init__(
-        self,
-        audio_feature_dim: int = 128,
-        ontology_dim: int = 20,
-        hidden_dim: int = 256,
-        num_layers: int = 3,
-    ):
-        super().__init__()
+    def __init__(self, input_dim: int = 17, hidden_dims: List[int] = [64, 32, 16]):
+        super(CriticNetwork, self).__init__()
 
-        self.audio_feature_dim = audio_feature_dim
-        self.ontology_dim = ontology_dim
+        layers = []
+        prev_dim = input_dim
 
-        # Audio feature encoder
-        self.audio_encoder = nn.Sequential(
-            nn.Linear(audio_feature_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.ReLU(),
+        for hidden_dim in hidden_dims:
+            layers.append(nn.Linear(prev_dim, hidden_dim))
+            layers.append(nn.ReLU())
+            layers.append(nn.Dropout(0.2))
+            prev_dim = hidden_dim
+
+        # Output layer: satisfaction score (-1 to 1)
+        layers.append(nn.Linear(prev_dim, 1))
+        layers.append(nn.Tanh())  # Output between -1 and 1
+
+        self.network = nn.Sequential(*layers)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through network"""
+        return self.network(x)
+
+
+class CriticAgent(BaseAgent):
+    """
+    Critic Agent that judges audio quality and predicts user satisfaction.
+
+    The Critic:
+    1. Extracts audio features from input audio
+    2. Maps features to ontology concepts
+    3. Predicts user satisfaction score
+    4. Suggests corrections for negative qualities
+    5. Can be trained to improve predictions
+    """
+
+    def __init__(self, agent_id: str, message_bus, config: Optional[Dict[str, Any]] = None):
+        capabilities = [
+            AgentCapability.AUDIO_ANALYSIS,
+            AgentCapability.MACHINE_LEARNING,
+        ]
+
+        super().__init__(
+            agent_id=agent_id,
+            agent_type="critic",
+            capabilities=capabilities,
+            message_bus=message_bus
         )
 
-        # Ontology state encoder
-        self.ontology_encoder = nn.Sequential(
-            nn.Linear(ontology_dim, hidden_dim // 2),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(hidden_dim // 2, hidden_dim // 4),
-            nn.ReLU(),
+        self.config = config or {}
+        self.ontology: AudioOntology = get_audio_ontology()
+
+        # Neural network for satisfaction prediction
+        self.network = CriticNetwork()
+        self.optimizer = torch.optim.Adam(self.network.parameters(), lr=0.001)
+
+        # Feature extraction parameters
+        self.sample_rate = self.config.get('sample_rate', 44100)
+        if self.sample_rate <= 0:
+            raise ValueError(
+                f"sample_rate must be positive (got {self.sample_rate})"
+            )
+        self.n_fft = self.config.get('n_fft', 2048)
+        self.hop_length = self.config.get('hop_length', 512)
+
+        # Training data — bounded ring buffer to prevent unbounded growth
+        # over long sessions. Override via config['max_training_samples'].
+        self.max_training_samples = self.config.get('max_training_samples', 10000)
+        from collections import deque as _deque
+        self.training_data: "_deque[Tuple[AudioFeatures, float]]" = _deque(
+            maxlen=self.max_training_samples
         )
 
-        # Combined evaluation network
-        combined_dim = (hidden_dim // 2) + (hidden_dim // 4)
-        self.evaluator = nn.Sequential(
-            nn.Linear(combined_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.ReLU(),
-            nn.Linear(hidden_dim // 2, 1),
-            nn.Sigmoid(),  # Output 0-1 satisfaction score
-        )
+        # Concept detection thresholds — caller may override the defaults
+        # by passing config['concept_thresholds'] = {...} (deep-merged).
+        self.concept_thresholds = self._initialize_thresholds()
+        override = self.config.get('concept_thresholds')
+        if override:
+            for concept, fields in override.items():
+                if concept in self.concept_thresholds:
+                    self.concept_thresholds[concept].update(fields)
+                else:
+                    self.concept_thresholds[concept] = dict(fields)
 
-        # Attribute-specific heads (optional, for detailed feedback)
-        self.attribute_heads = nn.ModuleDict(
-            {
-                attr.name: nn.Sequential(
-                    nn.Linear(combined_dim, 64),
-                    nn.ReLU(),
-                    nn.Linear(64, 1),
-                    nn.Sigmoid(),
-                )
-                for attr in AudioAttribute
-            }
-        )
+        logger.info(f"Critic agent {agent_id} initialized")
 
-    def forward(
-        self, audio_features: torch.Tensor, ontology_state: torch.Tensor
-    ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
-        """
-        Forward pass.
-
-        Args:
-            audio_features: (batch, audio_feature_dim)
-            ontology_state: (batch, ontology_dim)
-
-        Returns:
-            satisfaction_score: (batch, 1)
-            attribute_scores: Dict of (batch, 1) for each attribute
-        """
-        # Encode audio features
-        audio_encoded = self.audio_encoder(audio_features)
-
-        # Encode ontology state
-        ontology_encoded = self.ontology_encoder(ontology_state)
-
-        # Combine
-        combined = torch.cat([audio_encoded, ontology_encoded], dim=-1)
-
-        # Overall satisfaction
-        satisfaction = self.evaluator(combined)
-
-        # Attribute-specific scores
-        attribute_scores = {
-            name: head(combined) for name, head in self.attribute_heads.items()
+    def _initialize_thresholds(self) -> Dict[str, Dict[str, float]]:
+        """Initialize concept detection thresholds"""
+        return {
+            "mud": {
+                "low_mid_energy": 0.7,  # High low-mid energy indicates mud
+                "clarity_threshold": 0.3,  # Low clarity indicates mud
+            },
+            "harshness": {
+                "high_mid_energy": 0.8,  # High high-mid energy
+                "presence_energy": 0.8,  # High presence energy
+            },
+            "boominess": {
+                "bass_energy": 0.8,  # Excessive bass
+                "dynamic_range": 0.2,  # Low dynamic range
+            },
+            "clarity": {
+                "spectral_centroid": 3000,  # Higher centroid = more clarity
+                "high_mid_energy": 0.5,  # Adequate high-mid energy
+            },
+            "warmth": {
+                "bass_energy": 0.5,  # Good bass presence
+                "low_mid_energy": 0.5,  # Good low-mid presence
+            },
         }
 
-        return satisfaction, attribute_scores
-
-
-@ray.remote
-class CriticAgent:
-    """
-    Ray actor for the Critic agent.
-    Evaluates audio quality and provides rewards for RL training.
-    """
-
-    def __init__(
-        self,
-        model_path: Optional[str] = None,
-        device: str = "cpu",
-        learning_rate: float = 1e-4,
-        ontology: Optional[AudioOntologyManager] = None,
-    ):
+    def extract_features(self, audio: np.ndarray, sr: int = None) -> AudioFeatures:
         """
-        Initialize Critic agent.
+        Extract comprehensive audio features for critic analysis.
 
         Args:
-            model_path: Path to pre-trained model (None to train from scratch)
-            device: "cpu" or "cuda"
-            learning_rate: Learning rate for training
-            ontology: Ontology manager
-        """
-        self.device = torch.device(device)
-        self.ontology = ontology or AudioOntologyManager()
-
-        # Initialize network
-        self.model = CriticNetwork().to(self.device)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
-        self.criterion = nn.MSELoss()
-
-        # Load pre-trained model if provided
-        if model_path:
-            self.load_model(model_path)
-
-        # Training history
-        self.training_history = []
-
-        logger.info("Critic agent initialized")
-
-    def extract_audio_features(self, audio: np.ndarray, sr: int = 44100) -> np.ndarray:
-        """
-        Extract audio features for the critic network.
-
-        Args:
-            audio: Audio signal (mono, normalized)
-            sr: Sample rate
+            audio: Audio signal as numpy array
+            sr: Sample rate (uses default if None)
 
         Returns:
-            Feature vector (128-dim)
+            AudioFeatures object
         """
-        # Extract spectral features
-        spectral_centroid = librosa.feature.spectral_centroid(y=audio, sr=sr)[0]
-        spectral_rolloff = librosa.feature.spectral_rolloff(y=audio, sr=sr)[0]
-        spectral_bandwidth = librosa.feature.spectral_bandwidth(y=audio, sr=sr)[0]
-        zero_crossing_rate = librosa.feature.zero_crossing_rate(audio)[0]
+        if sr is None:
+            sr = self.sample_rate
 
-        # Extract MFCCs
-        mfccs = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=20)
+        features = AudioFeatures()
 
-        # Extract chroma
-        chroma = librosa.feature.chroma_stft(y=audio, sr=sr)
+        try:
+            # Spectral features
+            spectral_centroids = librosa.feature.spectral_centroid(
+                y=audio, sr=sr, n_fft=self.n_fft, hop_length=self.hop_length
+            )[0]
+            features.spectral_centroid = np.mean(spectral_centroids) / sr  # Normalize
 
-        # Extract RMS energy
-        rms = librosa.feature.rms(y=audio)[0]
+            spectral_rolloff = librosa.feature.spectral_rolloff(
+                y=audio, sr=sr, n_fft=self.n_fft, hop_length=self.hop_length
+            )[0]
+            features.spectral_rolloff = np.mean(spectral_rolloff) / sr
 
-        # Aggregate features
-        features = np.concatenate(
-            [
-                np.mean(spectral_centroid, keepdims=True),
-                np.std(spectral_centroid, keepdims=True),
-                np.mean(spectral_rolloff, keepdims=True),
-                np.std(spectral_rolloff, keepdims=True),
-                np.mean(spectral_bandwidth, keepdims=True),
-                np.std(spectral_bandwidth, keepdims=True),
-                np.mean(zero_crossing_rate, keepdims=True),
-                np.std(zero_crossing_rate, keepdims=True),
-                np.mean(mfccs, axis=1),  # 20 dims
-                np.std(mfccs, axis=1),  # 20 dims
-                np.mean(chroma, axis=1),  # 12 dims
-                np.std(chroma, axis=1),  # 12 dims
-                np.mean(rms, keepdims=True),
-                np.std(rms, keepdims=True),
-            ]
-        )
+            spectral_bandwidth = librosa.feature.spectral_bandwidth(
+                y=audio, sr=sr, n_fft=self.n_fft, hop_length=self.hop_length
+            )[0]
+            features.spectral_bandwidth = np.mean(spectral_bandwidth) / sr
 
-        # Pad to 128 dims if needed
-        if len(features) < 128:
-            features = np.pad(features, (0, 128 - len(features)), mode="constant")
-        else:
-            features = features[:128]
+            spectral_flatness = librosa.feature.spectral_flatness(
+                y=audio, n_fft=self.n_fft, hop_length=self.hop_length
+            )[0]
+            features.spectral_flatness = np.mean(spectral_flatness)
+
+            # Energy per frequency band
+            stft = np.abs(librosa.stft(audio, n_fft=self.n_fft, hop_length=self.hop_length))
+            frequencies = librosa.fft_frequencies(sr=sr, n_fft=self.n_fft)
+
+            def get_band_energy(low_freq, high_freq):
+                band_mask = (frequencies >= low_freq) & (frequencies < high_freq)
+                band_energy = np.mean(stft[band_mask, :])
+                return float(band_energy)
+
+            features.sub_bass_energy = get_band_energy(20, 60)
+            features.bass_energy = get_band_energy(60, 250)
+            features.low_mid_energy = get_band_energy(250, 500)
+            features.mid_energy = get_band_energy(500, 2000)
+            features.high_mid_energy = get_band_energy(2000, 4000)
+            features.presence_energy = get_band_energy(4000, 6000)
+            features.brilliance_energy = get_band_energy(6000, 20000)
+
+            # Normalize band energies
+            total_energy = (
+                features.sub_bass_energy + features.bass_energy
+                + features.low_mid_energy + features.mid_energy
+                + features.high_mid_energy + features.presence_energy
+                + features.brilliance_energy
+            )
+
+            if total_energy > 0:
+                features.sub_bass_energy /= total_energy
+                features.bass_energy /= total_energy
+                features.low_mid_energy /= total_energy
+                features.mid_energy /= total_energy
+                features.high_mid_energy /= total_energy
+                features.presence_energy /= total_energy
+                features.brilliance_energy /= total_energy
+
+            # Dynamic features
+            features.rms_energy = float(np.sqrt(np.mean(audio**2)))
+
+            # Dynamic range (difference between 95th and 5th percentile)
+            audio_db = librosa.amplitude_to_db(np.abs(audio), ref=np.max)
+            features.dynamic_range = float(np.percentile(audio_db, 95) - np.percentile(audio_db, 5))
+
+            # Crest factor (peak to RMS ratio)
+            peak = np.max(np.abs(audio))
+            if features.rms_energy > 0:
+                features.crest_factor = peak / features.rms_energy
+            else:
+                features.crest_factor = 0.0
+
+            # Temporal features
+            zcr = librosa.feature.zero_crossing_rate(audio, hop_length=self.hop_length)[0]
+            features.zero_crossing_rate = np.mean(zcr)
+
+            # Tempo
+            tempo, _ = librosa.beat.beat_track(y=audio, sr=sr)
+            features.tempo = float(tempo) / 200.0  # Normalize to 0-1 range (assuming max 200 BPM)
+
+            # Harmonic-percussive separation
+            y_harmonic, y_percussive = librosa.effects.hpss(audio)
+            harmonic_energy = np.sum(y_harmonic**2)
+            percussive_energy = np.sum(y_percussive**2)
+            total = harmonic_energy + percussive_energy
+            if total > 0:
+                features.harmonic_ratio = harmonic_energy / total
+            else:
+                features.harmonic_ratio = 0.5
+
+        except Exception as e:
+            logger.error(f"Error extracting features: {e}")
 
         return features
 
-    def evaluate(
-        self,
-        audio: np.ndarray,
-        current_state: AudioState,
-        goals: List[AudioGoal],
-        sr: int = 44100,
-    ) -> CriticEvaluation:
+    def detect_concepts(self, features: AudioFeatures) -> Tuple[List[str], List[str]]:
         """
-        Evaluate audio quality.
+        Detect audio concepts from features.
+
+        Returns:
+            Tuple of (positive_concepts, negative_concepts)
+        """
+        positive_concepts = []
+        negative_concepts = []
+
+        # Detect MUD
+        if (features.low_mid_energy > self.concept_thresholds["mud"]["low_mid_energy"]):
+            negative_concepts.append("mud")
+
+        # Detect HARSHNESS
+        if (
+            features.high_mid_energy > self.concept_thresholds["harshness"]["high_mid_energy"]
+            or features.presence_energy > self.concept_thresholds["harshness"]["presence_energy"]
+        ):
+            negative_concepts.append("harshness")
+
+        # Detect BOOMINESS
+        if (
+            features.bass_energy > self.concept_thresholds["boominess"]["bass_energy"]
+            and features.dynamic_range < self.concept_thresholds["boominess"]["dynamic_range"]
+        ):
+            negative_concepts.append("boominess")
+
+        # Detect CLARITY
+        clarity_centroid = self.concept_thresholds["clarity"]["spectral_centroid"] / self.sample_rate
+        if (
+            features.spectral_centroid > clarity_centroid
+            and features.high_mid_energy > self.concept_thresholds["clarity"]["high_mid_energy"]
+        ):
+            positive_concepts.append("clarity")
+
+        # Detect WARMTH
+        if (
+            features.bass_energy > self.concept_thresholds["warmth"]["bass_energy"]
+            and features.low_mid_energy > self.concept_thresholds["warmth"]["low_mid_energy"]
+            and "mud" not in negative_concepts
+        ):
+            positive_concepts.append("warmth")
+
+        # Detect BRIGHTNESS
+        if features.presence_energy > 0.3 or features.brilliance_energy > 0.2:
+            if "harshness" not in negative_concepts:
+                positive_concepts.append("brightness")
+
+        # Detect TIGHTNESS
+        if features.dynamic_range > 50 and features.bass_energy < 0.7:
+            positive_concepts.append("tightness")
+
+        # Detect DEPTH
+        if features.sub_bass_energy > 0.1:
+            positive_concepts.append("depth")
+
+        return positive_concepts, negative_concepts
+
+    def judge_audio(self, audio: np.ndarray, sr: int = None) -> CriticJudgment:
+        """
+        Judge audio quality and provide satisfaction score.
+
+        Args:
+            audio: Audio signal as numpy array
+            sr: Sample rate
+
+        Returns:
+            CriticJudgment with satisfaction score and analysis
+        """
+        # Extract features
+        features = self.extract_features(audio, sr)
+
+        # Detect concepts
+        positive_concepts, negative_concepts = self.detect_concepts(features)
+        all_concepts = positive_concepts + negative_concepts
+
+        # Predict satisfaction using neural network
+        feature_vector = torch.FloatTensor(features.to_vector()).unsqueeze(0)
+        with torch.no_grad():
+            nn_satisfaction = self.network(feature_vector).item()
+
+        # Also use ontology-based prediction
+        ontology_satisfaction = self.ontology.predict_satisfaction(all_concepts)
+
+        # Combine both predictions (weighted average)
+        satisfaction_score = 0.6 * nn_satisfaction + 0.4 * ontology_satisfaction
+
+        # Calculate confidence based on agreement
+        confidence = 1.0 - abs(nn_satisfaction - ontology_satisfaction) / 2.0
+
+        # Get frequency balance
+        frequency_balance = {
+            "sub_bass": features.sub_bass_energy,
+            "bass": features.bass_energy,
+            "low_mids": features.low_mid_energy,
+            "mids": features.mid_energy,
+            "high_mids": features.high_mid_energy,
+            "presence": features.presence_energy,
+            "brilliance": features.brilliance_energy,
+        }
+
+        # Get suggested corrections
+        suggested_corrections = self.ontology.suggest_corrections(negative_concepts)
+
+        judgment = CriticJudgment(
+            satisfaction_score=satisfaction_score,
+            detected_concepts=all_concepts,
+            positive_concepts=positive_concepts,
+            negative_concepts=negative_concepts,
+            frequency_balance=frequency_balance,
+            suggested_corrections=suggested_corrections,
+            confidence=confidence,
+        )
+
+        logger.info(
+            f"Critic judgment: satisfaction={satisfaction_score:.3f}, "
+            f"confidence={confidence:.3f}, concepts={all_concepts}"
+        )
+
+        return judgment
+
+    def train_on_feedback(self, audio: np.ndarray, user_satisfaction: float, sr: int = None):
+        """
+        Train the critic network on user feedback.
 
         Args:
             audio: Audio signal
-            current_state: Current ontology state
-            goals: Target goals
+            user_satisfaction: User-provided satisfaction score (-1.0 to 1.0)
             sr: Sample rate
-
-        Returns:
-            CriticEvaluation with scores and reward
         """
-        # Extract features
-        audio_features = self.extract_audio_features(audio, sr)
-        ontology_vector = current_state.to_vector()
+        features = self.extract_features(audio, sr)
+        self.training_data.append((features, user_satisfaction))
 
-        # Prepare tensors
-        audio_tensor = torch.FloatTensor(audio_features).unsqueeze(0).to(self.device)
-        ontology_tensor = (
-            torch.FloatTensor(ontology_vector).unsqueeze(0).to(self.device)
-        )
+        # Train on batch if we have enough data
+        if len(self.training_data) >= 32:
+            self._train_batch()
 
-        # Get prediction
-        self.model.eval()
-        with torch.no_grad():
-            satisfaction_pred, attribute_preds = self.model(
-                audio_tensor, ontology_tensor
-            )
+    def _train_batch(self):
+        """Train network on accumulated training data"""
+        if len(self.training_data) < 8:
+            return
 
-        satisfaction_score = satisfaction_pred.item()
+        # Prepare batch
+        batch_size = min(32, len(self.training_data))
+        batch_indices = np.random.choice(len(self.training_data), batch_size, replace=False)
 
-        # Convert attribute predictions
-        attribute_scores = {
-            AudioAttribute[name]: pred.item() for name, pred in attribute_preds.items()
-        }
+        features_batch = []
+        labels_batch = []
 
-        # Calculate reward signal for RL
-        # Reward is based on satisfaction improvement and goal achievement
-        goal_satisfaction = self.ontology.estimate_satisfaction_score(
-            current_state, goals
-        )
-        reward = (satisfaction_score + goal_satisfaction) / 2.0
-        reward = (reward - 0.5) * 2.0  # Scale to [-1, 1]
+        for idx in batch_indices:
+            features, satisfaction = self.training_data[idx]
+            features_batch.append(features.to_vector())
+            labels_batch.append(satisfaction)
 
-        # Generate feedback
-        feedback = self._generate_feedback(satisfaction_score, attribute_scores, goals)
+        features_tensor = torch.FloatTensor(np.array(features_batch))
+        labels_tensor = torch.FloatTensor(labels_batch).unsqueeze(1)
 
-        # Calculate confidence based on evaluation consistency
-        confidence = self._calculate_confidence(
-            satisfaction_score, attribute_scores, goals
-        )
-
-        return CriticEvaluation(
-            satisfaction_score=satisfaction_score,
-            attribute_scores=attribute_scores,
-            reward=reward,
-            confidence=confidence,
-            feedback=feedback,
-        )
-
-    def _generate_feedback(
-        self,
-        satisfaction: float,
-        attribute_scores: Dict[AudioAttribute, float],
-        goals: List[AudioGoal],
-    ) -> str:
-        """Generate human-readable feedback."""
-        feedback_parts = [f"Satisfaction: {satisfaction:.2f}"]
-
-        # Find areas needing improvement
-        issues = []
-        for goal in goals:
-            attr_score = attribute_scores.get(goal.attribute, 0.5)
-            if abs(attr_score - goal.target_value) > goal.tolerance:
-                if attr_score < goal.target_value:
-                    issues.append(f"Need more {goal.attribute.name}")
-                else:
-                    issues.append(f"Too much {goal.attribute.name}")
-
-        if issues:
-            feedback_parts.append("Issues: " + ", ".join(issues))
-
-        return " | ".join(feedback_parts)
-
-    def _calculate_confidence(
-        self,
-        satisfaction_score: float,
-        attribute_scores: Dict[AudioAttribute, float],
-        goals: List[AudioGoal],
-    ) -> float:
-        """
-        Calculate confidence based on evaluation consistency and goal alignment.
-
-        Args:
-            satisfaction_score: Overall satisfaction score
-            attribute_scores: Individual attribute scores
-            goals: List of audio goals
-
-        Returns:
-            Confidence score between 0.0 and 1.0
-        """
-        # Base confidence from score consistency
-        if not attribute_scores:
-            return 0.5
-
-        # Calculate variance in attribute scores
-        score_values = list(attribute_scores.values())
-        score_variance = np.var(score_values)
-        consistency_confidence = max(0.0, 1.0 - score_variance * 2.0)
-
-        # Calculate goal alignment confidence
-        if goals:
-            goal_confidence = 0.0
-            for goal in goals:
-                attr_score = attribute_scores.get(goal.attribute, 0.5)
-                # Higher confidence when scores are closer to goals
-                distance = abs(attr_score - goal.target_value)
-                if distance <= goal.tolerance:
-                    goal_confidence += 1.0 - (distance / goal.tolerance)
-                else:
-                    goal_confidence += max(0.0, 0.5 - (distance - goal.tolerance))
-
-            goal_confidence = min(1.0, goal_confidence / len(goals))
-        else:
-            goal_confidence = 0.7  # Default if no goals
-
-        # Weighted combination
-        final_confidence = consistency_confidence * 0.4 + goal_confidence * 0.6
-
-        # Add satisfaction score influence
-        final_confidence = final_confidence * 0.8 + satisfaction_score * 0.2
-
-        # Ensure bounds
-        return max(0.1, min(1.0, final_confidence))
-
-    def train_step(
-        self,
-        audio_batch: List[np.ndarray],
-        ontology_batch: List[AudioState],
-        satisfaction_labels: List[float],
-        sr: int = 44100,
-    ) -> float:
-        """
-        Perform one training step.
-
-        Args:
-            audio_batch: List of audio samples
-            ontology_batch: List of ontology states
-            satisfaction_labels: Ground truth satisfaction scores (from user feedback)
-            sr: Sample rate
-
-        Returns:
-            Loss value
-        """
-        # Extract features
-        audio_features = np.stack(
-            [self.extract_audio_features(audio, sr) for audio in audio_batch]
-        )
-        ontology_vectors = np.stack([state.to_vector() for state in ontology_batch])
-
-        # Prepare tensors
-        audio_tensor = torch.FloatTensor(audio_features).to(self.device)
-        ontology_tensor = torch.FloatTensor(ontology_vectors).to(self.device)
-        labels = torch.FloatTensor(satisfaction_labels).unsqueeze(-1).to(self.device)
-
-        # Forward pass
-        self.model.train()
-        satisfaction_pred, _ = self.model(audio_tensor, ontology_tensor)
-
-        # Compute loss
-        loss = self.criterion(satisfaction_pred, labels)
-
-        # Backward pass
+        # Training step
+        self.network.train()
         self.optimizer.zero_grad()
+
+        predictions = self.network(features_tensor)
+        loss = F.mse_loss(predictions, labels_tensor)
+
         loss.backward()
         self.optimizer.step()
 
-        loss_value = loss.item()
-        self.training_history.append(loss_value)
+        logger.info(f"Critic trained on batch: loss={loss.item():.4f}")
 
-        return loss_value
+    def handle_message(self, message: Message) -> Any:
+        """Handle incoming messages"""
+        try:
+            if message.message_type == MessageType.AUDIO_ANALYSIS_REQUEST:
+                audio = message.payload.get('audio')
+                sr = message.payload.get('sample_rate', self.sample_rate)
 
-    def save_model(self, path: str):
-        """Save model checkpoint."""
-        torch.save(
-            {
-                "model_state_dict": self.model.state_dict(),
-                "optimizer_state_dict": self.optimizer.state_dict(),
-                "training_history": self.training_history,
-            },
-            path,
-        )
-        logger.info(f"Saved critic model to {path}")
+                judgment = self.judge_audio(audio, sr)
 
-    def load_model(self, path: str):
-        """Load model checkpoint."""
-        checkpoint = torch.load(path, map_location=self.device)
-        self.model.load_state_dict(checkpoint["model_state_dict"])
-        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        self.training_history = checkpoint.get("training_history", [])
-        logger.info(f"Loaded critic model from {path}")
+                return {
+                    'status': 'success',
+                    'judgment': {
+                        'satisfaction_score': judgment.satisfaction_score,
+                        'confidence': judgment.confidence,
+                        'positive_concepts': judgment.positive_concepts,
+                        'negative_concepts': judgment.negative_concepts,
+                        'frequency_balance': judgment.frequency_balance,
+                        'suggested_corrections': [
+                            {
+                                'concept': concept,
+                                'adjustments': [(fr.name, db) for fr, db in adjustments]
+                            }
+                            for concept, adjustments in judgment.suggested_corrections.items()
+                        ]
+                    }
+                }
 
-    def get_training_stats(self) -> Dict:
-        """Get training statistics."""
-        if not self.training_history:
-            return {"error": "No training history"}
+            elif message.message_type == MessageType.TRAINING_DATA:
+                audio = message.payload.get('audio')
+                satisfaction = message.payload.get('satisfaction')
+                sr = message.payload.get('sample_rate', self.sample_rate)
 
-        return {
-            "total_steps": len(self.training_history),
-            "latest_loss": self.training_history[-1],
-            "average_loss_last_100": np.mean(self.training_history[-100:]),
-            "min_loss": min(self.training_history),
-        }
+                self.train_on_feedback(audio, satisfaction, sr)
 
+                return {'status': 'success', 'message': 'Training data received'}
 
-def create_critic_agent(**kwargs) -> ray.ObjectRef:
-    """Convenience function to create a Critic agent."""
-    return CriticAgent.remote(**kwargs)
-
-
-if __name__ == "__main__":
-    # Example usage
-    import ray
-    from ..core.audio_ontology import create_clarity_goal, create_reduce_mud_goal
-
-    ray.init(ignore_reinit_error=True)
-
-    # Create critic agent
-    critic = CriticAgent.remote()
-
-    # Generate dummy audio
-    dummy_audio = np.random.randn(44100 * 2)  # 2 seconds
-    dummy_state = AudioState()
-    dummy_state.set_attribute(AudioAttribute.CLARITY, 0.5)
-    dummy_goals = [create_clarity_goal(), create_reduce_mud_goal()]
-
-    # Evaluate
-    evaluation = ray.get(critic.evaluate.remote(dummy_audio, dummy_state, dummy_goals))
-
-    print("Evaluation:", evaluation)
-
-    ray.shutdown()
+        except Exception as e:
+            logger.error(f"Error handling message: {e}")
+            return {'status': 'error', 'message': str(e)}

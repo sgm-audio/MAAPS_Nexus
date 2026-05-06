@@ -7,9 +7,8 @@ lifecycle management, and monitoring.
 import threading
 import time
 import logging
-from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any, Callable
-from datetime import datetime
+from abc import ABC
+from typing import List, Optional, Dict, Any
 from enum import Enum
 
 from .message_bus import get_message_bus, MessageBus
@@ -29,29 +28,57 @@ class AgentState(Enum):
     ERROR = "error"
 
 
+class AgentCapability(Enum):
+    """Declared capabilities for agents in the multi-agent audio system."""
+    AUDIO_ANALYSIS = "audio_analysis"
+    AUDIO_PROCESSING = "audio_processing"
+    MACHINE_LEARNING = "machine_learning"
+    COORDINATION = "coordination"
+    DAW_INTEGRATION = "daw_integration"
+    MONITORING = "monitoring"
+
+
 class BaseAgent(ABC):
     """
     Base class for all agents in the system.
     Handles communication, lifecycle, and common functionality.
     """
 
-    def __init__(self, agent_id: str, agent_name: str):
+    def __init__(
+        self,
+        agent_id: str,
+        agent_name: Optional[str] = None,
+        agent_type: Optional[str] = None,
+        capabilities: Optional[List["AgentCapability"]] = None,
+        message_bus: Optional[MessageBus] = None,
+    ):
         """
         Initialize the agent.
 
         Args:
-            agent_id: Unique identifier for this agent
-            agent_name: Human-readable agent name
+            agent_id: Unique identifier for this agent.
+            agent_name: Human-readable agent name. Defaults to agent_id.
+            agent_type: Logical type ("critic", "eq", "dynamics", "hgo", ...).
+            capabilities: Declared capabilities (see AgentCapability).
+            message_bus: Optional message bus override. Falls back to the
+                process-wide singleton if not provided.
         """
         self.agent_id = agent_id
-        self.agent_name = agent_name
+        self.agent_name = agent_name or agent_id
+        self.agent_type = agent_type
+        self.capabilities = list(capabilities or [])
 
         # State management
         self._state = AgentState.CREATED
         self._state_lock = threading.Lock()
 
-        # Message bus
-        self._message_bus: MessageBus = get_message_bus()
+        # Message bus — accept an injected bus for testing; fall back to singleton
+        if message_bus is not None:
+            self._message_bus = message_bus
+        else:
+            self._message_bus = get_message_bus()
+        # Public alias used by the multi-agent core
+        self.message_bus = self._message_bus
 
         # Subscription management
         self._subscribed_topics: List[str] = []
@@ -72,33 +99,23 @@ class BaseAgent(ABC):
 
         logger.info(f"Agent {self.agent_id} ({self.agent_name}) created")
 
-    @abstractmethod
     def setup(self):
-        """
-        Setup the agent - override this method.
-        Called once during agent initialization.
-        Subscribe to topics and perform setup here.
-        """
-        pass
+        """Optional lifecycle hook. Override to subscribe to topics, etc."""
+        return None
 
-    @abstractmethod
     def teardown(self):
-        """
-        Teardown the agent - override this method.
-        Called once during agent shutdown.
-        Cleanup resources here.
-        """
-        pass
+        """Optional lifecycle hook. Override for resource cleanup."""
+        return None
 
-    @abstractmethod
     def handle_message(self, message: Message):
-        """
-        Handle an incoming message - override this method.
-        This is the main message processing logic for the agent.
+        """Default no-op message handler. Override for real behavior."""
+        return None
 
-        Args:
-            message: Incoming message
-        """
+    # ---- Compatibility re-declarations (non-abstract) ----
+    # The original BaseAgent declared these as abstract. We keep the
+    # method names available so subclasses can still override them, but
+    # we no longer prevent instantiation when they are not overridden.
+    def _abstract_setup_placeholder(self):
         pass
 
     def _set_state(self, new_state: AgentState, error: Optional[Exception] = None):

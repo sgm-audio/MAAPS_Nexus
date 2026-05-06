@@ -1,551 +1,681 @@
 """
-Dynamics/Compression Reinforcement Learning Agent for MAAPS
+Dynamics/Compression Reinforcement Learning Agent
 
-The Dynamics agent learns to adjust compression and dynamics processing through RL.
-It "fights" with the EQ agent - both trying to optimize audio quality, requiring
-the HGO coordinator to mediate conflicts.
-
-This is the SECOND action agent - now the agents compete!
+This agent learns to adjust dynamics processing (compression, limiting)
+to maximize audio quality as judged by the Critic agent. Works alongside
+(and sometimes conflicts with) the EQ agent.
 """
 
-import ray
 import numpy as np
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 import logging
 from dataclasses import dataclass
-import copy
+from collections import deque
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import random
 
-from src.core.audio_ontology import (
-    AudioState,
-    AudioGoal,
-    AudioAttribute,
-    AgentAction,
-    AudioOntologyManager,
-)
+from src.core.base_agent import BaseAgent, AgentCapability
+from src.core.types import Message, MessageType, Topics
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class DynamicsSettings:
-    """Settings for dynamics processing."""
+class DynamicsParameters:
+    """Parameters for dynamics processing"""
+    # Compressor parameters
+    threshold: float = -20.0  # dB (-60 to 0)
+    ratio: float = 4.0  # 1.0 to 20.0
+    attack_ms: float = 10.0  # 0.1 to 100 ms
+    release_ms: float = 100.0  # 10 to 1000 ms
+    knee_width: float = 6.0  # 0 to 12 dB
+    makeup_gain: float = 0.0  # 0 to 24 dB
 
-    threshold: float  # dB (-60 to 0)
-    ratio: float  # Compression ratio (1.0 to 20.0)
-    attack: float  # Attack time in ms (0.1 to 100)
-    release: float  # Release time in ms (10 to 1000)
-    knee: float  # Knee width in dB (0 to 20)
-    makeup_gain: float  # Makeup gain in dB (0 to 30)
-    dry_wet: float  # Mix (0 to 1)
+    # Limiter parameters
+    limiter_threshold: float = -0.3  # dB (-6 to 0)
+    limiter_release: float = 50.0  # ms
+
+    # Gate parameters (optional)
+    gate_threshold: float = -60.0  # dB (-80 to 0)
+    gate_enabled: bool = False
 
     def to_vector(self) -> np.ndarray:
-        """Convert to normalized vector."""
-        return np.array(
-            [
-                (self.threshold + 60) / 60,  # Normalize to [0, 1]
-                np.log10(self.ratio) / np.log10(20),  # Log scale
-                np.log10(self.attack) / np.log10(100),  # Log scale
-                np.log10(self.release) / np.log10(1000),  # Log scale
-                self.knee / 20,
-                self.makeup_gain / 30,
-                self.dry_wet,
-            ]
-        )
+        """Convert parameters to vector for RL"""
+        return np.array([
+            (self.threshold + 60) / 60,  # Normalize to 0-1
+            (self.ratio - 1) / 19,  # Normalize to 0-1
+            np.log10(self.attack_ms / 0.1) / 3,  # Log scale, normalized
+            np.log10(self.release_ms / 10) / 2,  # Log scale, normalized
+            self.knee_width / 12,
+            self.makeup_gain / 24,
+            (self.limiter_threshold + 6) / 6,
+            np.log10(self.limiter_release / 10) / 2,
+            float(self.gate_enabled),
+            (self.gate_threshold + 80) / 80,
+        ])
 
-    @staticmethod
-    def from_vector(vector: np.ndarray) -> "DynamicsSettings":
-        """Create DynamicsSettings from vector."""
-        return DynamicsSettings(
+    @classmethod
+    def from_vector(cls, vector: np.ndarray) -> 'DynamicsParameters':
+        """Create parameters from vector"""
+        return cls(
             threshold=vector[0] * 60 - 60,
-            ratio=10 ** (vector[1] * np.log10(20)),
-            attack=10 ** (vector[2] * np.log10(100)),
-            release=10 ** (vector[3] * np.log10(1000)),
-            knee=vector[4] * 20,
-            makeup_gain=vector[5] * 30,
-            dry_wet=np.clip(vector[6], 0, 1),
+            ratio=vector[1] * 19 + 1,
+            attack_ms=0.1 * (10 ** (vector[2] * 3)),
+            release_ms=10 * (10 ** (vector[3] * 2)),
+            knee_width=vector[4] * 12,
+            makeup_gain=vector[5] * 24,
+            limiter_threshold=vector[6] * 6 - 6,
+            limiter_release=10 * (10 ** (vector[7] * 2)),
+            gate_enabled=vector[8] > 0.5,
+            gate_threshold=vector[9] * 80 - 80,
         )
 
 
-class DynamicsActorNetwork(nn.Module):
-    """Actor network for dynamics control policy."""
-
-    def __init__(self, state_dim: int, action_dim: int = 7, hidden_dim: int = 256):
-        super().__init__()
-
-        self.network = nn.Sequential(
-            nn.Linear(state_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(hidden_dim, action_dim),
-            nn.Tanh(),  # Output in [-1, 1]
-        )
-
-    def forward(self, state: torch.Tensor) -> torch.Tensor:
-        return self.network(state)
-
-
-class DynamicsCriticNetwork(nn.Module):
-    """Critic network for Q-value estimation."""
-
-    def __init__(self, state_dim: int, action_dim: int = 7, hidden_dim: int = 256):
-        super().__init__()
-
-        # Twin critics
-        self.q1 = nn.Sequential(
-            nn.Linear(state_dim + action_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, 1),
-        )
-
-        self.q2 = nn.Sequential(
-            nn.Linear(state_dim + action_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, 1),
-        )
-
-    def forward(
-        self, state: torch.Tensor, action: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        x = torch.cat([state, action], dim=-1)
-        return self.q1(x), self.q2(x)
-
-    def q1_forward(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
-        x = torch.cat([state, action], dim=-1)
-        return self.q1(x)
-
-
-class DynamicsReplayBuffer:
-    """Replay buffer for dynamics agent."""
-
-    def __init__(self, max_size: int = 100000):
-        self.max_size = max_size
-        self.buffer = []
-        self.position = 0
-
-    def add(self, state, action, reward, next_state, done):
-        if len(self.buffer) < self.max_size:
-            self.buffer.append(None)
-        self.buffer[self.position] = (state, action, reward, next_state, done)
-        self.position = (self.position + 1) % self.max_size
-
-    def sample(self, batch_size: int):
-        indices = np.random.choice(len(self.buffer), batch_size, replace=False)
-        batch = [self.buffer[idx] for idx in indices]
-
-        states = np.array([item[0] for item in batch])
-        actions = np.array([item[1] for item in batch])
-        rewards = np.array([item[2] for item in batch])
-        next_states = np.array([item[3] for item in batch])
-        dones = np.array([item[4] for item in batch])
-
-        return states, actions, rewards, next_states, dones
-
-    def size(self):
-        return len(self.buffer)
-
-
-@ray.remote
-class DynamicsRLAgent:
+class DynamicsPolicyNetwork(nn.Module):
     """
-    Dynamics/Compression agent using TD3 reinforcement learning.
-    Learns to adjust compression parameters to maximize Critic satisfaction.
+    Policy network for dynamics processing.
 
-    This agent will compete with the EQ agent - both trying to improve audio,
-    potentially conflicting. The HGO coordinator will mediate.
+    Maps audio features to dynamics parameter adjustments.
     """
 
-    def __init__(
-        self,
-        sample_rate: int = 44100,
-        device: str = "cpu",
-        learning_rate: float = 3e-4,
-        gamma: float = 0.99,
-        tau: float = 0.005,
-        policy_noise: float = 0.2,
-        noise_clip: float = 0.5,
-        policy_delay: int = 2,
-        exploration_noise: float = 0.1,
-    ):
-        """
-        Initialize Dynamics RL agent.
+    def __init__(self, audio_feature_dim: int = 17, hidden_dim: int = 128):
+        super(DynamicsPolicyNetwork, self).__init__()
 
-        Args:
-            sample_rate: Audio sample rate
-            device: "cpu" or "cuda"
-            learning_rate: Learning rate
-            gamma: Discount factor
-            tau: Target network update rate
-            policy_noise: Noise for target policy smoothing
-            noise_clip: Max noise clip
-            policy_delay: Delay for policy updates
-            exploration_noise: Exploration noise std
-        """
-        self.sample_rate = sample_rate
-        self.device = torch.device(device)
+        self.action_dim = 10  # All dynamics parameters
+
+        # Encoder for audio features
+        self.feature_encoder = nn.Sequential(
+            nn.Linear(audio_feature_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.ReLU(),
+        )
+
+        # Policy head
+        self.policy_mean = nn.Linear(hidden_dim // 2, self.action_dim)
+        self.policy_log_std = nn.Parameter(torch.zeros(self.action_dim))
+
+        # Value head
+        self.value_head = nn.Linear(hidden_dim // 2, 1)
+
+    def forward(self, audio_features: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Forward pass - returns (action_mean, action_log_std)"""
+        features = self.feature_encoder(audio_features)
+        action_mean = torch.tanh(self.policy_mean(features))  # Bound to [-1, 1]
+        action_log_std = self.policy_log_std.expand_as(action_mean)
+        return action_mean, action_log_std
+
+    def get_value(self, audio_features: torch.Tensor) -> torch.Tensor:
+        """Get state value estimate"""
+        features = self.feature_encoder(audio_features)
+        return self.value_head(features)
+
+    def sample_action(self, audio_features: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Sample action from policy"""
+        action_mean, action_log_std = self.forward(audio_features)
+        action_std = action_log_std.exp()
+
+        normal = torch.distributions.Normal(action_mean, action_std)
+        action = normal.sample()
+        action = torch.clamp(action, -1.0, 1.0)
+
+        log_prob = normal.log_prob(action).sum(dim=-1)
+        value = self.get_value(audio_features)
+
+        return action, log_prob, value
+
+
+@dataclass
+class RLExperience:
+    """Single experience for RL training"""
+    audio_features: np.ndarray
+    action: np.ndarray
+    reward: float
+    next_audio_features: np.ndarray
+    done: bool
+    log_prob: float = 0.0
+    value: float = 0.0
+    # Filled in once the trajectory is complete via GAE
+    advantage: float = 0.0
+    return_: float = 0.0
+
+
+class DynamicsRLAgent(BaseAgent):
+    """
+    Dynamics/Compression Agent with Reinforcement Learning.
+
+    Learns to adjust dynamics parameters to maximize Critic satisfaction.
+    Works alongside EQ agent, sometimes cooperating, sometimes conflicting.
+    """
+
+    def __init__(self, agent_id: str, message_bus, critic_agent_id: str,
+                 config: Optional[Dict[str, Any]] = None):
+        capabilities = [
+            AgentCapability.AUDIO_PROCESSING,
+            AgentCapability.MACHINE_LEARNING,
+        ]
+
+        super().__init__(
+            agent_id=agent_id,
+            agent_type="dynamics_rl",
+            capabilities=capabilities,
+            message_bus=message_bus
+        )
+
+        self.config = config or {}
+        self.critic_agent_id = critic_agent_id
+
+        # Initialize dynamics parameters
+        self.current_params = DynamicsParameters()
+
+        # RL components
+        self.policy_network = DynamicsPolicyNetwork()
+        self.optimizer = torch.optim.Adam(self.policy_network.parameters(), lr=3e-4)
+
+        # Experience replay
+        self.replay_buffer: deque = deque(maxlen=10000)
+        self.episode_buffer: List[RLExperience] = []
 
         # RL hyperparameters
-        self.gamma = gamma
-        self.tau = tau
-        self.policy_noise = policy_noise
-        self.noise_clip = noise_clip
-        self.policy_delay = policy_delay
-        self.exploration_noise = exploration_noise
+        self.gamma = 0.99
+        self.gae_lambda = 0.95
+        self.clip_epsilon = 0.2
+        self.value_loss_coef = 0.5
+        self.entropy_coef = 0.01
+        self.batch_size = 64
+        self.update_epochs = 4
 
-        # State/action dimensions
-        # State: ontology vector (20) + current dynamics settings (7)
-        self.state_dim = 20 + 7
-        # Action: dynamics adjustments (7 parameters)
-        self.action_dim = 7
+        # Exploration
+        self.epsilon = 1.0
+        self.epsilon_decay = 0.995
+        self.epsilon_min = 0.1
 
-        # Initialize networks
-        self.actor = DynamicsActorNetwork(self.state_dim, self.action_dim).to(
-            self.device
-        )
-        self.actor_target = copy.deepcopy(self.actor)
-        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=learning_rate)
+        # Training statistics
+        self.episodes_trained = 0
+        self.total_reward = 0.0
+        self.best_reward = -float('inf')
+        self.best_params = None
 
-        self.critic = DynamicsCriticNetwork(self.state_dim, self.action_dim).to(
-            self.device
-        )
-        self.critic_target = copy.deepcopy(self.critic)
-        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=learning_rate)
+        # Audio processing
+        self.sample_rate = self.config.get('sample_rate', 44100)
 
-        # Replay buffer
-        self.replay_buffer = DynamicsReplayBuffer()
+        logger.info(f"Dynamics RL Agent {agent_id} initialized")
 
-        # Current dynamics settings
-        self.current_dynamics = self._initialize_dynamics()
-
-        # Training stats
-        self.total_steps = 0
-        self.training_history = []
-
-        # Ontology
-        self.ontology = AudioOntologyManager()
-
-        logger.info("Dynamics RL agent initialized")
-
-    def _initialize_dynamics(self) -> DynamicsSettings:
-        """Initialize with default/neutral dynamics settings."""
-        return DynamicsSettings(
-            threshold=-20.0,
-            ratio=2.0,
-            attack=10.0,
-            release=100.0,
-            knee=5.0,
-            makeup_gain=0.0,
-            dry_wet=0.5,
-        )
-
-    def apply_compressor(
-        self, audio: np.ndarray, settings: DynamicsSettings
-    ) -> np.ndarray:
+    def apply_dynamics(self, audio: np.ndarray, params: DynamicsParameters) -> np.ndarray:
         """
-        Apply compression to audio.
-
-        Simple feed-forward compressor implementation.
+        Apply dynamics processing to audio.
 
         Args:
-            audio: Input audio (mono)
-            settings: Compression settings
+            audio: Input audio signal
+            params: Dynamics parameters to apply
 
         Returns:
-            Compressed audio
+            Processed audio
         """
-        # Convert to dB
-        epsilon = 1e-10
-        audio_abs = np.abs(audio) + epsilon
-        audio_db = 20 * np.log10(audio_abs)
+        output = audio.copy()
 
-        # Compute gain reduction
-        gain_reduction = np.zeros_like(audio_db)
+        # Apply gate if enabled
+        if params.gate_enabled:
+            output = self._apply_gate(output, params.gate_threshold)
 
-        # Knee processing
-        for i, db in enumerate(audio_db):
-            if db < settings.threshold - settings.knee / 2:
-                # Below knee, no compression
-                gain_reduction[i] = 0
-            elif db > settings.threshold + settings.knee / 2:
-                # Above knee, full compression
-                over = db - settings.threshold
-                gain_reduction[i] = over * (1 - 1 / settings.ratio)
-            else:
-                # In knee, smooth transition
-                over = db - (settings.threshold - settings.knee / 2)
-                gain_reduction[i] = (
-                    over**2 / (2 * settings.knee) * (1 - 1 / settings.ratio)
-                )
+        # Apply compressor
+        output = self._apply_compressor(
+            output,
+            threshold=params.threshold,
+            ratio=params.ratio,
+            attack_ms=params.attack_ms,
+            release_ms=params.release_ms,
+            knee_width=params.knee_width,
+        )
 
-        # Simple envelope follower for attack/release
-        envelope = np.zeros_like(gain_reduction)
-        for i in range(1, len(gain_reduction)):
-            if gain_reduction[i] > envelope[i - 1]:
-                # Attack
-                attack_coef = 1 - np.exp(-1000 / (settings.attack * self.sample_rate))
-                envelope[i] = envelope[i - 1] + attack_coef * (
-                    gain_reduction[i] - envelope[i - 1]
-                )
-            else:
-                # Release
-                release_coef = 1 - np.exp(-1000 / (settings.release * self.sample_rate))
-                envelope[i] = envelope[i - 1] + release_coef * (
-                    gain_reduction[i] - envelope[i - 1]
-                )
+        # Apply makeup gain
+        if params.makeup_gain > 0:
+            gain_linear = 10 ** (params.makeup_gain / 20)
+            output = output * gain_linear
 
-        # Apply gain reduction
-        gain_linear = 10 ** (-(envelope - settings.makeup_gain) / 20)
-        compressed = audio * gain_linear
-
-        # Dry/wet mix
-        output = settings.dry_wet * compressed + (1 - settings.dry_wet) * audio
+        # Apply limiter
+        output = self._apply_limiter(
+            output,
+            threshold=params.limiter_threshold,
+            release_ms=params.limiter_release,
+        )
 
         return output
 
-    def select_action(
-        self, audio_state: AudioState, add_noise: bool = True
-    ) -> Tuple[np.ndarray, DynamicsSettings]:
+    def _apply_gate(self, audio: np.ndarray, threshold_db: float) -> np.ndarray:
+        """Apply noise gate"""
+        threshold_linear = 10 ** (threshold_db / 20)
+
+        # Simple gate: zero out samples below threshold
+        gated = audio.copy()
+        envelope = np.abs(audio)
+
+        # Smooth envelope
+        window_size = int(self.sample_rate * 0.01)  # 10ms window
+        if window_size > 0:
+            envelope = np.convolve(envelope, np.ones(window_size) / window_size, mode='same')
+
+        # Apply gate
+        mask = envelope > threshold_linear
+        gated = gated * mask
+
+        return gated
+
+    def _apply_compressor(self, audio: np.ndarray, threshold: float, ratio: float,
+                          attack_ms: float, release_ms: float, knee_width: float) -> np.ndarray:
         """
-        Select dynamics adjustment action.
+        Apply dynamic range compression.
 
-        Args:
-            audio_state: Current ontology state
-            add_noise: Add exploration noise
-
-        Returns:
-            action: Action vector
-            new_dynamics: New dynamics settings
+        Uses a feed-forward design with smooth gain reduction.
         """
-        # Construct state
-        ontology_vector = audio_state.to_vector()
-        dynamics_vector = self.current_dynamics.to_vector()
-        state = np.concatenate([ontology_vector, dynamics_vector])
+        # Convert to dB
+        epsilon = 1e-10
+        audio_db = 20 * np.log10(np.abs(audio) + epsilon)
 
-        # Get action from policy
-        state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.device)
-        self.actor.eval()
-        with torch.no_grad():
-            action = self.actor(state_tensor).cpu().numpy()[0]
+        # Calculate gain reduction
+        gain_reduction_db = np.zeros_like(audio_db)
 
-        # Add exploration noise
-        if add_noise:
-            noise = np.random.normal(0, self.exploration_noise, size=action.shape)
-            action = np.clip(action + noise, -1, 1)
+        for i, sample_db in enumerate(audio_db):
+            if knee_width > 0:
+                # Soft knee
+                if sample_db < (threshold - knee_width / 2):
+                    # Below knee - no compression
+                    gr = 0
+                elif sample_db > (threshold + knee_width / 2):
+                    # Above knee - full compression
+                    gr = (threshold - sample_db) + (sample_db - threshold) / ratio
+                else:
+                    # In knee - smooth transition
+                    knee_factor = (sample_db - threshold + knee_width / 2) / knee_width
+                    gr = knee_factor * (sample_db - threshold) * (1 - 1 / ratio)
+            else:
+                # Hard knee
+                if sample_db > threshold:
+                    gr = (threshold - sample_db) + (sample_db - threshold) / ratio
+                else:
+                    gr = 0
 
-        # Convert action to dynamics adjustments
-        current_vector = self.current_dynamics.to_vector()
-        new_vector = np.clip(current_vector + action * 0.1, 0, 1)  # Small adjustments
-        new_dynamics = DynamicsSettings.from_vector(new_vector)
+            gain_reduction_db[i] = gr
 
-        return action, new_dynamics
+        # Apply attack and release smoothing
+        attack_samples = int(attack_ms * self.sample_rate / 1000)
+        release_samples = int(release_ms * self.sample_rate / 1000)
 
-    def train_step(self, batch_size: int = 256) -> Optional[Dict]:
+        smoothed_gr = gain_reduction_db.copy()
+        for i in range(1, len(smoothed_gr)):
+            if gain_reduction_db[i] < smoothed_gr[i - 1]:
+                # Attack (gain reduction increasing)
+                alpha = 1.0 / attack_samples if attack_samples > 0 else 1.0
+            else:
+                # Release (gain reduction decreasing)
+                alpha = 1.0 / release_samples if release_samples > 0 else 1.0
+
+            smoothed_gr[i] = alpha * gain_reduction_db[i] + (1 - alpha) * smoothed_gr[i - 1]
+
+        # Apply gain reduction
+        gain_linear = 10 ** (smoothed_gr / 20)
+        compressed = audio * gain_linear
+
+        return compressed
+
+    def _apply_limiter(
+        self, audio: np.ndarray, threshold: float,
+        release_ms: float,
+    ) -> np.ndarray:
         """
-        Perform one training step.
+        Apply peak limiter.
 
-        Args:
-            batch_size: Batch size
-
-        Returns:
-            Training metrics
+        Fast attack, controlled release.
         """
-        if self.replay_buffer.size() < batch_size:
-            return None
+        threshold_linear = 10 ** (threshold / 20)
 
-        # Sample batch
-        states, actions, rewards, next_states, dones = self.replay_buffer.sample(
-            batch_size
-        )
+        # Fast peak detection
+        envelope = np.abs(audio)
 
-        # Convert to tensors
-        states = torch.FloatTensor(states).to(self.device)
-        actions = torch.FloatTensor(actions).to(self.device)
-        rewards = torch.FloatTensor(rewards).unsqueeze(-1).to(self.device)
-        next_states = torch.FloatTensor(next_states).to(self.device)
-        dones = torch.FloatTensor(dones).unsqueeze(-1).to(self.device)
+        # Calculate gain reduction
+        gain_reduction = np.ones_like(audio)
+        for i, peak in enumerate(envelope):
+            if peak > threshold_linear:
+                gain_reduction[i] = threshold_linear / (peak + 1e-10)
 
-        # Update critic
-        with torch.no_grad():
-            # Target policy smoothing
-            noise = (torch.randn_like(actions) * self.policy_noise).clamp(
-                -self.noise_clip, self.noise_clip
+        # Apply release smoothing
+        release_samples = int(release_ms * self.sample_rate / 1000)
+        smoothed_gain = gain_reduction.copy()
+
+        for i in range(1, len(smoothed_gain)):
+            # Fast attack (instant), slow release
+            if gain_reduction[i] < smoothed_gain[i - 1]:
+                # Attack - instant
+                smoothed_gain[i] = gain_reduction[i]
+            else:
+                # Release - smooth
+                alpha = 1.0 / release_samples if release_samples > 0 else 1.0
+                smoothed_gain[i] = alpha * gain_reduction[i] + (1 - alpha) * smoothed_gain[i - 1]
+
+        # Apply limiting
+        limited = audio * smoothed_gain
+
+        return limited
+
+    def get_reward_from_critic(self, audio: np.ndarray) -> Tuple[float, Dict[str, Any]]:
+        """Get reward from Critic agent"""
+        response = self.message_bus.request(
+            Message(
+                topic=Topics.agent_request(self.critic_agent_id),
+                sender=self.agent_id,
+                message_type=MessageType.CRITIC_JUDGMENT_REQUEST,
+                payload={
+                    'audio': audio,
+                    'sample_rate': self.sample_rate,
+                },
             )
-            next_actions = (self.actor_target(next_states) + noise).clamp(-1, 1)
-
-            # Compute target Q
-            target_q1, target_q2 = self.critic_target(next_states, next_actions)
-            target_q = torch.min(target_q1, target_q2)
-            target_q = rewards + (1 - dones) * self.gamma * target_q
-
-        # Current Q estimates
-        current_q1, current_q2 = self.critic(states, actions)
-
-        # Critic loss
-        critic_loss = nn.MSELoss()(current_q1, target_q) + nn.MSELoss()(
-            current_q2, target_q
         )
 
-        # Optimize critic
-        self.critic_optimizer.zero_grad()
-        critic_loss.backward()
-        self.critic_optimizer.step()
+        if response and response.payload.get('status') == 'success':
+            judgment = response.payload.get('judgment', {})
+            reward = judgment.get('satisfaction_score', 0.0)
+            return reward, judgment
+        else:
+            logger.warning("Failed to get reward from Critic")
+            return 0.0, {}
 
-        # Delayed policy update
-        actor_loss = None
-        if self.total_steps % self.policy_delay == 0:
-            # Compute actor loss
-            actor_loss = -self.critic.q1_forward(states, self.actor(states)).mean()
+    def get_audio_features(self, audio: np.ndarray) -> np.ndarray:
+        """Request a 17-dim feature vector from the Critic, with deterministic fallback."""
+        response = self.message_bus.request(
+            Message(
+                topic=Topics.agent_request(self.critic_agent_id),
+                sender=self.agent_id,
+                message_type=MessageType.AUDIO_FEATURE_REQUEST,
+                payload={
+                    'audio': audio,
+                    'sample_rate': self.sample_rate,
+                },
+            ),
+            timeout=2.0,
+        )
 
-            # Optimize actor
-            self.actor_optimizer.zero_grad()
-            actor_loss.backward()
-            self.actor_optimizer.step()
+        if response and response.payload.get('status') == 'success':
+            features = response.payload.get('features')
+            if features is not None:
+                arr = np.asarray(features, dtype=np.float32)
+                if arr.shape == (17,):
+                    return arr
 
-            # Update target networks
-            self._update_target_networks()
+        return self._extract_features_local(audio)
 
-        self.total_steps += 1
+    def _extract_features_local(self, audio: np.ndarray) -> np.ndarray:
+        """Same 17-dim layout as CriticAgent.extract_features(), used as a fallback."""
+        if audio.size == 0:
+            return np.zeros(17, dtype=np.float32)
 
-        metrics = {
-            "critic_loss": critic_loss.item(),
-            "actor_loss": actor_loss.item() if actor_loss is not None else None,
-            "total_steps": self.total_steps,
+        sr = self.sample_rate
+        n = audio.size
+        spec = np.abs(np.fft.rfft(audio))
+        freqs = np.fft.rfftfreq(n, d=1.0 / sr)
+        spec_sum = spec.sum() + 1e-12
+        centroid = float((freqs * spec).sum() / spec_sum) / sr
+        cumulative = np.cumsum(spec)
+        rolloff_idx = int(np.searchsorted(cumulative, 0.85 * spec_sum))
+        rolloff = float(freqs[min(rolloff_idx, len(freqs) - 1)]) / sr
+        bandwidth = float(np.sqrt(((freqs - centroid * sr) ** 2 * spec).sum() / spec_sum)) / sr
+        geom = float(np.exp(np.mean(np.log(spec + 1e-12))))
+        flatness = geom / (float(spec.mean()) + 1e-12)
+
+        bands = [(20, 60), (60, 250), (250, 500), (500, 2000),
+                 (2000, 4000), (4000, 6000), (6000, 20000)]
+        band_energies = []
+        for lo, hi in bands:
+            mask = (freqs >= lo) & (freqs < hi)
+            band_energies.append(float((spec[mask] ** 2).sum()))
+        total_e = sum(band_energies) + 1e-12
+        band_energies = [e / total_e for e in band_energies]
+
+        rms = float(np.sqrt(np.mean(audio ** 2)))
+        peak = float(np.max(np.abs(audio)))
+        dynamic_range = 20 * np.log10((peak + 1e-12) / (rms + 1e-12))
+        crest = peak / (rms + 1e-12)
+        zcr = float(np.mean(np.abs(np.diff(np.sign(audio)))) / 2)
+        harmonic_pct = sum(band_energies[:4])
+
+        # 17-dim layout matches CriticAgent: 4 spectral + 7 bands + 3 dynamic + zcr + tempo + harmonic
+        return np.array([
+            centroid, rolloff, bandwidth, flatness,
+            *band_energies,
+            rms, dynamic_range, crest,
+            zcr, 0.0, harmonic_pct,
+        ], dtype=np.float32)
+
+    def select_action(self, audio_features: np.ndarray, explore: bool = True) -> Tuple[np.ndarray, float, float]:
+        """Select dynamics adjustment action using policy network"""
+        if explore and random.random() < self.epsilon:
+            # Random exploration
+            action = np.random.uniform(-1, 1, size=10)
+            log_prob = 0.0
+            value = 0.0
+        else:
+            # Policy-based action
+            feature_tensor = torch.FloatTensor(audio_features).unsqueeze(0)
+            with torch.no_grad():
+                action_tensor, log_prob_tensor, value_tensor = self.policy_network.sample_action(feature_tensor)
+                action = action_tensor.squeeze(0).numpy()
+                log_prob = log_prob_tensor.item()
+                value = value_tensor.item()
+
+        return action, log_prob, value
+
+    def action_to_param_adjustments(self, action: np.ndarray) -> DynamicsParameters:
+        """
+        Convert RL action to dynamics parameter adjustments.
+
+        Args:
+            action: Action vector from policy (-1 to 1)
+
+        Returns:
+            New dynamics parameters
+        """
+        # Get current parameters as vector
+        current_vector = self.current_params.to_vector()
+
+        # Apply action as delta (scaled)
+        adjustment_scale = 0.1  # Max 10% change per step
+        new_vector = current_vector + (action * adjustment_scale)
+
+        # Clip to valid range [0, 1]
+        new_vector = np.clip(new_vector, 0, 1)
+
+        # Convert back to parameters
+        return DynamicsParameters.from_vector(new_vector)
+
+    def train_episode(self, audio: np.ndarray, max_steps: int = 10) -> Dict[str, Any]:
+        """Run one training episode"""
+        self.episode_buffer = []
+        episode_reward = 0.0
+
+        # Get initial judgment
+        initial_reward, _ = self.get_reward_from_critic(audio)
+
+        current_audio = audio.copy()
+
+        for step in range(max_steps):
+            audio_features = self.get_audio_features(current_audio)
+
+            # Select action
+            action, log_prob, value = self.select_action(audio_features, explore=True)
+
+            # Convert action to parameter adjustments
+            new_params = self.action_to_param_adjustments(action)
+
+            # Apply dynamics processing
+            processed_audio = self.apply_dynamics(current_audio, new_params)
+
+            # Get reward from Critic
+            reward, judgment = self.get_reward_from_critic(processed_audio)
+
+            # Store experience with REAL next-state features
+            experience = RLExperience(
+                audio_features=audio_features,
+                action=action,
+                reward=reward,
+                next_audio_features=self.get_audio_features(processed_audio),
+                done=(step == max_steps - 1),
+                log_prob=log_prob,
+                value=value,
+            )
+            self.episode_buffer.append(experience)
+
+            # Update state
+            self.current_params = new_params
+            current_audio = processed_audio
+            episode_reward += reward
+
+            logger.debug(f"Dynamics step {step}: reward={reward:.3f}")
+
+        # Compute GAE advantages on the just-finished trajectory before mixing
+        # it into the random-sampling replay buffer.
+        self._compute_gae(self.episode_buffer)
+        self.replay_buffer.extend(self.episode_buffer)
+
+        # Train on buffer
+        if len(self.replay_buffer) >= self.batch_size:
+            train_stats = self._train_on_buffer()
+        else:
+            train_stats = {}
+
+        # Decay exploration
+        self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
+
+        # Update statistics
+        self.episodes_trained += 1
+        self.total_reward += episode_reward
+
+        if episode_reward > self.best_reward:
+            self.best_reward = episode_reward
+            self.best_params = self.current_params
+
+        return {
+            'episode': self.episodes_trained,
+            'episode_reward': episode_reward,
+            'best_reward': self.best_reward,
+            'epsilon': self.epsilon,
+            'initial_reward': initial_reward,
+            **train_stats
         }
 
-        self.training_history.append(metrics)
-        return metrics
+    def _compute_gae(self, trajectory: List["RLExperience"]) -> None:
+        """Populate `advantage` and `return_` on each step using GAE.
 
-    def _update_target_networks(self):
-        """Soft update of target networks."""
-        for param, target_param in zip(
-            self.actor.parameters(), self.actor_target.parameters()
-        ):
-            target_param.data.copy_(
-                self.tau * param.data + (1 - self.tau) * target_param.data
-            )
-
-        for param, target_param in zip(
-            self.critic.parameters(), self.critic_target.parameters()
-        ):
-            target_param.data.copy_(
-                self.tau * param.data + (1 - self.tau) * target_param.data
-            )
-
-    def store_experience(
-        self,
-        state: AudioState,
-        action: np.ndarray,
-        reward: float,
-        next_state: AudioState,
-        done: bool,
-    ):
-        """Store experience in replay buffer."""
-        state_vector = np.concatenate(
-            [state.to_vector(), self.current_dynamics.to_vector()]
-        )
-        next_state_vector = np.concatenate(
-            [next_state.to_vector(), self.current_dynamics.to_vector()]
-        )
-
-        self.replay_buffer.add(state_vector, action, reward, next_state_vector, done)
-
-    def process_audio(
-        self, audio: np.ndarray, audio_state: AudioState
-    ) -> Tuple[np.ndarray, AgentAction]:
+        delta_t = r_t + gamma * V(s_{t+1}) * (1 - done_t) - V(s_t)
+        A_t     = delta_t + gamma * lambda * (1 - done_t) * A_{t+1}
+        return  = A_t + V(s_t)
         """
-        Process audio with dynamics.
+        if not trajectory:
+            return
+        gae = 0.0
+        next_value = 0.0
+        for step in reversed(trajectory):
+            mask = 0.0 if step.done else 1.0
+            delta = step.reward + self.gamma * next_value * mask - step.value
+            gae = delta + self.gamma * self.gae_lambda * mask * gae
+            step.advantage = float(gae)
+            step.return_ = float(gae + step.value)
+            next_value = step.value
 
-        Args:
-            audio: Input audio
-            audio_state: Current ontology state
+    def _train_on_buffer(self) -> Dict[str, Any]:
+        """Train policy network on replay buffer (PPO with GAE)."""
+        if len(self.replay_buffer) < self.batch_size:
+            return {}
 
-        Returns:
-            processed_audio: Output audio
-            action: Action taken
-        """
-        # Select action
-        action_vector, new_dynamics = self.select_action(audio_state, add_noise=True)
+        # Sample batch
+        batch = random.sample(self.replay_buffer, self.batch_size)
 
-        # Apply dynamics
-        processed_audio = self.apply_compressor(audio, new_dynamics)
+        # Prepare tensors (advantages and returns were precomputed via GAE)
+        audio_features = torch.FloatTensor([exp.audio_features for exp in batch])
+        actions = torch.FloatTensor([exp.action for exp in batch])
+        old_log_probs = torch.FloatTensor([exp.log_prob for exp in batch])
+        advantages = torch.FloatTensor([exp.advantage for exp in batch])
+        returns = torch.FloatTensor([exp.return_ for exp in batch])
 
-        # Update current dynamics
-        self.current_dynamics = new_dynamics
+        # Standardize the GAE advantages on the batch
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
-        # Create action object
-        action = AgentAction(
-            agent_id="dynamics_rl_agent",
-            action_type="dynamics_adjustment",
-            parameters={
-                "threshold": new_dynamics.threshold,
-                "ratio": new_dynamics.ratio,
-                "attack": new_dynamics.attack,
-                "release": new_dynamics.release,
-                "knee": new_dynamics.knee,
-                "makeup_gain": new_dynamics.makeup_gain,
-                "dry_wet": new_dynamics.dry_wet,
-            },
-            confidence=0.8,
-        )
+        # PPO update
+        total_policy_loss = 0.0
+        total_value_loss = 0.0
+        total_entropy = 0.0
 
-        return processed_audio, action
+        for _ in range(self.update_epochs):
+            action_mean, action_log_std = self.policy_network(audio_features)
+            action_std = action_log_std.exp()
+            dist = torch.distributions.Normal(action_mean, action_std)
 
-    def save_model(self, path: str):
-        """Save model checkpoint."""
-        torch.save(
-            {
-                "actor_state_dict": self.actor.state_dict(),
-                "actor_target_state_dict": self.actor_target.state_dict(),
-                "critic_state_dict": self.critic.state_dict(),
-                "critic_target_state_dict": self.critic_target.state_dict(),
-                "actor_optimizer": self.actor_optimizer.state_dict(),
-                "critic_optimizer": self.critic_optimizer.state_dict(),
-                "total_steps": self.total_steps,
-            },
-            path,
-        )
-        logger.info(f"Saved Dynamics RL model to {path}")
+            new_log_probs = dist.log_prob(actions).sum(dim=-1)
+            ratio = (new_log_probs - old_log_probs).exp()
 
-    def load_model(self, path: str):
-        """Load model checkpoint."""
-        checkpoint = torch.load(path, map_location=self.device)
-        self.actor.load_state_dict(checkpoint["actor_state_dict"])
-        self.actor_target.load_state_dict(checkpoint["actor_target_state_dict"])
-        self.critic.load_state_dict(checkpoint["critic_state_dict"])
-        self.critic_target.load_state_dict(checkpoint["critic_target_state_dict"])
-        self.actor_optimizer.load_state_dict(checkpoint["actor_optimizer"])
-        self.critic_optimizer.load_state_dict(checkpoint["critic_optimizer"])
-        self.total_steps = checkpoint["total_steps"]
-        logger.info(f"Loaded Dynamics RL model from {path}")
+            surr1 = ratio * advantages
+            surr2 = torch.clamp(ratio, 1 - self.clip_epsilon, 1 + self.clip_epsilon) * advantages
+            policy_loss = -torch.min(surr1, surr2).mean()
 
+            values = self.policy_network.get_value(audio_features).squeeze()
+            value_loss = F.mse_loss(values, returns)
 
-if __name__ == "__main__":
-    # Example usage
-    import ray
+            entropy = dist.entropy().mean()
 
-    ray.init(ignore_reinit_error=True)
+            loss = policy_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy
 
-    # Create Dynamics agent
-    dynamics_agent = DynamicsRLAgent.remote()
+            self.optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.policy_network.parameters(), 0.5)
+            self.optimizer.step()
 
-    # Test with dummy audio
-    dummy_audio = np.random.randn(44100)
-    dummy_state = AudioState()
-    dummy_state.set_attribute(AudioAttribute.PUNCH, 0.5)
+            total_policy_loss += policy_loss.item()
+            total_value_loss += value_loss.item()
+            total_entropy += entropy.item()
 
-    processed, action = ray.get(
-        dynamics_agent.process_audio.remote(dummy_audio, dummy_state)
-    )
-    print(f"Processed audio shape: {processed.shape}")
-    print(f"Action: {action.action_type}")
+        return {
+            'policy_loss': total_policy_loss / self.update_epochs,
+            'value_loss': total_value_loss / self.update_epochs,
+            'entropy': total_entropy / self.update_epochs,
+        }
 
-    ray.shutdown()
+    def handle_message(self, message: Message) -> Any:
+        """Handle incoming messages"""
+        try:
+            if message.message_type == MessageType.AUDIO_PROCESSING_REQUEST:
+                audio = message.payload.get('audio')
+                mode = message.payload.get('mode', 'inference')
+
+                if mode == 'training':
+                    stats = self.train_episode(audio)
+                    return {
+                        'status': 'success',
+                        'mode': 'training',
+                        'stats': stats,
+                    }
+                else:
+                    # Inference mode
+                    if self.best_params:
+                        processed_audio = self.apply_dynamics(audio, self.best_params)
+                        params_dict = {
+                            'threshold': self.best_params.threshold,
+                            'ratio': self.best_params.ratio,
+                            'attack_ms': self.best_params.attack_ms,
+                            'release_ms': self.best_params.release_ms,
+                            'makeup_gain': self.best_params.makeup_gain,
+                        }
+                    else:
+                        processed_audio = audio
+                        params_dict = {}
+
+                    return {
+                        'status': 'success',
+                        'mode': 'inference',
+                        'audio': processed_audio,
+                        'params': params_dict,
+                    }
+
+        except Exception as e:
+            logger.error(f"Error handling message: {e}")
+            return {'status': 'error', 'message': str(e)}
