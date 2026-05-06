@@ -1,40 +1,54 @@
-# Python artifacts
+```
+# Dependencies
 __pycache__/
-*.py[cod]
+*.pyc
 *.pyo
 *.pyd
-.Python
-.venv/
-venv/
-ENV/
 
-# Environment & secrets
-.env
-.env.*
-metadata.db
-
-# Logs and caches
-logs/
-.pytest_cache/
-.snapshots/
-.mypy_cache/
-.ruff_cache/
-
-# Node / frontend
-node_modules/
+# Build artifacts
 dist/
 build/
-.parcel-cache/
+*.egg-info/
 
-# Editors / OS
-.DS_Store
-.idea/
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
 .vscode/
-Thumbs.db
-
-# Data & temp
-data/
-tmp/
-*.bak
+.idea/
 *.swp
 *.swo
+
+# Logs
+*.log
+
+# Coverage
+.coverage
+coverage/
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
+# Cache
+.cache/
+.mypy_cache/
+.pytest_cache/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+```

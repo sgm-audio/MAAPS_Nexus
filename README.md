@@ -1,5 +1,9 @@
 # Multi-Agent Audio Processing System
 
+[![CI/CD](https://github.com/maaps/maaps/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/maaps/maaps/actions/workflows/ci-cd.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
+
 A comprehensive, production-ready multi-agent system for advanced audio processing, AI-powered music generation, and intelligent project management.
 
 ## Overview
@@ -463,11 +467,11 @@ See inline documentation in source files for detailed API reference.
 
 ## License
 
-[Your License Here]
+MIT License - See [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
-[Contributing Guidelines]
+We welcome contributions! Please see our [Code of Conduct](CODE_OF_CONDUCT.md) and feel free to submit issues or pull requests.
 
 ## Support
 
