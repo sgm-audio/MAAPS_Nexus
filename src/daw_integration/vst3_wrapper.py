@@ -18,8 +18,7 @@ import struct
 import time
 import threading
 import socket
-import json
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Optional, Callable
 from dataclasses import dataclass
 from enum import Enum
 import logging
@@ -170,12 +169,14 @@ class SharedMemoryAudioBuffer:
         if self.is_creator and hasattr(os, 'shm_unlink'):
             try:
                 os.shm_unlink(self.config.shm_name)
-            except:
+            except Exception:
                 pass
 
-    def _write_header(self, magic: int, version: int, write_offset: int,
-                     read_offset: int, block_size: int, sample_rate: int,
-                     num_channels: int, block_id: int, status: int):
+    def _write_header(
+        self, magic: int, version: int, write_offset: int,
+        read_offset: int, block_size: int, sample_rate: int,
+        num_channels: int, block_id: int, status: int,
+    ):
         """Write header to shared memory"""
         header = struct.pack(
             'IIQQQIIIQ',
@@ -190,9 +191,10 @@ class SharedMemoryAudioBuffer:
         """Read header from shared memory"""
         self.shm_buffer.seek(0)
         header_bytes = self.shm_buffer.read(self.HEADER_SIZE)
-        magic, version, write_offset, read_offset, block_size, sample_rate, num_channels, block_id, status = struct.unpack(
-            'IIQQQIIIQ', header_bytes[:48]
-        )
+        (
+            magic, version, write_offset, read_offset, block_size,
+            sample_rate, num_channels, block_id, status,
+        ) = struct.unpack('IIQQQIIIQ', header_bytes[:48])
 
         return {
             'magic': magic,
@@ -378,7 +380,7 @@ class VST3Backend:
         # Remove socket file
         try:
             os.unlink(self.config.socket_path)
-        except:
+        except Exception:
             pass
 
         logger.info("VST3 Backend stopped")
@@ -426,9 +428,11 @@ class VST3Backend:
 
                     if self.blocks_processed % 100 == 0:
                         avg_latency = self.total_latency / self.blocks_processed
-                        logger.debug(f"Processed {self.blocks_processed} blocks, "
-                                   f"avg latency={avg_latency:.2f}ms, "
-                                   f"max={self.max_latency:.2f}ms")
+                        logger.debug(
+                            f"Processed {self.blocks_processed} blocks, "
+                            f"avg latency={avg_latency:.2f}ms, "
+                            f"max={self.max_latency:.2f}ms"
+                        )
 
                 else:
                     # No data available, sleep briefly
@@ -459,24 +463,23 @@ def create_vst3_backend_for_hgo(hgo_coordinator_id: str, message_bus) -> VST3Bac
     def process_audio_with_hgo(audio: np.ndarray) -> np.ndarray:
         """Process audio through HGO coordinator"""
         try:
-            # Send to HGO coordinator
-            from src.core.types import Message as AgentMessage, MessageType as AgentMessageType
+            from src.core.types import Message as AgentMessage, MessageType as AgentMessageType, Topics
 
             response = message_bus.request(
-                hgo_coordinator_id,
                 AgentMessage(
-                    message_type=AgentMessageType.COORDINATION_REQUEST,
-                    sender_id="vst3_backend",
+                    topic=Topics.agent_request(hgo_coordinator_id),
+                    sender="vst3_backend",
+                    message_type=AgentMessageType.COORDINATION_UPDATE,
                     payload={
                         'audio': audio,
                         'training': False,  # Inference mode in VST
                         'max_steps': 1,  # Low latency - single step
-                    }
+                    },
                 )
             )
 
-            if response and response.get('status') == 'success':
-                return response.get('processed_audio', audio)
+            if response and response.payload.get('status') == 'success':
+                return response.payload.get('processed_audio', audio)
             else:
                 logger.warning("HGO coordination failed, returning original audio")
                 return audio

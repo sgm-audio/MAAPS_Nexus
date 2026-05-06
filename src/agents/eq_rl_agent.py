@@ -17,8 +17,7 @@ import torch.nn.functional as F
 import random
 
 from src.core.base_agent import BaseAgent, AgentCapability
-from src.core.types import Message, MessageType
-from src.core.audio_ontology import FrequencyRange
+from src.core.types import Message, MessageType, Topics
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +148,9 @@ class RLExperience:
     done: bool
     log_prob: float = 0.0
     value: float = 0.0
+    # Filled in once the trajectory is complete via GAE
+    advantage: float = 0.0
+    return_: float = 0.0
 
 
 class EQRLAgent(BaseAgent):
@@ -184,7 +186,7 @@ class EQRLAgent(BaseAgent):
             1000,  # Mids
             3000,  # High-mids
             5000,  # Presence
-            10000, # Brilliance
+            10000,  # Brilliance
         ]
 
         # Initialize EQ state
@@ -274,8 +276,10 @@ class EQRLAgent(BaseAgent):
 
         return output
 
-    def _design_peak_filter(self, center_freq: float, gain_db: float,
-                           q_factor: float, sr: int) -> Tuple[np.ndarray, np.ndarray]:
+    def _design_peak_filter(
+        self, center_freq: float, gain_db: float,
+        q_factor: float, sr: int,
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """Design a peaking EQ filter"""
         # Convert gain from dB to linear
         A = 10 ** (gain_db / 40)
@@ -296,8 +300,10 @@ class EQRLAgent(BaseAgent):
 
         return b, a
 
-    def _design_shelf_filter(self, cutoff_freq: float, gain_db: float,
-                            sr: int, shelf_type: str = 'low') -> Tuple[np.ndarray, np.ndarray]:
+    def _design_shelf_filter(
+        self, cutoff_freq: float, gain_db: float,
+        sr: int, shelf_type: str = 'low',
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """Design a shelving filter"""
         A = 10 ** (gain_db / 40)
         omega = 2 * np.pi * cutoff_freq / sr
@@ -336,26 +342,104 @@ class EQRLAgent(BaseAgent):
         Returns:
             (reward, judgment_details)
         """
-        # Request judgment from Critic
         response = self.message_bus.request(
-            self.critic_agent_id,
             Message(
-                message_type=MessageType.AUDIO_ANALYSIS_REQUEST,
-                sender_id=self.agent_id,
+                topic=Topics.agent_request(self.critic_agent_id),
+                sender=self.agent_id,
+                message_type=MessageType.CRITIC_JUDGMENT_REQUEST,
                 payload={
                     'audio': audio,
                     'sample_rate': self.sample_rate,
-                }
+                },
             )
         )
 
-        if response and response.get('status') == 'success':
-            judgment = response.get('judgment', {})
+        if response and response.payload.get('status') == 'success':
+            judgment = response.payload.get('judgment', {})
             reward = judgment.get('satisfaction_score', 0.0)
             return reward, judgment
         else:
             logger.warning("Failed to get reward from Critic")
             return 0.0, {}
+
+    def get_audio_features(self, audio: np.ndarray) -> np.ndarray:
+        """Request a 17-dim feature vector from the Critic agent.
+
+        Falls back to a deterministic local extraction when the Critic is
+        unavailable, so training never silently learns from random noise.
+        """
+        response = self.message_bus.request(
+            Message(
+                topic=Topics.agent_request(self.critic_agent_id),
+                sender=self.agent_id,
+                message_type=MessageType.AUDIO_FEATURE_REQUEST,
+                payload={
+                    'audio': audio,
+                    'sample_rate': self.sample_rate,
+                },
+            ),
+            timeout=2.0,
+        )
+
+        if response and response.payload.get('status') == 'success':
+            features = response.payload.get('features')
+            if features is not None:
+                arr = np.asarray(features, dtype=np.float32)
+                if arr.shape == (17,):
+                    return arr
+
+        return self._extract_features_local(audio)
+
+    def _extract_features_local(self, audio: np.ndarray) -> np.ndarray:
+        """Deterministic 17-dim feature extraction used as a Critic fallback.
+
+        Layout matches CriticAgent.extract_features():
+            [centroid, rolloff, bandwidth, flatness,
+             7 band energies (sub_bass..brilliance, normalized),
+             rms, dynamic_range, crest_factor,
+             zcr, harmonic_pct]
+        """
+        if audio.size == 0:
+            return np.zeros(17, dtype=np.float32)
+
+        sr = self.sample_rate
+        n = audio.size
+        # spectrum
+        spec = np.abs(np.fft.rfft(audio))
+        freqs = np.fft.rfftfreq(n, d=1.0 / sr)
+        spec_sum = spec.sum() + 1e-12
+        centroid = float((freqs * spec).sum() / spec_sum) / sr
+        cumulative = np.cumsum(spec)
+        rolloff_idx = int(np.searchsorted(cumulative, 0.85 * spec_sum))
+        rolloff = float(freqs[min(rolloff_idx, len(freqs) - 1)]) / sr
+        bandwidth = float(np.sqrt(((freqs - centroid * sr) ** 2 * spec).sum() / spec_sum)) / sr
+        geom = float(np.exp(np.mean(np.log(spec + 1e-12))))
+        flatness = geom / (float(spec.mean()) + 1e-12)
+
+        bands = [(20, 60), (60, 250), (250, 500), (500, 2000),
+                 (2000, 4000), (4000, 6000), (6000, 20000)]
+        band_energies = []
+        for lo, hi in bands:
+            mask = (freqs >= lo) & (freqs < hi)
+            band_energies.append(float((spec[mask] ** 2).sum()))
+        total_e = sum(band_energies) + 1e-12
+        band_energies = [e / total_e for e in band_energies]
+
+        rms = float(np.sqrt(np.mean(audio ** 2)))
+        peak = float(np.max(np.abs(audio)))
+        dynamic_range = 20 * np.log10((peak + 1e-12) / (rms + 1e-12))
+        crest = peak / (rms + 1e-12)
+        zcr = float(np.mean(np.abs(np.diff(np.sign(audio)))) / 2)
+        # Cheap harmonic estimate: ratio of low-frequency energy to total
+        harmonic_pct = sum(band_energies[:4])
+
+        # 17-dim layout matches CriticAgent: 4 spectral + 7 bands + 3 dynamic + zcr + tempo + harmonic
+        return np.array([
+            centroid, rolloff, bandwidth, flatness,
+            *band_energies,
+            rms, dynamic_range, crest,
+            zcr, 0.0, harmonic_pct,
+        ], dtype=np.float32)
 
     def select_action(self, audio_features: np.ndarray, explore: bool = True) -> Tuple[np.ndarray, float, float]:
         """
@@ -437,9 +521,8 @@ class EQRLAgent(BaseAgent):
         current_audio = audio.copy()
 
         for step in range(max_steps):
-            # Get audio features from Critic (reuse its feature extractor)
-            # For simplicity, use a placeholder - in production, call Critic
-            audio_features = np.random.randn(17)  # TODO: Get from Critic
+            # Real features for the current audio (Critic if available, local fallback otherwise)
+            audio_features = self.get_audio_features(current_audio)
 
             # Select action
             action, log_prob, value = self.select_action(audio_features, explore=True)
@@ -453,12 +536,12 @@ class EQRLAgent(BaseAgent):
             # Get reward from Critic
             reward, judgment = self.get_reward_from_critic(processed_audio)
 
-            # Store experience
+            # Store experience with REAL next-state features
             experience = RLExperience(
                 audio_features=audio_features,
                 action=action,
                 reward=reward,
-                next_audio_features=np.random.randn(17),  # TODO: Get from processed audio
+                next_audio_features=self.get_audio_features(processed_audio),
                 done=(step == max_steps - 1),
                 log_prob=log_prob,
                 value=value,
@@ -470,10 +553,14 @@ class EQRLAgent(BaseAgent):
             current_audio = processed_audio
             episode_reward += reward
 
-            logger.debug(f"Step {step}: reward={reward:.3f}, "
-                        f"negative_concepts={judgment.get('negative_concepts', [])}")
+            logger.debug(
+                f"Step {step}: reward={reward:.3f}, "
+                f"negative_concepts={judgment.get('negative_concepts', [])}"
+            )
 
-        # Add episode to replay buffer
+        # Compute GAE advantages and returns over the just-finished trajectory
+        # before mixing it into the random-sampling replay buffer.
+        self._compute_gae(self.episode_buffer)
         self.replay_buffer.extend(self.episode_buffer)
 
         # Train on episode
@@ -502,23 +589,43 @@ class EQRLAgent(BaseAgent):
             **train_stats
         }
 
+    def _compute_gae(self, trajectory: List["RLExperience"]) -> None:
+        """Populate `advantage` and `return_` on each step using GAE.
+
+        delta_t = r_t + gamma * V(s_{t+1}) * (1 - done_t) - V(s_t)
+        A_t     = delta_t + gamma * lambda * (1 - done_t) * A_{t+1}
+        return  = A_t + V(s_t)
+
+        Operates in-place; meaningless on an empty trajectory.
+        """
+        if not trajectory:
+            return
+        gae = 0.0
+        next_value = 0.0
+        for step in reversed(trajectory):
+            mask = 0.0 if step.done else 1.0
+            delta = step.reward + self.gamma * next_value * mask - step.value
+            gae = delta + self.gamma * self.gae_lambda * mask * gae
+            step.advantage = float(gae)
+            step.return_ = float(gae + step.value)
+            next_value = step.value
+
     def _train_on_buffer(self) -> Dict[str, Any]:
-        """Train policy network on replay buffer"""
+        """Train policy network on replay buffer using precomputed GAE advantages."""
         if len(self.replay_buffer) < self.batch_size:
             return {}
 
         # Sample batch
         batch = random.sample(self.replay_buffer, self.batch_size)
 
-        # Prepare tensors
+        # Prepare tensors (advantages and returns were precomputed via GAE)
         audio_features = torch.FloatTensor([exp.audio_features for exp in batch])
         actions = torch.FloatTensor([exp.action for exp in batch])
         old_log_probs = torch.FloatTensor([exp.log_prob for exp in batch])
-        rewards = torch.FloatTensor([exp.reward for exp in batch])
-        old_values = torch.FloatTensor([exp.value for exp in batch])
+        advantages = torch.FloatTensor([exp.advantage for exp in batch])
+        returns = torch.FloatTensor([exp.return_ for exp in batch])
 
-        # Compute advantages using GAE
-        advantages = rewards - old_values
+        # Standardize advantages on the batch (still useful even with GAE)
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
         # PPO update
@@ -543,9 +650,9 @@ class EQRLAgent(BaseAgent):
             surr2 = torch.clamp(ratio, 1 - self.clip_epsilon, 1 + self.clip_epsilon) * advantages
             policy_loss = -torch.min(surr1, surr2).mean()
 
-            # Value loss
+            # Value loss against GAE-corrected return targets, not raw rewards
             values = self.policy_network.get_value(audio_features).squeeze()
-            value_loss = F.mse_loss(values, rewards)
+            value_loss = F.mse_loss(values, returns)
 
             # Entropy bonus
             entropy = dist.entropy().mean()

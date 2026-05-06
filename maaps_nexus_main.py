@@ -31,7 +31,6 @@ from src.agents.dynamics_rl_agent import DynamicsRLAgent
 from src.agents.hgo_coordinator import HGOCoordinator, OptimizationGoal, GoalPriority
 from src.daw_integration.vst3_wrapper import (
     VST3Backend,
-    SharedMemoryConfig,
     create_vst3_backend_for_hgo
 )
 
@@ -184,8 +183,8 @@ class MAAPSNexusSystem:
             logger.info("="*60)
             logger.info("")
             logger.info("System Status:")
-            logger.info(f"  Ray Dashboard: http://127.0.0.1:8265")
-            logger.info(f"  Agents Running: 4 (Critic, EQ, Dynamics, HGO)")
+            logger.info("  Ray Dashboard: http://127.0.0.1:8265")
+            logger.info("  Agents Running: 4 (Critic, EQ, Dynamics, HGO)")
             logger.info(f"  VST3 Backend: {'Active' if self.vst3_backend else 'Disabled'}")
             logger.info("")
             logger.info("Ready to process audio!")
@@ -318,9 +317,13 @@ class MAAPSNexusSystem:
                 # Print statistics every 10 seconds
                 if int(time.time()) % 10 == 0:
                     if self.vst3_backend:
+                        avg_latency = (
+                            self.vst3_backend.total_latency
+                            / max(1, self.vst3_backend.blocks_processed)
+                        )
                         logger.info(
                             f"VST3 Stats: {self.vst3_backend.blocks_processed} blocks, "
-                            f"avg latency: {self.vst3_backend.total_latency / max(1, self.vst3_backend.blocks_processed):.2f}ms"
+                            f"avg latency: {avg_latency:.2f}ms"
                         )
 
         except KeyboardInterrupt:

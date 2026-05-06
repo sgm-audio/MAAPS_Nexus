@@ -5,9 +5,7 @@ This module provides Ray cluster management for distributed agent execution,
 including single-machine and multi-node cluster support.
 """
 
-import os
 import ray
-from ray import serve
 from typing import Dict, Any, Optional, List
 import logging
 from dataclasses import dataclass
@@ -97,7 +95,7 @@ class RayClusterManager:
             self._initialized = True
             self._cluster_resources = ray.cluster_resources()
 
-            logger.info(f"Ray cluster initialized successfully")
+            logger.info("Ray cluster initialized successfully")
             logger.info(f"Available resources: {self._cluster_resources}")
             logger.info(f"Dashboard: http://{self.config.dashboard_host}:{self.config.dashboard_port}")
 

@@ -13,16 +13,15 @@ The coordinator:
 """
 
 import numpy as np
-from typing import Dict, Any, List, Tuple, Optional, Set
+from typing import Dict, Any, List, Tuple, Optional
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
 import torch
 import torch.nn as nn
-from collections import defaultdict
 
 from src.core.base_agent import BaseAgent, AgentCapability
-from src.core.types import Message, MessageType
+from src.core.types import Message, MessageType, Topics
 from src.core.audio_ontology import get_audio_ontology, AudioOntology
 
 logger = logging.getLogger(__name__)
@@ -173,9 +172,11 @@ class HGOCoordinator(BaseAgent):
                 goal.eq_subgoals.append(f"avoid_{concept}")
                 goal.dynamics_subgoals.append(f"avoid_{concept}")
 
-        logger.debug(f"Goal '{goal.name}' decomposed: "
-                    f"EQ subgoals={goal.eq_subgoals}, "
-                    f"Dynamics subgoals={goal.dynamics_subgoals}")
+        logger.debug(
+            f"Goal '{goal.name}' decomposed: "
+            f"EQ subgoals={goal.eq_subgoals}, "
+            f"Dynamics subgoals={goal.dynamics_subgoals}"
+        )
 
     def coordinate_agents(self, audio: np.ndarray,
                           training: bool = True,
@@ -232,41 +233,22 @@ class HGOCoordinator(BaseAgent):
 
             # Execute actions in coordinated manner
             for agent_id, action in action_order:
-                if agent_id == self.eq_agent_id:
-                    # Apply EQ
+                if agent_id == self.eq_agent_id or agent_id == self.dynamics_agent_id:
                     response = self.message_bus.request(
-                        agent_id,
                         Message(
+                            topic=Topics.agent_request(agent_id),
+                            sender=self.agent_id,
                             message_type=MessageType.AUDIO_PROCESSING_REQUEST,
-                            sender_id=self.agent_id,
                             payload={
                                 'audio': current_audio,
                                 'mode': 'training' if training else 'inference',
                                 'action': action.action_vector,
-                            }
+                            },
                         )
                     )
 
-                    if response and response.get('status') == 'success':
-                        current_audio = response.get('audio', current_audio)
-
-                elif agent_id == self.dynamics_agent_id:
-                    # Apply dynamics
-                    response = self.message_bus.request(
-                        agent_id,
-                        Message(
-                            message_type=MessageType.AUDIO_PROCESSING_REQUEST,
-                            sender_id=self.agent_id,
-                            payload={
-                                'audio': current_audio,
-                                'mode': 'training' if training else 'inference',
-                                'action': action.action_vector,
-                            }
-                        )
-                    )
-
-                    if response and response.get('status') == 'success':
-                        current_audio = response.get('audio', current_audio)
+                    if response and response.payload.get('status') == 'success':
+                        current_audio = response.payload.get('audio', current_audio)
 
             # Get feedback from Critic
             judgment = self._get_critic_judgment(current_audio)
@@ -276,12 +258,15 @@ class HGOCoordinator(BaseAgent):
             # Compute cooperation bonus
             cooperation_bonus = self._compute_cooperation_bonus(judgment)
             total_step_reward = step_reward + cooperation_bonus
+            episode_rewards[-1] = total_step_reward
 
             # Update cooperation score
             self._update_cooperation_score(judgment)
 
-            logger.debug(f"Step {step + 1}: reward={step_reward:.3f}, "
-                        f"cooperation_bonus={cooperation_bonus:.3f}")
+            logger.debug(
+                f"Step {step + 1}: reward={step_reward:.3f}, "
+                f"cooperation_bonus={cooperation_bonus:.3f}"
+            )
 
         # Compute final metrics
         final_judgment = self._get_critic_judgment(current_audio)
@@ -303,26 +288,80 @@ class HGOCoordinator(BaseAgent):
             'episode_rewards': episode_rewards,
             'avg_reward': avg_episode_reward,
             'cooperation_score': self.cooperation_score,
-            'conflicts_detected': len([c for c in self.conflict_history
-                                      if c.agents_involved]),
+            'conflicts_detected': len([
+                c for c in self.conflict_history if c.agents_involved
+            ]),
             'final_judgment': final_judgment,
         }
 
-    def _get_agent_proposal(self, agent_id: str, audio: np.ndarray,
-                           training: bool) -> AgentAction:
-        """Get action proposal from an agent"""
-        # For now, return placeholder
-        # In full implementation, query agent for proposed action
+    def _get_agent_proposal(
+        self, agent_id: str, audio: np.ndarray, training: bool,
+    ) -> AgentAction:
+        """Query the actual EQ or Dynamics agent for an action proposal.
 
+        Routes via per-agent topic, requests an "action_proposal" with the
+        current audio. Falls back to a structured neutral proposal (zeros +
+        confidence 0.0) if the agent does not respond, so coordination can
+        still proceed but its conflict detector can tell the difference
+        between a real proposal and a missing one (confidence == 0.0).
+
+        `affected_concepts` is populated from the current goals'
+        decomposed subgoals — the previously dead `eq_subgoals` and
+        `dynamics_subgoals` lists now actually flow into conflict detection.
+        """
         agent_type = "eq" if agent_id == self.eq_agent_id else "dynamics"
+        # EQ action: 7 bands * 2 params (gain + Q) = 14. Dynamics: 10 params.
+        action_dim = 14 if agent_type == "eq" else 10
 
+        # Pull the union of subgoals across all current goals for this agent type
+        subgoals: List[str] = []
+        for goal in getattr(self, 'active_goals', []) or []:
+            subgoals.extend(
+                goal.eq_subgoals if agent_type == "eq" else goal.dynamics_subgoals
+            )
+        # Strip the "avoid_" / "target_" prefix to get bare concept names
+        affected = [s.split("_", 1)[1] if "_" in s else s for s in subgoals]
+
+        response = self.message_bus.request(
+            Message(
+                topic=Topics.agent_request(agent_id),
+                sender=self.agent_id,
+                message_type=MessageType.AUDIO_PROCESSING_REQUEST,
+                payload={
+                    'mode': 'propose',
+                    'audio': audio,
+                    'training': training,
+                    'subgoals': subgoals,
+                },
+            ),
+            timeout=2.0,
+        )
+
+        if response and response.payload.get('status') == 'success':
+            action_vec = np.asarray(
+                response.payload.get('action', np.zeros(action_dim)),
+                dtype=np.float32,
+            )
+            if action_vec.shape != (action_dim,):
+                action_vec = np.zeros(action_dim, dtype=np.float32)
+            return AgentAction(
+                agent_id=agent_id,
+                agent_type=agent_type,
+                action_vector=action_vec,
+                predicted_reward=float(response.payload.get('predicted_reward', 0.0)),
+                confidence=float(response.payload.get('confidence', 0.5)),
+                affected_concepts=affected,
+            )
+
+        # Agent did not respond — return a marker proposal (confidence 0.0)
+        # so downstream conflict detection can ignore it.
         return AgentAction(
             agent_id=agent_id,
             agent_type=agent_type,
-            action_vector=np.zeros(7 if agent_type == "eq" else 10),
+            action_vector=np.zeros(action_dim, dtype=np.float32),
             predicted_reward=0.0,
-            confidence=0.5,
-            affected_concepts=[],
+            confidence=0.0,
+            affected_concepts=affected,
         )
 
     def _detect_conflict(self, action1: AgentAction, action2: AgentAction) -> Optional[Dict[str, Any]]:
@@ -361,9 +400,11 @@ class HGOCoordinator(BaseAgent):
 
         return None
 
-    def _resolve_conflict(self, conflict: Dict[str, Any],
-                         action1: AgentAction,
-                         action2: AgentAction) -> ConflictResolution:
+    def _resolve_conflict(
+        self, conflict: Dict[str, Any],
+        action1: AgentAction,
+        action2: AgentAction,
+    ) -> ConflictResolution:
         """
         Resolve conflict between agents.
 
@@ -427,19 +468,19 @@ class HGOCoordinator(BaseAgent):
     def _get_critic_judgment(self, audio: np.ndarray) -> Dict[str, Any]:
         """Get judgment from Critic agent"""
         response = self.message_bus.request(
-            self.critic_agent_id,
             Message(
-                message_type=MessageType.AUDIO_ANALYSIS_REQUEST,
-                sender_id=self.agent_id,
+                topic=Topics.agent_request(self.critic_agent_id),
+                sender=self.agent_id,
+                message_type=MessageType.CRITIC_JUDGMENT_REQUEST,
                 payload={
                     'audio': audio,
                     'sample_rate': self.config.get('sample_rate', 44100),
-                }
+                },
             )
         )
 
-        if response and response.get('status') == 'success':
-            return response.get('judgment', {})
+        if response and response.payload.get('status') == 'success':
+            return response.payload.get('judgment', {})
         else:
             return {'satisfaction_score': 0.0}
 

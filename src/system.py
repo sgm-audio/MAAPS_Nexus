@@ -5,11 +5,10 @@ Provides easy access to the complete multi-agent system.
 """
 
 import logging
-import time
 from typing import Optional, Dict, Any
 
 from .core import get_message_bus, get_agent_registry
-from .orchestration import get_coordinator, WorkflowEngine, create_audio_enhancement_workflow, create_music_production_workflow
+from .orchestration import get_coordinator, WorkflowEngine
 
 # Configure logging
 logging.basicConfig(
@@ -117,7 +116,8 @@ class MultiAgentSystem:
         if response and response.payload.get('success'):
             return response.payload['workflow_id']
         else:
-            raise RuntimeError(f"Failed to create workflow: {response.payload.get('error') if response else 'No response'}")
+            err = response.payload.get('error') if response else 'No response'
+            raise RuntimeError(f"Failed to create workflow: {err}")
 
     def execute_workflow(self, workflow_id: str) -> bool:
         """
@@ -142,7 +142,8 @@ class MultiAgentSystem:
         if response and response.payload.get('success'):
             return True
         else:
-            raise RuntimeError(f"Failed to execute workflow: {response.payload.get('error') if response else 'No response'}")
+            err = response.payload.get('error') if response else 'No response'
+            raise RuntimeError(f"Failed to execute workflow: {err}")
 
     def get_workflow_status(self, workflow_id: str) -> Optional[Dict]:
         """Get status of a workflow"""
@@ -240,7 +241,13 @@ class MultiAgentSystem:
         else:
             raise RuntimeError("Generation request timed out")
 
-    def extract_metadata(self, audio_data: Any = None, audio_path: str = None, sample_rate: int = 44100, deep_analysis: bool = True) -> Dict:
+    def extract_metadata(
+        self,
+        audio_data: Any = None,
+        audio_path: str = None,
+        sample_rate: int = 44100,
+        deep_analysis: bool = True,
+    ) -> Dict:
         """
         Extract metadata from audio.
 

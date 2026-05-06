@@ -10,7 +10,7 @@ import numpy as np
 import librosa
 from typing import Dict, Any, List, Tuple, Optional
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -152,14 +152,31 @@ class CriticAgent(BaseAgent):
 
         # Feature extraction parameters
         self.sample_rate = self.config.get('sample_rate', 44100)
+        if self.sample_rate <= 0:
+            raise ValueError(
+                f"sample_rate must be positive (got {self.sample_rate})"
+            )
         self.n_fft = self.config.get('n_fft', 2048)
         self.hop_length = self.config.get('hop_length', 512)
 
-        # Training data
-        self.training_data: List[Tuple[AudioFeatures, float]] = []
+        # Training data — bounded ring buffer to prevent unbounded growth
+        # over long sessions. Override via config['max_training_samples'].
+        self.max_training_samples = self.config.get('max_training_samples', 10000)
+        from collections import deque as _deque
+        self.training_data: "_deque[Tuple[AudioFeatures, float]]" = _deque(
+            maxlen=self.max_training_samples
+        )
 
-        # Concept detection thresholds
+        # Concept detection thresholds — caller may override the defaults
+        # by passing config['concept_thresholds'] = {...} (deep-merged).
         self.concept_thresholds = self._initialize_thresholds()
+        override = self.config.get('concept_thresholds')
+        if override:
+            for concept, fields in override.items():
+                if concept in self.concept_thresholds:
+                    self.concept_thresholds[concept].update(fields)
+                else:
+                    self.concept_thresholds[concept] = dict(fields)
 
         logger.info(f"Critic agent {agent_id} initialized")
 
@@ -244,10 +261,12 @@ class CriticAgent(BaseAgent):
             features.brilliance_energy = get_band_energy(6000, 20000)
 
             # Normalize band energies
-            total_energy = (features.sub_bass_energy + features.bass_energy +
-                          features.low_mid_energy + features.mid_energy +
-                          features.high_mid_energy + features.presence_energy +
-                          features.brilliance_energy)
+            total_energy = (
+                features.sub_bass_energy + features.bass_energy
+                + features.low_mid_energy + features.mid_energy
+                + features.high_mid_energy + features.presence_energy
+                + features.brilliance_energy
+            )
 
             if total_energy > 0:
                 features.sub_bass_energy /= total_energy
@@ -310,24 +329,33 @@ class CriticAgent(BaseAgent):
             negative_concepts.append("mud")
 
         # Detect HARSHNESS
-        if (features.high_mid_energy > self.concept_thresholds["harshness"]["high_mid_energy"] or
-            features.presence_energy > self.concept_thresholds["harshness"]["presence_energy"]):
+        if (
+            features.high_mid_energy > self.concept_thresholds["harshness"]["high_mid_energy"]
+            or features.presence_energy > self.concept_thresholds["harshness"]["presence_energy"]
+        ):
             negative_concepts.append("harshness")
 
         # Detect BOOMINESS
-        if (features.bass_energy > self.concept_thresholds["boominess"]["bass_energy"] and
-            features.dynamic_range < self.concept_thresholds["boominess"]["dynamic_range"]):
+        if (
+            features.bass_energy > self.concept_thresholds["boominess"]["bass_energy"]
+            and features.dynamic_range < self.concept_thresholds["boominess"]["dynamic_range"]
+        ):
             negative_concepts.append("boominess")
 
         # Detect CLARITY
-        if (features.spectral_centroid > self.concept_thresholds["clarity"]["spectral_centroid"] / self.sample_rate and
-            features.high_mid_energy > self.concept_thresholds["clarity"]["high_mid_energy"]):
+        clarity_centroid = self.concept_thresholds["clarity"]["spectral_centroid"] / self.sample_rate
+        if (
+            features.spectral_centroid > clarity_centroid
+            and features.high_mid_energy > self.concept_thresholds["clarity"]["high_mid_energy"]
+        ):
             positive_concepts.append("clarity")
 
         # Detect WARMTH
-        if (features.bass_energy > self.concept_thresholds["warmth"]["bass_energy"] and
-            features.low_mid_energy > self.concept_thresholds["warmth"]["low_mid_energy"] and
-            "mud" not in negative_concepts):
+        if (
+            features.bass_energy > self.concept_thresholds["warmth"]["bass_energy"]
+            and features.low_mid_energy > self.concept_thresholds["warmth"]["low_mid_energy"]
+            and "mud" not in negative_concepts
+        ):
             positive_concepts.append("warmth")
 
         # Detect BRIGHTNESS
@@ -401,8 +429,10 @@ class CriticAgent(BaseAgent):
             confidence=confidence,
         )
 
-        logger.info(f"Critic judgment: satisfaction={satisfaction_score:.3f}, "
-                   f"confidence={confidence:.3f}, concepts={all_concepts}")
+        logger.info(
+            f"Critic judgment: satisfaction={satisfaction_score:.3f}, "
+            f"confidence={confidence:.3f}, concepts={all_concepts}"
+        )
 
         return judgment
 

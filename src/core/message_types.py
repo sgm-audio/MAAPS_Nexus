@@ -23,6 +23,14 @@ class MessageType(Enum):
     REQUEST = "request"
     RESPONSE = "response"
     STREAM = "stream"
+    # Multi-agent audio system extensions
+    AUDIO_PROCESSING_REQUEST = "audio.processing.request"
+    AUDIO_PROCESSING_RESPONSE = "audio.processing.response"
+    AUDIO_FEATURE_REQUEST = "audio.feature.request"
+    AUDIO_FEATURE_RESPONSE = "audio.feature.response"
+    CRITIC_JUDGMENT_REQUEST = "critic.judgment.request"
+    CRITIC_JUDGMENT_RESPONSE = "critic.judgment.response"
+    COORDINATION_UPDATE = "coordination.update"
 
 
 @dataclass
@@ -259,3 +267,14 @@ class Topics:
     LOG_EVENT_ERROR = "log.event.error"
     LOG_METRICS_PERFORMANCE = "log.metrics.performance"
     LOG_AUDIT_ACTION = "log.audit.action"
+
+    # Per-agent direct-routing topics for multi-agent coordination
+    @staticmethod
+    def agent_request(agent_id: str) -> str:
+        """Topic that a specific agent subscribes to for direct requests."""
+        return f"agent.{agent_id}.request"
+
+    @staticmethod
+    def agent_response(agent_id: str) -> str:
+        """Topic that a specific agent publishes responses on."""
+        return f"agent.{agent_id}.response"

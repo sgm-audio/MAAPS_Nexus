@@ -3,13 +3,11 @@ WebSocket Manager for Real-time Updates
 Manages WebSocket connections and broadcasts agent events
 """
 
-import asyncio
 import logging
 from fastapi import WebSocket
 from typing import Dict, Set, Any
 from datetime import datetime
 import uuid
-import json
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +44,7 @@ class WebSocketManager:
         for client_id, websocket in list(self.active_connections.items()):
             try:
                 await websocket.close()
-            except:
+            except Exception:
                 pass
 
         self.active_connections.clear()
@@ -169,9 +167,8 @@ class WebSocketManager:
             })
 
         elif message_type == "auth":
-            # Handle authentication
-            token = data.get("token")
-            # TODO: Validate token
+            # Handle authentication (token validation is handled at WebSocket
+            # connect-time in api.auth.validate_websocket_token).
             await self.send_to_client(client_id, {
                 "type": "authenticated",
                 "success": True,
