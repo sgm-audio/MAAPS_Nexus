@@ -2,155 +2,137 @@
 
 This file provides guidance for agentic coding agents working in the MAAPS Nexus repository.
 
-## Build/Lint/Test Commands
+## System Overview
+MAAPS Nexus has two architectures:
+- **RL System (primary)**: Real-time mixing/mastering via RL agents, Ray distributed actors
+- **Legacy System**: Offline audio enhancement/music generation, Pub-sub message bus, REST API
+
+Entry points:
+- RL System: `maaps_nexus_main.py`
+- Legacy System: `examples/basic_usage.py` or API server
+- DAW Integration: VST3/CLAP/ARA plugins (VST3 requires building C++ plugin)
+
+## Key Commands
 
 ### Environment Setup
 ```bash
 # Create and activate virtual environment
 python -m venv venv
-venv\Scripts\activate  # Windows
-source venv/bin/activate  # Unix/macOS
+source venv/bin/activate  # Unix/macOS; Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
+# On Linux, also install for shared-memory DAW integration:
+pip install posix-ipc
 ```
 
-### Testing Commands
+### Testing
 ```bash
-# Run all tests
+# Full test suite
 pytest tests/
 
-# Run single test file
-pytest tests/test_system.py
-python tests/test_system.py
+# With coverage
+pytest tests/ --cov=src --cov-report=html
 
-# Run specific test class/method
-pytest tests/test_system.py::TestSystemBasics
-pytest tests/test_system.py::TestSystemBasics::test_system_creation
-
-# Run live performance tests
+# Specific suites
+pytest tests/test_rl_system.py
 pytest tests/test_live_effects_chain.py
-pytest tests/test_live_looping.py
-pytest tests/test_synchronization_clock.py
-
-# Run integration tests with synthetic data
 pytest tests/test_synthetic_integration.py
-
-# Run adaptive latency protection tests
 pytest tests/test_adaptive_latency.py
 
-# Run tests with coverage report
-pytest tests/ --cov=src --cov-report=html
+# Single test
+pytest tests/test_system.py::TestSystemBasics::test_system_creation
 ```
 
-### Code Quality Commands
+### Code Quality
 ```bash
-# Format code
+# Format
 black .
 
-# Lint code
+# Lint
 flake8
 
-# Type checking
-mypy src/
+# Type check (ignore missing imports for optional deps)
+mypy src/ --ignore-missing-imports
 ```
 
 ### Running the System
 ```bash
-# RL System (Standalone test mode)
+# RL System - Standalone test (no DAW)
 python maaps_nexus_main.py --mode test --test-duration 10.0
 
-# RL System (VST3 DAW integration)
+# RL System - VST3 DAW integration
 python maaps_nexus_main.py --mode vst3 --buffer-size 512 --sample-rate 44100
 
-# Legacy System
+# RL System - CLAP/ARA DAW integration
+python maaps_nexus_main.py --mode clap --buffer-size 512 --sample-rate 44100
+python maaps_nexus_main.py --mode ara  --buffer-size 512 --sample-rate 44100
+
+# Legacy System examples
 python examples/basic_usage.py
 
-# API server
+# Legacy API server
+pip install -r requirements-api.txt
 uvicorn api.main:app --reload
+
+# Build VST3 plugin (optional)
+cd vst3_plugin && mkdir -p build && cd build && cmake .. && cmake --build . && cmake --install .
 ```
 
-## Code Style Guidelines
+## RL System Development
+Primary focus. Agents are Ray actors coordinating via HGO (Hierarchical Goal Optimization).
 
-### Import Organization
-- Standard library imports first
-- Third-party imports second
-- Local imports third
-- Use absolute imports for local modules: `from src.core.message_bus import MessageBus`
-- Group related imports together
+### Adding an RL Agent
+1. Create Ray actor in `src/agents/` using `@ray.remote` (see `eq_rl_agent.py` for TD3 pattern)
+2. Implement `process_audio()`, `store_experience()`, `train_step()` using `AudioState` from `src/core/audio_ontology.py`
+3. Register with HGO Coordinator in `maaps_nexus_main.py`
+4. Target <10ms latency; profile with `tests/performance/`
 
-### Type Hints
-- Use type hints for all function signatures and class attributes
-- Import from `typing` module: `Dict`, `List`, `Optional`, `Tuple`, `Union`
-- Use `Optional[T]` for nullable values
-- Use `dataclass` for simple data containers
+### Key RL Components (`src/agents/`)
+- `critic_agent.py`: Reward signal generator (build first)
+- `eq_rl_agent.py`: 8-band EQ TD3 agent
+- `dynamics_rl_agent.py`: Compression TD3 agent
+- `hgo_coordinator.py`: Conflict resolution
 
-### Naming Conventions
-- **Classes**: PascalCase (e.g., `BaseAgent`, `CriticNetwork`)
-- **Functions/Variables**: snake_case (e.g., `process_audio`, `satisfaction_score`)
-- **Constants**: UPPER_SNAKE_CASE (e.g., `MAX_LATENCY_MS`)
-- **Private members**: prefix with underscore (e.g., `_state`, `_process_internal`)
-- **Agent IDs**: lowercase with underscores (e.g., `critic_agent`, `eq_rl_agent`)
+## Legacy System Development
+Secondary focus. Agents inherit from `BaseAgent` and communicate via message bus.
 
-### Error Handling
-- Use specific exception types rather than generic `Exception`
-- Log errors with appropriate level using `logging` module
-- Use try-except blocks for external dependencies (file I/O, network calls)
-- Raise custom exceptions for domain-specific errors
+### Adding a Legacy Agent
+1. Subclass `BaseAgent` from `src/core/base_agent.py`
+2. Implement `setup()`, `handle_message(message)`, `teardown()`
+3. Subscribe to topics in `setup()` and publish responses via `self.publish(...)`
+4. Register in `src/orchestration/agent_coordinator.py → _create_core_agents()`
 
-### Documentation
-- Use triple quotes for module and class docstrings
-- Document all public methods with Args, Returns, Raises sections
-- Use inline comments sparingly - prefer self-documenting code
-- Include type hints in docstrings for clarity
+### Key Legacy Components
+- `src/core/message_bus.py`: Pub-sub communication
+- `src/core/base_agent.py`: Common agent lifecycle
+- `src/orchestration/agent_coordinator.py`: Agent lifecycle management
+- `api/main.py`: REST API server (FastAPI)
 
-### Agent Development Patterns
-- **RL Agents**: Use `@ray.remote` decorator, inherit from base patterns in `eq_rl_agent.py`
-- **Legacy Agents**: Inherit from `BaseAgent`, implement `setup()`, `handle_message()`, `teardown()`
-- **State Management**: Use enums for agent states, thread-safe patterns for shared state
-- **Communication**: Use message bus topics with wildcards, follow request-response pattern
+## Code Conventions
+- **Imports**: stdlib → third-party → local (absolute: `from src.core.message_bus import MessageBus`)
+- **Naming**: Classes=PascalCase, vars/functions=snake_case, constants=UPPER_SNAKE_CASE, private=_prefix
+- **Type Hints**: Use for all signatures/attributes; `Optional[T]` for nullable; `dataclass` for simple data
+- **Error Handling**: Specific exceptions; log with `logging`; try-except for I/O/network; custom domain exceptions
+- **Documentation**: Triple-quoted docstrings; Args/Returns/Raises for public methods; sparse inline comments
 
-### Performance Constraints
-- Target <10ms latency for real-time audio processing
-- Use Ray actors for parallel processing in RL system
-- Minimize data copying between agents
-- Profile with `tests/performance/` tools
+## Performance & Safety
+- **Latency Target**: <10ms for real-time audio processing
+- **Parallelism**: Ray actors for RL system
+- **Data Flow**: Minimize copying between agents
+- **Security**: Never log secrets; validate inputs; use env vars for config; least privilege
+- **State Management**: Enums for agent states; thread-safe patterns for shared state
 
-### Testing Patterns
-- Use `unittest.TestCase` for test classes
-- Implement `setUpClass`/`tearDownClass` for expensive setup
-- Use synthetic data generators from `tests/utils/`
-- Test both success and failure scenarios
-- Include integration tests for multi-agent workflows
+## Important Files
+- `src/nexus_system.py`: RL system orchestrator (Ray cluster, agent lifecycle, plugin IPC)
+- `src/core/audio_ontology.py`: Shared attribute vocabulary (Clarity, Warmth, Punch, etc.)
+- `src/daw_integration/streaming_plugin_wrapper.py`: VST3/CLAP shared-memory IPC bridge
+- `src/daw_integration/ara_plugin_wrapper.py`: ARA2 host integration
+- `src/infrastructure/ray_cluster.py`: Ray cluster initialization & resource management
+- `src/utils/vertex_ai_integration.py`: Vertex AI integration
+- `src/utils/llm_integration.py`: Multi-provider LLM (Anthropic/OpenAI/Ollama)
 
-### Security Best Practices
-- Never log secrets, API keys, or sensitive data
-- Use environment variables for configuration
-- Validate all external inputs
-- Follow principle of least privilege
-
-### File Organization
-- Keep related functionality in same module
-- Use `__init__.py` to control imports
-- Separate public API from internal implementation
-- Follow existing directory structure patterns
-
-## Architecture Notes
-
-### RL System Components
-- **Critic Agent**: Must be built first - provides reward signals
-- **EQ/Dynamics Agents**: Use TD3 algorithm, compete via HGO
-- **HGO Coordinator**: Mediates conflicts between agents
-- **Ray Cluster**: Distributed computing foundation
-
-### Legacy System Components
-- **Message Bus**: Pub-sub communication with priority queuing
-- **Base Agent**: Common lifecycle and communication patterns
-- **Workflow Engine**: Multi-step orchestration
-
-### Integration Points
-- VST3 plugin uses shared memory for <10ms latency
-- Vertex AI integration via `src/utils/vertex_ai_integration.py`
-- API layer provides HTTP endpoints for legacy system
-
-Remember: The RL system is the primary focus, legacy system is secondary.
+## Configuration
+- Environment variables (copy `.env.example` to `.env`):
+  - `VERTEX_PROJECT_ID`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` (optional LLM integrations)
+  - `AGENT_LOG_LEVEL`, `MESSAGE_BUS_MAX_QUEUE_SIZE`, `MAX_CPU_USAGE`, `MAX_MEMORY_USAGE`, `CACHE_MAX_SIZE_MB` (system tuning)
