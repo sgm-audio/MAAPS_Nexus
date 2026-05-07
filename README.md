@@ -1,5 +1,9 @@
 # MAAPS Nexus
 
+[![CI](https://github.com/SGM-Studios/MAAPS_Nexus/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/SGM-Studios/MAAPS_Nexus/actions/workflows/ci-cd.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+
 **Multi-Agent Audio Processing System** — an AI-powered audio engine where competing reinforcement-learning agents collaborate through a shared ontology to make real-time mixing and mastering decisions, integrated directly into your DAW via VST3, CLAP, or ARA.
 
 ---
