@@ -5,37 +5,18 @@ Provides easy access to the complete multi-agent system.
 """
 
 import logging
-import time
-from typing import Optional, Dict, Any, Union, List
+from typing import Optional, Dict, Any
 
 from .core import get_message_bus, get_agent_registry
-from .core.message_types import Topics, Timeouts
-from .orchestration import (
-    get_coordinator,
-    WorkflowEngine,
-    create_audio_enhancement_workflow,
-    create_music_production_workflow,
-)
+from .orchestration import get_coordinator, WorkflowEngine
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
 logger = logging.getLogger(__name__)
-
-
-def requires_init(func):
-    """Decorator to ensure system is initialized before calling methods."""
-
-    def wrapper(self, *args, **kwargs):
-        if not getattr(self, "initialized", False):
-            raise RuntimeError(
-                f"System not initialized. Call .start() before {func.__name__}"
-            )
-        return func(self, *args, **kwargs)
-
-    return wrapper
 
 
 class MultiAgentSystem:
@@ -66,14 +47,13 @@ class MultiAgentSystem:
             self.coordinator.initialize_system()
 
             # Get workflow engine reference
-            self.workflow_engine = self.coordinator.agents.get("workflow_engine")
+            self.workflow_engine = self.coordinator.agents.get('workflow_engine')
 
             self.initialized = True
 
             logger.info("Multi-agent system started successfully")
 
         except Exception as e:
-            # We log and re-raise to ensure the caller knows start failed
             logger.error(f"Failed to start system: {e}")
             raise
 
@@ -98,7 +78,10 @@ class MultiAgentSystem:
     def get_health(self) -> Dict:
         """Get system health status"""
         if not self.initialized:
-            return {"status": "not_initialized", "health_score": 0}
+            return {
+                'status': 'not_initialized',
+                'health_score': 0
+            }
 
         return self.coordinator.get_system_health()
 
@@ -110,7 +93,6 @@ class MultiAgentSystem:
         """Get list of all agents"""
         return self.coordinator.get_all_agent_statuses()
 
-    @requires_init
     def create_workflow(self, workflow_definition: Dict) -> str:
         """
         Create a new workflow.
@@ -121,22 +103,22 @@ class MultiAgentSystem:
         Returns:
             workflow_id
         """
-        if not self.workflow_engine:
-            raise RuntimeError("Workflow engine not available")
+        if not self.initialized or not self.workflow_engine:
+            raise RuntimeError("System not initialized")
 
         # Send workflow creation request
         response = self.workflow_engine.request(
-            Topics.WORKFLOW_CREATE, workflow_definition, timeout=Timeouts.SHORT
+            "workflow.create",
+            workflow_definition,
+            timeout=5.0
         )
 
-        if response and response.payload.get("success"):
-            return response.payload["workflow_id"]
+        if response and response.payload.get('success'):
+            return response.payload['workflow_id']
         else:
-            raise RuntimeError(
-                f"Failed to create workflow: {response.payload.get('error') if response else 'No response'}"
-            )
+            err = response.payload.get('error') if response else 'No response'
+            raise RuntimeError(f"Failed to create workflow: {err}")
 
-    @requires_init
     def execute_workflow(self, workflow_id: str) -> bool:
         """
         Execute a workflow.
@@ -147,45 +129,39 @@ class MultiAgentSystem:
         Returns:
             True if workflow was queued successfully
         """
-        if not self.workflow_engine:
-            raise RuntimeError("Workflow engine not available")
+        if not self.initialized or not self.workflow_engine:
+            raise RuntimeError("System not initialized")
 
         # Send workflow execution request
         response = self.workflow_engine.request(
-            Topics.WORKFLOW_EXECUTE,
-            {"workflow_id": workflow_id},
-            timeout=Timeouts.SHORT,
+            "workflow.execute",
+            {'workflow_id': workflow_id},
+            timeout=5.0
         )
 
-        if response and response.payload.get("success"):
+        if response and response.payload.get('success'):
             return True
         else:
-            raise RuntimeError(
-                f"Failed to execute workflow: {response.payload.get('error') if response else 'No response'}"
-            )
+            err = response.payload.get('error') if response else 'No response'
+            raise RuntimeError(f"Failed to execute workflow: {err}")
 
-    @requires_init
     def get_workflow_status(self, workflow_id: str) -> Optional[Dict]:
         """Get status of a workflow"""
-        if not self.workflow_engine:
-            raise RuntimeError("Workflow engine not available")
+        if not self.initialized or not self.workflow_engine:
+            raise RuntimeError("System not initialized")
 
         response = self.workflow_engine.request(
-            Topics.WORKFLOW_STATUS, {"workflow_id": workflow_id}, timeout=Timeouts.SHORT
+            "workflow.status",
+            {'workflow_id': workflow_id},
+            timeout=5.0
         )
 
-        if response and response.payload.get("success"):
-            return response.payload["status"]
+        if response and response.payload.get('success'):
+            return response.payload['status']
         else:
             return None
 
-    @requires_init
-    def enhance_audio(
-        self,
-        audio_data: Union[Any, List[float]],
-        sample_rate: int = 44100,
-        params: Optional[Dict] = None,
-    ) -> Dict:
+    def enhance_audio(self, audio_data: Any, sample_rate: int = 44100, params: Optional[Dict] = None) -> Dict:
         """
         Enhance audio using the audio enhancement agent.
 
@@ -197,19 +173,22 @@ class MultiAgentSystem:
         Returns:
             Enhancement result dict
         """
-        enhancement_agent = self.coordinator.agents.get("audio_enhancement_agent")
+        if not self.initialized:
+            raise RuntimeError("System not initialized")
+
+        enhancement_agent = self.coordinator.agents.get('audio_enhancement_agent')
         if not enhancement_agent:
             raise RuntimeError("Audio enhancement agent not found")
 
         # Send enhancement request
         response = enhancement_agent.request(
-            Topics.AUDIO_ENHANCEMENT_REQUEST,
+            "audio.enhancement.request",
             {
-                "audio_data": audio_data,
-                "sample_rate": sample_rate,
-                "params": params or {},
+                'audio_data': audio_data,
+                'sample_rate': sample_rate,
+                'params': params or {}
             },
-            timeout=Timeouts.VERY_LONG,
+            timeout=120.0
         )
 
         if response:
@@ -217,10 +196,7 @@ class MultiAgentSystem:
         else:
             raise RuntimeError("Enhancement request timed out")
 
-    @requires_init
-    def generate_music(
-        self, content_type: str, musical_context: Dict, params: Optional[Dict] = None
-    ) -> Dict:
+    def generate_music(self, content_type: str, musical_context: Dict, params: Optional[Dict] = None) -> Dict:
         """
         Generate musical content.
 
@@ -232,15 +208,18 @@ class MultiAgentSystem:
         Returns:
             Generation result dict
         """
-        content_agent = self.coordinator.agents.get("content_generation_agent")
+        if not self.initialized:
+            raise RuntimeError("System not initialized")
+
+        content_agent = self.coordinator.agents.get('content_generation_agent')
         if not content_agent:
             raise RuntimeError("Content generation agent not found")
 
         topic_map = {
-            "melody": Topics.MUSIC_GEN_MELODY_REQ,
-            "harmony": Topics.MUSIC_GEN_HARMONY_REQ,
-            "drums": Topics.MUSIC_GEN_DRUMS_REQ,
-            "bass": Topics.MUSIC_GEN_BASS_REQ,
+            'melody': 'music.generation.melody.request',
+            'harmony': 'music.generation.harmony.request',
+            'drums': 'music.generation.drums.request',
+            'bass': 'music.generation.bass.request'
         }
 
         topic = topic_map.get(content_type)
@@ -249,7 +228,12 @@ class MultiAgentSystem:
 
         # Send generation request
         response = content_agent.request(
-            topic, {**musical_context, "params": params or {}}, timeout=Timeouts.LONG
+            topic,
+            {
+                **musical_context,
+                'params': params or {}
+            },
+            timeout=60.0
         )
 
         if response:
@@ -257,10 +241,9 @@ class MultiAgentSystem:
         else:
             raise RuntimeError("Generation request timed out")
 
-    @requires_init
     def extract_metadata(
         self,
-        audio_data: Union[Any, List[float]] = None,
+        audio_data: Any = None,
         audio_path: str = None,
         sample_rate: int = 44100,
         deep_analysis: bool = True,
@@ -277,20 +260,23 @@ class MultiAgentSystem:
         Returns:
             Metadata dict
         """
-        metadata_agent = self.coordinator.agents.get("metadata_management_agent")
+        if not self.initialized:
+            raise RuntimeError("System not initialized")
+
+        metadata_agent = self.coordinator.agents.get('metadata_management_agent')
         if not metadata_agent:
             raise RuntimeError("Metadata management agent not found")
 
         # Send metadata extraction request
         response = metadata_agent.request(
-            Topics.METADATA_EXTRACT_REQ,
+            "metadata.extract.request",
             {
-                "audio_data": audio_data,
-                "audio_path": audio_path,
-                "sample_rate": sample_rate,
-                "deep_analysis": deep_analysis,
+                'audio_data': audio_data,
+                'audio_path': audio_path,
+                'sample_rate': sample_rate,
+                'deep_analysis': deep_analysis
             },
-            timeout=Timeouts.LONG,
+            timeout=60.0
         )
 
         if response:
@@ -298,7 +284,6 @@ class MultiAgentSystem:
         else:
             raise RuntimeError("Metadata extraction request timed out")
 
-    @requires_init
     def search_metadata(self, query: str, filters: Optional[Dict] = None) -> Dict:
         """
         Search for audio files by metadata.
@@ -310,14 +295,20 @@ class MultiAgentSystem:
         Returns:
             Search results dict
         """
-        metadata_agent = self.coordinator.agents.get("metadata_management_agent")
+        if not self.initialized:
+            raise RuntimeError("System not initialized")
+
+        metadata_agent = self.coordinator.agents.get('metadata_management_agent')
         if not metadata_agent:
             raise RuntimeError("Metadata management agent not found")
 
         response = metadata_agent.request(
-            Topics.METADATA_SEARCH_REQ,
-            {"query": query, "filters": filters or {}},
-            timeout=Timeouts.MEDIUM,
+            "metadata.search.request",
+            {
+                'query': query,
+                'filters': filters or {}
+            },
+            timeout=30.0
         )
 
         if response:
@@ -325,15 +316,19 @@ class MultiAgentSystem:
         else:
             raise RuntimeError("Search request timed out")
 
-    @requires_init
     def get_resource_metrics(self) -> Dict:
         """Get current system resource metrics"""
-        perf_agent = self.coordinator.agents.get("performance_optimization_agent")
+        if not self.initialized:
+            raise RuntimeError("System not initialized")
+
+        perf_agent = self.coordinator.agents.get('performance_optimization_agent')
         if not perf_agent:
             raise RuntimeError("Performance optimization agent not found")
 
         response = perf_agent.request(
-            Topics.SYSTEM_RESOURCE_REQ, {}, timeout=Timeouts.SHORT
+            "system.resource.request",
+            {},
+            timeout=5.0
         )
 
         if response:

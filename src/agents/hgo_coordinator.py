@@ -1,536 +1,590 @@
 """
-Hierarchical Goal Optimization (HGO) Coordinator for MAAPS
+HGO (Hierarchical Goal Optimization) Coordinator
 
-The HGO Coordinator mediates between competing agents (EQ and Dynamics).
-When agents conflict (both trying to optimize but pulling in different directions),
-the coordinator determines priorities, sequencing, and compromise solutions.
+Mediates between multiple audio processing agents (EQ, Dynamics, etc.)
+to optimize towards global audio quality goals while managing conflicts.
 
-This implements the "now they fight" phase - the coordinator prevents chaos.
+The coordinator:
+1. Receives global optimization goals (e.g., "maximize clarity and punch")
+2. Decomposes goals into sub-goals for each agent
+3. Coordinates agent actions to avoid destructive interference
+4. Resolves conflicts when agents work against each other
+5. Orchestrates multi-agent training for collaborative learning
 """
 
-import ray
 import numpy as np
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, Any, List, Tuple, Optional
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-import asyncio
+import torch
+import torch.nn as nn
 
-from src.core.audio_ontology import (
-    AudioState,
-    AudioGoal,
-    AudioAttribute,
-    AgentAction,
-    AudioOntologyManager,
-)
+from src.core.base_agent import BaseAgent, AgentCapability
+from src.core.types import Message, MessageType, Topics
+from src.core.audio_ontology import get_audio_ontology, AudioOntology
 
 logger = logging.getLogger(__name__)
 
 
-class ConflictType(Enum):
-    """Types of conflicts between agents."""
-
-    NO_CONFLICT = 0
-    PARAMETER_CONFLICT = 1  # Both agents affecting same audio aspect
-    GOAL_CONFLICT = 2  # Agents pursuing incompatible goals
-    RESOURCE_CONFLICT = 3  # Both agents needing same computational resources
-    TEMPORAL_CONFLICT = 4  # Order dependency issues
+class GoalPriority(Enum):
+    """Priority levels for optimization goals"""
+    CRITICAL = 3
+    HIGH = 2
+    MEDIUM = 1
+    LOW = 0
 
 
 @dataclass
-class AgentProposal:
-    """Proposal from an agent to take action."""
-
-    agent_id: str
-    action: AgentAction
-    predicted_impact: Dict[AudioAttribute, float]
-    predicted_satisfaction: float
-    confidence: float
-    priority: float = 0.5
-
-
-@dataclass
-class CoordinationDecision:
-    """Decision from the coordinator."""
-
-    approved_proposals: List[AgentProposal]
-    rejected_proposals: List[AgentProposal]
-    execution_order: List[str]  # Agent IDs in execution order
-    compromise_adjustments: Dict[str, Dict[str, float]]  # agent_id -> param adjustments
-    reasoning: str
-
-
-@dataclass
-class ConflictReport:
-    """Report of conflict between agents."""
-
-    conflict_type: ConflictType
-    involved_agents: List[str]
-    conflicting_attributes: List[AudioAttribute]
-    severity: float  # 0.0 to 1.0
+class OptimizationGoal:
+    """Represents a high-level optimization goal"""
+    name: str
     description: str
+    target_concepts: List[str]  # Desired audio concepts
+    avoid_concepts: List[str]  # Concepts to avoid
+    priority: GoalPriority
+    weight: float = 1.0  # 0.0 to 1.0
+
+    # Agent-specific sub-goals
+    eq_subgoals: List[str] = field(default_factory=list)
+    dynamics_subgoals: List[str] = field(default_factory=list)
 
 
-@ray.remote
-class HGOCoordinator:
+@dataclass
+class AgentAction:
+    """Represents an action proposed by an agent"""
+    agent_id: str
+    agent_type: str
+    action_vector: np.ndarray
+    predicted_reward: float
+    confidence: float
+    affected_concepts: List[str]  # Audio concepts this action affects
+
+
+@dataclass
+class ConflictResolution:
+    """Resolution strategy for agent conflicts"""
+    conflict_type: str
+    agents_involved: List[str]
+    resolution_strategy: str
+    weight_adjustments: Dict[str, float]
+
+
+class HGOCoordinator(BaseAgent):
     """
     Hierarchical Goal Optimization Coordinator.
 
-    Responsibilities:
-    1. Receive proposals from multiple agents
-    2. Detect conflicts between proposals
-    3. Resolve conflicts using goal hierarchy and ontology
-    4. Determine execution order
-    5. Provide compromise solutions when needed
-    6. Monitor overall system satisfaction
+    Manages multiple RL agents (EQ, Dynamics, etc.) to achieve
+    global audio quality goals while minimizing destructive interference.
     """
 
-    def __init__(
-        self,
-        goal_hierarchy: Optional[List[AudioGoal]] = None,
-        conflict_threshold: float = 0.3,
-        compromise_weight: float = 0.5,
-        ontology: Optional[AudioOntologyManager] = None,
-    ):
-        """
-        Initialize HGO Coordinator.
+    def __init__(self, agent_id: str, message_bus,
+                 eq_agent_id: str,
+                 dynamics_agent_id: str,
+                 critic_agent_id: str,
+                 config: Optional[Dict[str, Any]] = None):
+        capabilities = [
+            AgentCapability.COORDINATION,
+            AgentCapability.MACHINE_LEARNING,
+        ]
 
-        Args:
-            goal_hierarchy: Ordered list of goals (highest priority first)
-            conflict_threshold: Threshold for detecting conflicts
-            compromise_weight: Weight for compromise solutions (0=first agent, 1=second agent)
-            ontology: Ontology manager
-        """
-        self.goal_hierarchy = goal_hierarchy or []
-        self.conflict_threshold = conflict_threshold
-        self.compromise_weight = compromise_weight
-        self.ontology = ontology or AudioOntologyManager()
-
-        # Coordination history
-        self.coordination_history = []
-        self.conflict_history = []
-
-        # Agent registry
-        self.registered_agents = {}
-
-        logger.info("HGO Coordinator initialized")
-
-    def register_agent(self, agent_id: str, agent_ref: Any, priority: float = 0.5):
-        """
-        Register an agent with the coordinator.
-
-        Args:
-            agent_id: Unique agent identifier
-            agent_ref: Ray actor reference
-            priority: Default priority (0-1)
-        """
-        self.registered_agents[agent_id] = {
-            "ref": agent_ref,
-            "priority": priority,
-            "action_count": 0,
-            "success_rate": 0.5,
-        }
-        logger.info(f"Registered agent: {agent_id}")
-
-    def detect_conflicts(
-        self, proposals: List[AgentProposal], current_state: AudioState
-    ) -> List[ConflictReport]:
-        """
-        Detect conflicts between agent proposals.
-
-        Args:
-            proposals: List of agent proposals
-            current_state: Current audio state
-
-        Returns:
-            List of conflict reports
-        """
-        conflicts = []
-
-        # Compare all pairs of proposals
-        for i, prop1 in enumerate(proposals):
-            for prop2 in proposals[i + 1 :]:
-                conflict = self._check_proposal_conflict(prop1, prop2, current_state)
-                if conflict:
-                    conflicts.append(conflict)
-
-        return conflicts
-
-    def _check_proposal_conflict(
-        self, prop1: AgentProposal, prop2: AgentProposal, current_state: AudioState
-    ) -> Optional[ConflictReport]:
-        """
-        Check if two proposals conflict.
-
-        Args:
-            prop1, prop2: Proposals to check
-            current_state: Current state
-
-        Returns:
-            ConflictReport if conflict detected, None otherwise
-        """
-        # Check for conflicting attribute impacts
-        conflicting_attrs = []
-        total_conflict = 0.0
-
-        for attr in AudioAttribute:
-            impact1 = prop1.predicted_impact.get(attr, 0.0)
-            impact2 = prop2.predicted_impact.get(attr, 0.0)
-
-            # Conflict if impacts have opposite signs and are significant
-            if abs(impact1) > 0.1 and abs(impact2) > 0.1:
-                if impact1 * impact2 < 0:  # Opposite signs
-                    conflicting_attrs.append(attr)
-                    total_conflict += abs(impact1) + abs(impact2)
-
-        if not conflicting_attrs:
-            return None
-
-        # Determine conflict type and severity
-        severity = min(total_conflict / len(conflicting_attrs), 1.0)
-
-        if severity < self.conflict_threshold:
-            return None
-
-        # Determine conflict type
-        if any(
-            attr in [AudioAttribute.CLARITY, AudioAttribute.WARMTH]
-            for attr in conflicting_attrs
-        ):
-            conflict_type = ConflictType.GOAL_CONFLICT
-        else:
-            conflict_type = ConflictType.PARAMETER_CONFLICT
-
-        return ConflictReport(
-            conflict_type=conflict_type,
-            involved_agents=[prop1.agent_id, prop2.agent_id],
-            conflicting_attributes=conflicting_attrs,
-            severity=severity,
-            description=f"Conflict between {prop1.agent_id} and {prop2.agent_id} on {len(conflicting_attrs)} attributes",
+        super().__init__(
+            agent_id=agent_id,
+            agent_type="hgo_coordinator",
+            capabilities=capabilities,
+            message_bus=message_bus
         )
 
-    def resolve_conflicts(
-        self,
-        proposals: List[AgentProposal],
-        conflicts: List[ConflictReport],
-        current_state: AudioState,
-    ) -> CoordinationDecision:
+        self.config = config or {}
+        self.eq_agent_id = eq_agent_id
+        self.dynamics_agent_id = dynamics_agent_id
+        self.critic_agent_id = critic_agent_id
+
+        self.ontology: AudioOntology = get_audio_ontology()
+
+        # Current optimization goals
+        self.active_goals: List[OptimizationGoal] = []
+
+        # Agent coordination state
+        self.agent_weights: Dict[str, float] = {
+            eq_agent_id: 0.5,
+            dynamics_agent_id: 0.5,
+        }
+
+        # Conflict tracking
+        self.conflict_history: List[ConflictResolution] = []
+        self.cooperation_score = 1.0  # 0.0 to 1.0
+
+        # Meta-learning for coordination
+        self.coordination_network = CoordinationNetwork(
+            num_agents=2,
+            audio_feature_dim=17,
+        )
+        self.coordination_optimizer = torch.optim.Adam(
+            self.coordination_network.parameters(),
+            lr=1e-4
+        )
+
+        # Training mode
+        self.training_mode = self.config.get('training_mode', 'cooperative')  # or 'competitive'
+
+        # Statistics
+        self.coordination_episodes = 0
+        self.total_global_reward = 0.0
+
+        logger.info(f"HGO Coordinator {agent_id} initialized")
+
+    def set_goals(self, goals: List[OptimizationGoal]):
+        """Set high-level optimization goals"""
+        self.active_goals = goals
+        logger.info(f"HGO Coordinator set {len(goals)} goals")
+
+        # Decompose goals into agent-specific sub-goals
+        for goal in goals:
+            self._decompose_goal(goal)
+
+    def _decompose_goal(self, goal: OptimizationGoal):
         """
-        Resolve conflicts and make coordination decision.
+        Decompose high-level goal into agent-specific sub-goals.
+
+        Examples:
+        - "Maximize clarity" -> EQ: boost high-mids, Dynamics: preserve transients
+        - "Add warmth" -> EQ: boost low-mids, Dynamics: gentle compression
+        - "Control dynamics" -> EQ: minimal, Dynamics: active compression
+        """
+        # EQ sub-goals based on target concepts
+        for concept in goal.target_concepts:
+            concept_obj = self.ontology.get_concept(concept)
+            if concept_obj and concept_obj.eq_adjustments:
+                goal.eq_subgoals.append(f"adjust_eq_for_{concept}")
+
+        # Dynamics sub-goals
+        dynamics_concepts = ['punch', 'tightness', 'control', 'dynamic', 'compressed']
+        for concept in goal.target_concepts:
+            if concept in dynamics_concepts:
+                goal.dynamics_subgoals.append(f"adjust_dynamics_for_{concept}")
+
+        # Avoid negative concepts
+        for concept in goal.avoid_concepts:
+            concept_obj = self.ontology.get_concept(concept)
+            if concept_obj:
+                # Both agents should work to avoid these
+                goal.eq_subgoals.append(f"avoid_{concept}")
+                goal.dynamics_subgoals.append(f"avoid_{concept}")
+
+        logger.debug(
+            f"Goal '{goal.name}' decomposed: "
+            f"EQ subgoals={goal.eq_subgoals}, "
+            f"Dynamics subgoals={goal.dynamics_subgoals}"
+        )
+
+    def coordinate_agents(self, audio: np.ndarray,
+                          training: bool = True,
+                          max_steps: int = 5) -> Dict[str, Any]:
+        """
+        Coordinate multiple agents to optimize audio.
 
         Args:
-            proposals: All agent proposals
-            conflicts: Detected conflicts
-            current_state: Current state
+            audio: Input audio to process
+            training: Whether to train agents
+            max_steps: Maximum coordination steps
 
         Returns:
-            CoordinationDecision
+            Coordination results
         """
-        if not conflicts:
-            # No conflicts, approve all proposals
-            return CoordinationDecision(
-                approved_proposals=proposals,
-                rejected_proposals=[],
-                execution_order=[p.agent_id for p in proposals],
-                compromise_adjustments={},
-                reasoning="No conflicts detected, all proposals approved",
+        current_audio = audio.copy()
+        episode_rewards = []
+
+        # Get initial judgment
+        initial_judgment = self._get_critic_judgment(current_audio)
+        initial_reward = initial_judgment.get('satisfaction_score', 0.0)
+
+        for step in range(max_steps):
+            logger.debug(f"HGO Coordination step {step + 1}/{max_steps}")
+
+            # Get proposed actions from each agent
+            eq_action = self._get_agent_proposal(
+                self.eq_agent_id,
+                current_audio,
+                training=training
             )
 
-        # Strategy 1: Goal hierarchy priority
-        # Prioritize proposals that align with higher-priority goals
-        proposal_scores = []
-        for proposal in proposals:
-            score = self._score_proposal_against_goals(proposal, current_state)
-            proposal_scores.append((score, proposal))
+            dynamics_action = self._get_agent_proposal(
+                self.dynamics_agent_id,
+                current_audio,
+                training=training
+            )
 
-        proposal_scores.sort(key=lambda x: x[0], reverse=True)
+            # Detect conflicts
+            conflict = self._detect_conflict(eq_action, dynamics_action)
 
-        # Strategy 2: Conflict resolution
-        approved = []
-        rejected = []
-        compromise_adjustments = {}
+            if conflict:
+                logger.info(f"Conflict detected: {conflict['type']}")
+                # Resolve conflict
+                resolution = self._resolve_conflict(conflict, eq_action, dynamics_action)
+                self.conflict_history.append(resolution)
 
-        for score, proposal in proposal_scores:
-            # Check if this proposal conflicts with already approved proposals
-            has_conflict = False
-            for conflict in conflicts:
-                if proposal.agent_id in conflict.involved_agents:
-                    # Check if other involved agent is already approved
-                    other_agents = [
-                        a for a in conflict.involved_agents if a != proposal.agent_id
-                    ]
-                    if any(a in [p.agent_id for p in approved] for a in other_agents):
-                        has_conflict = True
+                # Adjust agent weights based on resolution
+                for agent_id, weight in resolution.weight_adjustments.items():
+                    self.agent_weights[agent_id] = weight
 
-                        # Try compromise
-                        if conflict.severity < 0.7:  # Medium severity, try compromise
-                            adjustment = self._calculate_compromise(
-                                proposal, conflict, current_state
-                            )
-                            compromise_adjustments[proposal.agent_id] = adjustment
-                            approved.append(proposal)
-                            has_conflict = False
-                        break
+            # Determine action order and coordination
+            action_order = self._determine_action_order(eq_action, dynamics_action)
 
-            if has_conflict:
-                rejected.append(proposal)
-            elif proposal not in approved:
-                approved.append(proposal)
+            # Execute actions in coordinated manner
+            for agent_id, action in action_order:
+                if agent_id == self.eq_agent_id or agent_id == self.dynamics_agent_id:
+                    response = self.message_bus.request(
+                        Message(
+                            topic=Topics.agent_request(agent_id),
+                            sender=self.agent_id,
+                            message_type=MessageType.AUDIO_PROCESSING_REQUEST,
+                            payload={
+                                'audio': current_audio,
+                                'mode': 'training' if training else 'inference',
+                                'action': action.action_vector,
+                            },
+                        )
+                    )
 
-        # Strategy 3: Determine execution order
-        # Order based on attribute dependencies
-        execution_order = self._determine_execution_order(approved, current_state)
+                    if response and response.payload.get('status') == 'success':
+                        current_audio = response.payload.get('audio', current_audio)
 
-        # Generate reasoning
-        reasoning = self._generate_reasoning(
-            approved, rejected, conflicts, compromise_adjustments
+            # Get feedback from Critic
+            judgment = self._get_critic_judgment(current_audio)
+            step_reward = judgment.get('satisfaction_score', 0.0)
+            episode_rewards.append(step_reward)
+
+            # Compute cooperation bonus
+            cooperation_bonus = self._compute_cooperation_bonus(judgment)
+            total_step_reward = step_reward + cooperation_bonus
+            episode_rewards[-1] = total_step_reward
+
+            # Update cooperation score
+            self._update_cooperation_score(judgment)
+
+            logger.debug(
+                f"Step {step + 1}: reward={step_reward:.3f}, "
+                f"cooperation_bonus={cooperation_bonus:.3f}"
+            )
+
+        # Compute final metrics
+        final_judgment = self._get_critic_judgment(current_audio)
+        final_reward = final_judgment.get('satisfaction_score', 0.0)
+
+        improvement = final_reward - initial_reward
+        avg_episode_reward = np.mean(episode_rewards)
+
+        # Update statistics
+        self.coordination_episodes += 1
+        self.total_global_reward += final_reward
+
+        return {
+            'status': 'success',
+            'processed_audio': current_audio,
+            'initial_reward': initial_reward,
+            'final_reward': final_reward,
+            'improvement': improvement,
+            'episode_rewards': episode_rewards,
+            'avg_reward': avg_episode_reward,
+            'cooperation_score': self.cooperation_score,
+            'conflicts_detected': len([
+                c for c in self.conflict_history if c.agents_involved
+            ]),
+            'final_judgment': final_judgment,
+        }
+
+    def _get_agent_proposal(
+        self, agent_id: str, audio: np.ndarray, training: bool,
+    ) -> AgentAction:
+        """Query the actual EQ or Dynamics agent for an action proposal.
+
+        Routes via per-agent topic, requests an "action_proposal" with the
+        current audio. Falls back to a structured neutral proposal (zeros +
+        confidence 0.0) if the agent does not respond, so coordination can
+        still proceed but its conflict detector can tell the difference
+        between a real proposal and a missing one (confidence == 0.0).
+
+        `affected_concepts` is populated from the current goals'
+        decomposed subgoals — the previously dead `eq_subgoals` and
+        `dynamics_subgoals` lists now actually flow into conflict detection.
+        """
+        agent_type = "eq" if agent_id == self.eq_agent_id else "dynamics"
+        # EQ action: 7 bands * 2 params (gain + Q) = 14. Dynamics: 10 params.
+        action_dim = 14 if agent_type == "eq" else 10
+
+        # Pull the union of subgoals across all current goals for this agent type
+        subgoals: List[str] = []
+        for goal in getattr(self, 'active_goals', []) or []:
+            subgoals.extend(
+                goal.eq_subgoals if agent_type == "eq" else goal.dynamics_subgoals
+            )
+        # Strip the "avoid_" / "target_" prefix to get bare concept names
+        affected = [s.split("_", 1)[1] if "_" in s else s for s in subgoals]
+
+        response = self.message_bus.request(
+            Message(
+                topic=Topics.agent_request(agent_id),
+                sender=self.agent_id,
+                message_type=MessageType.AUDIO_PROCESSING_REQUEST,
+                payload={
+                    'mode': 'propose',
+                    'audio': audio,
+                    'training': training,
+                    'subgoals': subgoals,
+                },
+            ),
+            timeout=2.0,
         )
 
-        decision = CoordinationDecision(
-            approved_proposals=approved,
-            rejected_proposals=rejected,
-            execution_order=execution_order,
-            compromise_adjustments=compromise_adjustments,
-            reasoning=reasoning,
+        if response and response.payload.get('status') == 'success':
+            action_vec = np.asarray(
+                response.payload.get('action', np.zeros(action_dim)),
+                dtype=np.float32,
+            )
+            if action_vec.shape != (action_dim,):
+                action_vec = np.zeros(action_dim, dtype=np.float32)
+            return AgentAction(
+                agent_id=agent_id,
+                agent_type=agent_type,
+                action_vector=action_vec,
+                predicted_reward=float(response.payload.get('predicted_reward', 0.0)),
+                confidence=float(response.payload.get('confidence', 0.5)),
+                affected_concepts=affected,
+            )
+
+        # Agent did not respond — return a marker proposal (confidence 0.0)
+        # so downstream conflict detection can ignore it.
+        return AgentAction(
+            agent_id=agent_id,
+            agent_type=agent_type,
+            action_vector=np.zeros(action_dim, dtype=np.float32),
+            predicted_reward=0.0,
+            confidence=0.0,
+            affected_concepts=affected,
         )
 
-        self.coordination_history.append(decision)
-        return decision
-
-    def _score_proposal_against_goals(
-        self, proposal: AgentProposal, current_state: AudioState
-    ) -> float:
+    def _detect_conflict(self, action1: AgentAction, action2: AgentAction) -> Optional[Dict[str, Any]]:
         """
-        Score a proposal based on alignment with goal hierarchy.
+        Detect conflicts between agent actions.
 
-        Args:
-            proposal: Agent proposal
-            current_state: Current state
+        Conflicts occur when:
+        1. Agents work on opposing goals (e.g., EQ boosts, Dynamics compresses)
+        2. Actions cancel each other out
+        3. Actions reinforce negatively (e.g., both increase loudness -> clipping)
+        """
+        # Check for opposing concepts
+        concepts1 = set(action1.affected_concepts)
+        concepts2 = set(action2.affected_concepts)
+
+        # Check if any concept in one is opposite of concept in other
+        for concept1 in concepts1:
+            opposites = self.ontology.get_opposite_concepts(concept1)
+            for opposite in opposites:
+                if opposite.name in concepts2:
+                    return {
+                        'type': 'opposing_goals',
+                        'agents': [action1.agent_id, action2.agent_id],
+                        'conflicting_concepts': [concept1, opposite.name],
+                    }
+
+        # Check for reinforcing negatives (both reducing dynamic range)
+        # This is domain-specific logic
+        if action1.agent_type == "eq" and action2.agent_type == "dynamics":
+            # Example: heavy compression + too much EQ = artifacts
+            if action2.predicted_reward < 0 and action1.predicted_reward < 0:
+                return {
+                    'type': 'reinforcing_negative',
+                    'agents': [action1.agent_id, action2.agent_id],
+                }
+
+        return None
+
+    def _resolve_conflict(
+        self, conflict: Dict[str, Any],
+        action1: AgentAction,
+        action2: AgentAction,
+    ) -> ConflictResolution:
+        """
+        Resolve conflict between agents.
+
+        Strategies:
+        1. Priority-based: Use active goals to determine which agent gets priority
+        2. Sequential: Order actions to minimize interference
+        3. Blending: Weight actions based on predicted rewards
+        4. Negotiate: Reduce both actions' magnitudes
+        """
+        conflict_type = conflict['type']
+        agents = conflict['agents']
+
+        if conflict_type == 'opposing_goals':
+            # Use goal priorities to decide
+            # For now, balance 50/50
+            return ConflictResolution(
+                conflict_type=conflict_type,
+                agents_involved=agents,
+                resolution_strategy='balance',
+                weight_adjustments={
+                    agents[0]: 0.5,
+                    agents[1]: 0.5,
+                }
+            )
+
+        elif conflict_type == 'reinforcing_negative':
+            # Reduce both actions
+            return ConflictResolution(
+                conflict_type=conflict_type,
+                agents_involved=agents,
+                resolution_strategy='reduce_both',
+                weight_adjustments={
+                    agents[0]: 0.3,
+                    agents[1]: 0.3,
+                }
+            )
+
+        else:
+            # Default: no adjustment
+            return ConflictResolution(
+                conflict_type='unknown',
+                agents_involved=agents,
+                resolution_strategy='none',
+                weight_adjustments={},
+            )
+
+    def _determine_action_order(self, eq_action: AgentAction,
+                                dynamics_action: AgentAction) -> List[Tuple[str, AgentAction]]:
+        """
+        Determine optimal order for applying actions.
+
+        Typical order: EQ first, then Dynamics (industry standard)
+        But can be dynamic based on goals.
+        """
+        # Standard signal chain: EQ -> Dynamics
+        return [
+            (self.eq_agent_id, eq_action),
+            (self.dynamics_agent_id, dynamics_action),
+        ]
+
+    def _get_critic_judgment(self, audio: np.ndarray) -> Dict[str, Any]:
+        """Get judgment from Critic agent"""
+        response = self.message_bus.request(
+            Message(
+                topic=Topics.agent_request(self.critic_agent_id),
+                sender=self.agent_id,
+                message_type=MessageType.CRITIC_JUDGMENT_REQUEST,
+                payload={
+                    'audio': audio,
+                    'sample_rate': self.config.get('sample_rate', 44100),
+                },
+            )
+        )
+
+        if response and response.payload.get('status') == 'success':
+            return response.payload.get('judgment', {})
+        else:
+            return {'satisfaction_score': 0.0}
+
+    def _compute_cooperation_bonus(self, judgment: Dict[str, Any]) -> float:
+        """
+        Compute bonus reward for agent cooperation.
+
+        Agents get bonus when they:
+        - Improve multiple goals simultaneously
+        - Avoid negative concepts
+        - Work synergistically
+        """
+        positive_concepts = judgment.get('positive_concepts', [])
+        negative_concepts = judgment.get('negative_concepts', [])
+
+        # Bonus for achieving multiple positive concepts
+        diversity_bonus = len(positive_concepts) * 0.05
+
+        # Penalty for negative concepts
+        negative_penalty = len(negative_concepts) * -0.1
+
+        # Cooperation bonus based on current cooperation score
+        cooperation_bonus = self.cooperation_score * 0.1
+
+        return diversity_bonus + negative_penalty + cooperation_bonus
+
+    def _update_cooperation_score(self, judgment: Dict[str, Any]):
+        """Update cooperation score based on judgment"""
+        satisfaction = judgment.get('satisfaction_score', 0.0)
+
+        # Update cooperation score (moving average)
+        alpha = 0.1
+        self.cooperation_score = (1 - alpha) * self.cooperation_score + alpha * max(0, satisfaction)
+
+    def handle_message(self, message: Message) -> Any:
+        """Handle incoming messages"""
+        try:
+            if message.message_type == MessageType.COORDINATION_REQUEST:
+                audio = message.payload.get('audio')
+                training = message.payload.get('training', True)
+                max_steps = message.payload.get('max_steps', 5)
+
+                result = self.coordinate_agents(audio, training, max_steps)
+                return result
+
+            elif message.message_type == MessageType.SET_GOALS:
+                goals_data = message.payload.get('goals', [])
+
+                # Convert to OptimizationGoal objects
+                goals = []
+                for g in goals_data:
+                    goal = OptimizationGoal(
+                        name=g['name'],
+                        description=g['description'],
+                        target_concepts=g.get('target_concepts', []),
+                        avoid_concepts=g.get('avoid_concepts', []),
+                        priority=GoalPriority[g.get('priority', 'MEDIUM')],
+                        weight=g.get('weight', 1.0),
+                    )
+                    goals.append(goal)
+
+                self.set_goals(goals)
+
+                return {
+                    'status': 'success',
+                    'message': f'Set {len(goals)} optimization goals',
+                }
+
+        except Exception as e:
+            logger.error(f"Error handling message: {e}")
+            return {'status': 'error', 'message': str(e)}
+
+
+class CoordinationNetwork(nn.Module):
+    """
+    Neural network for learning optimal agent coordination.
+
+    Learns to predict optimal agent weights given audio features and goals.
+    """
+
+    def __init__(self, num_agents: int = 2, audio_feature_dim: int = 17,
+                 goal_dim: int = 10):
+        super(CoordinationNetwork, self).__init__()
+
+        self.num_agents = num_agents
+        input_dim = audio_feature_dim + goal_dim
+
+        self.network = nn.Sequential(
+            nn.Linear(input_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Linear(32, num_agents),
+            nn.Softmax(dim=-1),  # Output agent weights summing to 1
+        )
+
+    def forward(self, audio_features: torch.Tensor,
+                goal_features: torch.Tensor) -> torch.Tensor:
+        """
+        Compute optimal agent weights.
 
         Returns:
-            Score (higher is better)
+            Tensor of shape (batch_size, num_agents) with agent weights
         """
-        if not self.goal_hierarchy:
-            return proposal.predicted_satisfaction
-
-        total_score = 0.0
-        total_weight = 0.0
-
-        for goal in self.goal_hierarchy:
-            # Get predicted impact on this goal's attribute
-            impact = proposal.predicted_impact.get(goal.attribute, 0.0)
-
-            # Calculate current distance from goal
-            current_value = current_state.get_attribute(goal.attribute)
-            current_distance = goal.distance_from_target(current_value)
-
-            # Positive score if impact moves toward goal
-            if current_value < goal.target_value:
-                score = impact if impact > 0 else -abs(impact)
-            else:
-                score = impact if impact < 0 else -abs(impact)
-
-            # Weight by goal priority
-            weighted_score = score * goal.priority
-            total_score += weighted_score
-            total_weight += goal.priority
-
-        # Normalize
-        if total_weight > 0:
-            return total_score / total_weight
-        return 0.0
-
-    def _calculate_compromise(
-        self,
-        proposal: AgentProposal,
-        conflict: ConflictReport,
-        current_state: AudioState,
-    ) -> Dict[str, float]:
-        """
-        Calculate compromise adjustments for a proposal.
-
-        Args:
-            proposal: Conflicting proposal
-            conflict: Conflict report
-            current_state: Current state
-
-        Returns:
-            Parameter adjustments (scaling factors)
-        """
-        # Simple compromise: scale down the proposal
-        adjustment_factor = 1.0 - (conflict.severity * self.compromise_weight)
-
-        adjustments = {
-            param: adjustment_factor for param in proposal.action.parameters.keys()
-        }
-
-        return adjustments
-
-    def _determine_execution_order(
-        self, approved_proposals: List[AgentProposal], current_state: AudioState
-    ) -> List[str]:
-        """
-        Determine optimal execution order for approved proposals.
-
-        Args:
-            approved_proposals: List of approved proposals
-            current_state: Current state
-
-        Returns:
-            List of agent IDs in execution order
-        """
-        if len(approved_proposals) <= 1:
-            return [p.agent_id for p in approved_proposals]
-
-        # Heuristic: EQ before dynamics, as dynamics often depends on frequency content
-        order = []
-        for proposal in approved_proposals:
-            if "eq" in proposal.agent_id.lower():
-                order.insert(0, proposal.agent_id)
-            else:
-                order.append(proposal.agent_id)
-
-        return order
-
-    def _generate_reasoning(
-        self,
-        approved: List[AgentProposal],
-        rejected: List[AgentProposal],
-        conflicts: List[ConflictReport],
-        compromises: Dict[str, Dict[str, float]],
-    ) -> str:
-        """Generate human-readable reasoning for the decision."""
-        parts = []
-
-        parts.append(f"Approved {len(approved)} proposals, rejected {len(rejected)}")
-
-        if conflicts:
-            parts.append(f"Resolved {len(conflicts)} conflicts")
-
-        if compromises:
-            parts.append(f"Applied compromises to {len(compromises)} agents")
-
-        if rejected:
-            rejected_ids = [p.agent_id for p in rejected]
-            parts.append(f"Rejected: {', '.join(rejected_ids)}")
-
-        return " | ".join(parts)
-
-    async def coordinate(
-        self, proposals: List[AgentProposal], current_state: AudioState
-    ) -> CoordinationDecision:
-        """
-        Main coordination method.
-
-        Args:
-            proposals: Agent proposals
-            current_state: Current audio state
-
-        Returns:
-            CoordinationDecision
-        """
-        # Detect conflicts
-        conflicts = self.detect_conflicts(proposals, current_state)
-
-        if conflicts:
-            logger.info(f"Detected {len(conflicts)} conflicts")
-            for conflict in conflicts:
-                logger.debug(f"Conflict: {conflict.description}")
-                self.conflict_history.append(conflict)
-
-        # Resolve conflicts
-        decision = self.resolve_conflicts(proposals, conflicts, current_state)
-
-        logger.info(f"Coordination decision: {decision.reasoning}")
-
-        return decision
-
-    def set_goal_hierarchy(self, goals: List[AudioGoal]):
-        """Update goal hierarchy."""
-        self.goal_hierarchy = sorted(goals, key=lambda g: g.priority, reverse=True)
-        logger.info(f"Updated goal hierarchy with {len(goals)} goals")
-
-    def get_statistics(self) -> Dict:
-        """Get coordination statistics."""
-        return {
-            "total_coordinations": len(self.coordination_history),
-            "total_conflicts": len(self.conflict_history),
-            "registered_agents": len(self.registered_agents),
-            "conflict_rate": len(self.conflict_history)
-            / max(len(self.coordination_history), 1),
-        }
-
-    def get_agent_performance(self, agent_id: str) -> Dict:
-        """Get performance stats for an agent."""
-        if agent_id not in self.registered_agents:
-            return {"error": "Agent not registered"}
-
-        agent_info = self.registered_agents[agent_id]
-        return {
-            "agent_id": agent_id,
-            "priority": agent_info["priority"],
-            "action_count": agent_info["action_count"],
-            "success_rate": agent_info["success_rate"],
-        }
-
-
-def create_hgo_coordinator(
-    goals: Optional[List[AudioGoal]] = None, **kwargs
-) -> ray.ObjectRef:
-    """Convenience function to create HGO coordinator."""
-    coordinator = HGOCoordinator.remote(goal_hierarchy=goals, **kwargs)
-    return coordinator
-
-
-if __name__ == "__main__":
-    # Example usage
-    import ray
-    from ..core.audio_ontology import create_clarity_goal, create_warmth_goal
-
-    ray.init(ignore_reinit_error=True)
-
-    # Create coordinator
-    goals = [
-        create_clarity_goal(target=0.8, priority=1.0),
-        create_warmth_goal(target=0.7, priority=0.8),
-    ]
-
-    coordinator = HGOCoordinator.remote(goal_hierarchy=goals)
-
-    # Register agents
-    ray.get(coordinator.register_agent.remote("eq_agent", None, priority=0.8))
-    ray.get(coordinator.register_agent.remote("dynamics_agent", None, priority=0.7))
-
-    # Create dummy proposals
-    prop1 = AgentProposal(
-        agent_id="eq_agent",
-        action=AgentAction(agent_id="eq_agent", action_type="eq", parameters={}),
-        predicted_impact={AudioAttribute.CLARITY: 0.2},
-        predicted_satisfaction=0.7,
-        confidence=0.8,
-    )
-
-    prop2 = AgentProposal(
-        agent_id="dynamics_agent",
-        action=AgentAction(
-            agent_id="dynamics_agent", action_type="comp", parameters={}
-        ),
-        predicted_impact={AudioAttribute.CLARITY: -0.1, AudioAttribute.PUNCH: 0.3},
-        predicted_satisfaction=0.75,
-        confidence=0.85,
-    )
-
-    # Coordinate
-    current_state = AudioState()
-    current_state.set_attribute(AudioAttribute.CLARITY, 0.5)
-
-    decision = ray.get(coordinator.coordinate.remote([prop1, prop2], current_state))
-    print("Decision:", decision.reasoning)
-    print("Approved:", [p.agent_id for p in decision.approved_proposals])
-    print("Execution order:", decision.execution_order)
-
-    # Get stats
-    stats = ray.get(coordinator.get_statistics.remote())
-    print("Stats:", stats)
-
-    ray.shutdown()
+        combined = torch.cat([audio_features, goal_features], dim=-1)
+        weights = self.network(combined)
+        return weights
