@@ -14,6 +14,19 @@ from enum import Enum, auto
 import numpy as np
 
 
+@dataclass
+class FrequencyRange:
+    """Represents a frequency range with low and high bounds in Hz."""
+    low: float
+    high: float
+    
+    def __post_init__(self):
+        if self.low < 0:
+            raise ValueError("Low frequency must be non-negative")
+        if self.high <= self.low:
+            raise ValueError("High frequency must be greater than low frequency")
+
+
 class AudioAttribute(Enum):
     """Core audio quality attributes in the ontology."""
 
@@ -344,3 +357,12 @@ if __name__ == "__main__":
 
     synergies = ontology.get_synergistic_attributes(AudioAttribute.CLARITY)
     print(f"Attributes synergistic with CLARITY: {synergies}")
+
+
+# Alias for backward compatibility
+AudioOntology = AudioOntologyManager
+
+
+def get_audio_ontology() -> AudioOntologyManager:
+    """Get the singleton audio ontology instance."""
+    return AudioOntologyManager()

@@ -1,7 +1,5 @@
 # AGENTS.md
 
-This file provides guidance for agentic coding agents working in the MAAPS Nexus repository.
-
 ## System Overview
 MAAPS Nexus has two architectures:
 - **RL System (primary)**: Real-time mixing/mastering via RL agents, Ray distributed actors
@@ -34,13 +32,13 @@ pytest tests/
 # With coverage
 pytest tests/ --cov=src --cov-report=html
 
-# Specific suites
+# Specific suites (most commonly used)
 pytest tests/test_rl_system.py
 pytest tests/test_live_effects_chain.py
 pytest tests/test_synthetic_integration.py
 pytest tests/test_adaptive_latency.py
 
-# Single test
+# Single test example
 pytest tests/test_system.py::TestSystemBasics::test_system_creation
 ```
 
@@ -117,7 +115,7 @@ Secondary focus. Agents inherit from `BaseAgent` and communicate via message bus
 - **Documentation**: Triple-quoted docstrings; Args/Returns/Raises for public methods; sparse inline comments
 
 ## Performance & Safety
-- **Latency Target**: <10ms for real-time audio processing
+- **Latency Target**: <10ms for real-time audio processing (critical for RL system)
 - **Parallelism**: Ray actors for RL system
 - **Data Flow**: Minimize copying between agents
 - **Security**: Never log secrets; validate inputs; use env vars for config; least privilege
