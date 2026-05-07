@@ -1,539 +1,713 @@
 """
-EQ Reinforcement Learning Agent for MAAPS
+EQ Reinforcement Learning Agent
 
-The EQ agent learns to adjust equalization bands through reinforcement learning.
-It receives feedback from the Critic agent and explores parameter space to
-maximize user satisfaction.
-
-This is the FIRST action agent - it learns by randomly adjusting EQ until the Critic smiles.
+This agent learns to adjust EQ parameters to maximize audio quality
+as judged by the Critic agent. Uses Q-learning / Policy Gradient methods.
 """
 
-import ray
 import numpy as np
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from typing import Dict, List, Optional, Tuple
+from scipy import signal
+from typing import Dict, Any, List, Tuple, Optional
 import logging
 from dataclasses import dataclass
-from scipy import signal
-import copy
+from collections import deque
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import random
 
-from src.core.audio_ontology import (
-    AudioState,
-    AudioGoal,
-    AudioAttribute,
-    AgentAction,
-    FrequencyBand,
-    AudioOntologyManager,
-)
+from src.core.base_agent import BaseAgent, AgentCapability
+from src.core.types import Message, MessageType, Topics
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class EQBandSettings:
-    """Settings for one EQ band."""
-
-    frequency: float  # Center frequency in Hz
-    gain: float  # Gain in dB (-20 to +20)
-    q_factor: float  # Q factor (bandwidth), 0.1 to 10.0
-    band_type: str = "peak"  # "peak", "lowshelf", "highshelf", "lowpass", "highpass"
+class EQBand:
+    """Represents a single EQ band"""
+    center_freq: float  # Hz
+    gain: float  # dB (-12 to +12)
+    q_factor: float  # 0.1 to 10.0
+    eq_type: str = "peak"  # peak, lowshelf, highshelf
 
 
 @dataclass
 class EQState:
-    """Complete EQ state."""
-
-    bands: List[EQBandSettings]
+    """Current state of all EQ bands"""
+    bands: List[EQBand]
 
     def to_vector(self) -> np.ndarray:
-        """Convert to flat vector for RL."""
+        """Convert EQ state to vector for RL"""
         vector = []
         for band in self.bands:
-            vector.extend(
-                [
-                    np.log10(band.frequency) / 5.0,  # Normalize log freq
-                    band.gain / 20.0,  # Normalize to [-1, 1]
-                    np.log10(band.q_factor) / 2.0,  # Normalize log Q
-                ]
-            )
+            vector.extend([
+                band.center_freq / 20000,  # Normalize
+                (band.gain + 12) / 24,      # Normalize to 0-1
+                band.q_factor / 10,         # Normalize to 0-1
+            ])
         return np.array(vector)
 
-    @staticmethod
-    def from_vector(vector: np.ndarray, num_bands: int = 8) -> "EQState":
-        """Create EQState from vector."""
+    @classmethod
+    def from_vector(cls, vector: np.ndarray, center_freqs: List[float]) -> 'EQState':
+        """Create EQ state from vector"""
         bands = []
-        vector = vector.reshape(num_bands, 3)
-        for i, (freq_norm, gain_norm, q_norm) in enumerate(vector):
-            bands.append(
-                EQBandSettings(
-                    frequency=10 ** (freq_norm * 5.0),
-                    gain=gain_norm * 20.0,
-                    q_factor=10 ** (q_norm * 2.0),
-                )
-            )
-        return EQState(bands)
+        for i, center_freq in enumerate(center_freqs):
+            idx = i * 3
+            gain = vector[idx + 1] * 24 - 12
+            q_factor = vector[idx + 2] * 10
+            bands.append(EQBand(
+                center_freq=center_freq,
+                gain=gain,
+                q_factor=q_factor,
+            ))
+        return cls(bands=bands)
 
 
-class ActorNetwork(nn.Module):
-    """Actor network for policy (continuous action space)."""
-
-    def __init__(
-        self,
-        state_dim: int,
-        action_dim: int,
-        hidden_dim: int = 256,
-        max_action: float = 1.0,
-    ):
-        super().__init__()
-
-        self.max_action = max_action
-
-        self.network = nn.Sequential(
-            nn.Linear(state_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, action_dim),
-            nn.Tanh(),  # Output in [-1, 1]
-        )
-
-    def forward(self, state: torch.Tensor) -> torch.Tensor:
-        """Forward pass."""
-        return self.network(state) * self.max_action
-
-
-class CriticNetworkRL(nn.Module):
-    """Critic network for Q-value estimation (TD3 style)."""
-
-    def __init__(self, state_dim: int, action_dim: int, hidden_dim: int = 256):
-        super().__init__()
-
-        # Q1 architecture
-        self.q1 = nn.Sequential(
-            nn.Linear(state_dim + action_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, 1),
-        )
-
-        # Q2 architecture (twin critic)
-        self.q2 = nn.Sequential(
-            nn.Linear(state_dim + action_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, 1),
-        )
-
-    def forward(
-        self, state: torch.Tensor, action: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Forward pass, returns both Q values."""
-        x = torch.cat([state, action], dim=-1)
-        return self.q1(x), self.q2(x)
-
-    def q1_forward(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
-        """Forward pass for Q1 only."""
-        x = torch.cat([state, action], dim=-1)
-        return self.q1(x)
-
-
-class ReplayBuffer:
-    """Experience replay buffer for RL training."""
-
-    def __init__(self, max_size: int = 100000):
-        self.max_size = max_size
-        self.buffer = []
-        self.position = 0
-
-    def add(self, state, action, reward, next_state, done):
-        """Add experience to buffer."""
-        if len(self.buffer) < self.max_size:
-            self.buffer.append(None)
-        self.buffer[self.position] = (state, action, reward, next_state, done)
-        self.position = (self.position + 1) % self.max_size
-
-    def sample(self, batch_size: int):
-        """Sample batch from buffer."""
-        indices = np.random.choice(len(self.buffer), batch_size, replace=False)
-        batch = [self.buffer[idx] for idx in indices]
-
-        states = np.array([item[0] for item in batch])
-        actions = np.array([item[1] for item in batch])
-        rewards = np.array([item[2] for item in batch])
-        next_states = np.array([item[3] for item in batch])
-        dones = np.array([item[4] for item in batch])
-
-        return states, actions, rewards, next_states, dones
-
-    def size(self):
-        """Get buffer size."""
-        return len(self.buffer)
-
-
-@ray.remote
-class EQRLAgent:
+class EQPolicyNetwork(nn.Module):
     """
-    EQ agent using TD3 (Twin Delayed DDPG) reinforcement learning.
-    Learns to adjust EQ bands to maximize Critic satisfaction.
+    Policy network for EQ adjustment.
+
+    Maps audio features to EQ parameter adjustments.
     """
 
-    def __init__(
-        self,
-        num_bands: int = 8,
-        sample_rate: int = 44100,
-        device: str = "cpu",
-        learning_rate: float = 3e-4,
-        gamma: float = 0.99,
-        tau: float = 0.005,
-        policy_noise: float = 0.2,
-        noise_clip: float = 0.5,
-        policy_delay: int = 2,
-        exploration_noise: float = 0.1,
-    ):
+    def __init__(self, audio_feature_dim: int = 17, num_eq_bands: int = 7,
+                 hidden_dim: int = 128):
+        super(EQPolicyNetwork, self).__init__()
+
+        self.num_eq_bands = num_eq_bands
+        self.action_dim = num_eq_bands * 2  # gain and Q for each band
+
+        # Encoder for audio features
+        self.feature_encoder = nn.Sequential(
+            nn.Linear(audio_feature_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.ReLU(),
+        )
+
+        # Policy head (outputs mean of action distribution)
+        self.policy_mean = nn.Linear(hidden_dim // 2, self.action_dim)
+
+        # Log std (learnable parameter)
+        self.policy_log_std = nn.Parameter(torch.zeros(self.action_dim))
+
+        # Value head (for advantage estimation)
+        self.value_head = nn.Linear(hidden_dim // 2, 1)
+
+    def forward(self, audio_features: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Initialize EQ RL agent.
+        Forward pass.
 
-        Args:
-            num_bands: Number of EQ bands
-            sample_rate: Audio sample rate
-            device: "cpu" or "cuda"
-            learning_rate: Learning rate
-            gamma: Discount factor
-            tau: Target network update rate
-            policy_noise: Noise added to target policy
-            noise_clip: Max noise
-            policy_delay: Delay for policy updates
-            exploration_noise: Exploration noise std
+        Returns:
+            (action_mean, action_log_std)
         """
-        self.num_bands = num_bands
-        self.sample_rate = sample_rate
-        self.device = torch.device(device)
+        features = self.feature_encoder(audio_features)
+        action_mean = self.policy_mean(features)
+        action_log_std = self.policy_log_std.expand_as(action_mean)
 
-        # RL hyperparameters
-        self.gamma = gamma
-        self.tau = tau
-        self.policy_noise = policy_noise
-        self.noise_clip = noise_clip
-        self.policy_delay = policy_delay
-        self.exploration_noise = exploration_noise
+        return action_mean, action_log_std
 
-        # State/action dimensions
-        # State: ontology vector (20) + current EQ settings (num_bands * 3)
-        self.state_dim = 20 + (num_bands * 3)
-        # Action: EQ adjustments (num_bands * 3: freq, gain, Q)
-        self.action_dim = num_bands * 3
+    def get_value(self, audio_features: torch.Tensor) -> torch.Tensor:
+        """Get state value estimate"""
+        features = self.feature_encoder(audio_features)
+        return self.value_head(features)
 
-        # Initialize networks
-        self.actor = ActorNetwork(self.state_dim, self.action_dim).to(self.device)
-        self.actor_target = copy.deepcopy(self.actor)
-        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=learning_rate)
+    def sample_action(self, audio_features: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Sample action from policy.
 
-        self.critic = CriticNetworkRL(self.state_dim, self.action_dim).to(self.device)
-        self.critic_target = copy.deepcopy(self.critic)
-        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=learning_rate)
+        Returns:
+            (action, log_prob, value)
+        """
+        action_mean, action_log_std = self.forward(audio_features)
+        action_std = action_log_std.exp()
 
-        # Replay buffer
-        self.replay_buffer = ReplayBuffer()
+        # Sample from Gaussian distribution
+        normal = torch.distributions.Normal(action_mean, action_std)
+        action = normal.sample()
 
-        # Current EQ state
-        self.current_eq = self._initialize_eq()
+        # Clip actions to valid range
+        action = torch.clamp(action, -1.0, 1.0)
 
-        # Training stats
-        self.total_steps = 0
-        self.training_history = []
+        # Compute log probability
+        log_prob = normal.log_prob(action).sum(dim=-1)
 
-        # Ontology
-        self.ontology = AudioOntologyManager()
+        # Get value estimate
+        value = self.get_value(audio_features)
 
-        logger.info(f"EQ RL agent initialized with {num_bands} bands")
+        return action, log_prob, value
 
-    def _initialize_eq(self) -> EQState:
-        """Initialize EQ with default flat settings."""
-        # Standard frequency bands
-        frequencies = [60, 120, 250, 500, 1000, 2000, 4000, 8000][: self.num_bands]
 
-        bands = [
-            EQBandSettings(frequency=freq, gain=0.0, q_factor=1.0)
-            for freq in frequencies
+@dataclass
+class RLExperience:
+    """Single experience for RL training"""
+    audio_features: np.ndarray
+    action: np.ndarray
+    reward: float
+    next_audio_features: np.ndarray
+    done: bool
+    log_prob: float = 0.0
+    value: float = 0.0
+    # Filled in once the trajectory is complete via GAE
+    advantage: float = 0.0
+    return_: float = 0.0
+
+
+class EQRLAgent(BaseAgent):
+    """
+    EQ Agent with Reinforcement Learning.
+
+    Learns to adjust EQ parameters to maximize Critic satisfaction.
+    Uses policy gradient (PPO-style) reinforcement learning.
+    """
+
+    def __init__(self, agent_id: str, message_bus, critic_agent_id: str,
+                 config: Optional[Dict[str, Any]] = None):
+        capabilities = [
+            AgentCapability.AUDIO_PROCESSING,
+            AgentCapability.MACHINE_LEARNING,
         ]
 
-        return EQState(bands)
+        super().__init__(
+            agent_id=agent_id,
+            agent_type="eq_rl",
+            capabilities=capabilities,
+            message_bus=message_bus
+        )
+
+        self.config = config or {}
+        self.critic_agent_id = critic_agent_id
+
+        # EQ configuration - 7 bands matching frequency ranges
+        self.center_frequencies = [
+            50,    # Sub-bass
+            150,   # Bass
+            375,   # Low-mids
+            1000,  # Mids
+            3000,  # High-mids
+            5000,  # Presence
+            10000,  # Brilliance
+        ]
+
+        # Initialize EQ state
+        self.current_eq = EQState(bands=[
+            EQBand(center_freq=freq, gain=0.0, q_factor=1.0)
+            for freq in self.center_frequencies
+        ])
+
+        # RL components
+        self.policy_network = EQPolicyNetwork(
+            audio_feature_dim=17,
+            num_eq_bands=len(self.center_frequencies),
+        )
+        self.optimizer = torch.optim.Adam(self.policy_network.parameters(), lr=3e-4)
+
+        # Experience replay buffer
+        self.replay_buffer: deque = deque(maxlen=10000)
+        self.episode_buffer: List[RLExperience] = []
+
+        # RL hyperparameters
+        self.gamma = 0.99  # Discount factor
+        self.gae_lambda = 0.95  # GAE parameter
+        self.clip_epsilon = 0.2  # PPO clip parameter
+        self.value_loss_coef = 0.5
+        self.entropy_coef = 0.01
+        self.batch_size = 64
+        self.update_epochs = 4
+
+        # Exploration
+        self.epsilon = 1.0  # Exploration rate
+        self.epsilon_decay = 0.995
+        self.epsilon_min = 0.1
+
+        # Training statistics
+        self.episodes_trained = 0
+        self.total_reward = 0.0
+        self.best_reward = -float('inf')
+        self.best_eq_state = None
+
+        # Audio processing
+        self.sample_rate = self.config.get('sample_rate', 44100)
+
+        logger.info(f"EQ RL Agent {agent_id} initialized with {len(self.center_frequencies)} bands")
 
     def apply_eq(self, audio: np.ndarray, eq_state: EQState) -> np.ndarray:
         """
-        Apply EQ to audio signal.
+        Apply EQ filters to audio.
 
         Args:
-            audio: Input audio (mono)
-            eq_state: EQ settings
+            audio: Input audio signal
+            eq_state: EQ parameters to apply
 
         Returns:
-            Processed audio
+            Filtered audio
         """
-        processed = audio.copy()
+        output = audio.copy()
 
         for band in eq_state.bands:
-            if abs(band.gain) < 0.1:  # Skip near-zero gains
+            # Design filter based on band type
+            if band.eq_type == "peak":
+                # Peaking filter
+                b, a = self._design_peak_filter(
+                    band.center_freq,
+                    band.gain,
+                    band.q_factor,
+                    self.sample_rate
+                )
+            elif band.eq_type == "lowshelf":
+                b, a = self._design_shelf_filter(
+                    band.center_freq,
+                    band.gain,
+                    self.sample_rate,
+                    shelf_type='low'
+                )
+            elif band.eq_type == "highshelf":
+                b, a = self._design_shelf_filter(
+                    band.center_freq,
+                    band.gain,
+                    self.sample_rate,
+                    shelf_type='high'
+                )
+            else:
                 continue
 
-            # Design filter
-            w0 = 2 * np.pi * band.frequency / self.sample_rate
-            alpha = np.sin(w0) / (2 * band.q_factor)
-
-            # Peak filter coefficients
-            A = 10 ** (band.gain / 40)  # Convert dB to amplitude
-            b0 = 1 + alpha * A
-            b1 = -2 * np.cos(w0)
-            b2 = 1 - alpha * A
-            a0 = 1 + alpha / A
-            a1 = -2 * np.cos(w0)
-            a2 = 1 - alpha / A
-
-            # Normalize
-            b = np.array([b0, b1, b2]) / a0
-            a = np.array([1, a1 / a0, a2 / a0])
-
             # Apply filter
-            processed = signal.lfilter(b, a, processed)
+            output = signal.filtfilt(b, a, output)
 
-        return processed
+        return output
 
-    def select_action(
-        self, audio_state: AudioState, add_noise: bool = True
-    ) -> Tuple[np.ndarray, EQState]:
+    def _design_peak_filter(
+        self, center_freq: float, gain_db: float,
+        q_factor: float, sr: int,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Design a peaking EQ filter"""
+        # Convert gain from dB to linear
+        A = 10 ** (gain_db / 40)
+        omega = 2 * np.pi * center_freq / sr
+        alpha = np.sin(omega) / (2 * q_factor)
+
+        # Biquad coefficients
+        b0 = 1 + alpha * A
+        b1 = -2 * np.cos(omega)
+        b2 = 1 - alpha * A
+        a0 = 1 + alpha / A
+        a1 = -2 * np.cos(omega)
+        a2 = 1 - alpha / A
+
+        # Normalize
+        b = np.array([b0, b1, b2]) / a0
+        a = np.array([1, a1 / a0, a2 / a0])
+
+        return b, a
+
+    def _design_shelf_filter(
+        self, cutoff_freq: float, gain_db: float,
+        sr: int, shelf_type: str = 'low',
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Design a shelving filter"""
+        A = 10 ** (gain_db / 40)
+        omega = 2 * np.pi * cutoff_freq / sr
+
+        if shelf_type == 'low':
+            # Low shelf
+            alpha = np.sin(omega) / 2 * np.sqrt((A + 1/A) * (1/0.5 - 1) + 2)
+            b0 = A * ((A + 1) - (A - 1) * np.cos(omega) + 2 * np.sqrt(A) * alpha)
+            b1 = 2 * A * ((A - 1) - (A + 1) * np.cos(omega))
+            b2 = A * ((A + 1) - (A - 1) * np.cos(omega) - 2 * np.sqrt(A) * alpha)
+            a0 = (A + 1) + (A - 1) * np.cos(omega) + 2 * np.sqrt(A) * alpha
+            a1 = -2 * ((A - 1) + (A + 1) * np.cos(omega))
+            a2 = (A + 1) + (A - 1) * np.cos(omega) - 2 * np.sqrt(A) * alpha
+        else:
+            # High shelf
+            alpha = np.sin(omega) / 2 * np.sqrt((A + 1/A) * (1/0.5 - 1) + 2)
+            b0 = A * ((A + 1) + (A - 1) * np.cos(omega) + 2 * np.sqrt(A) * alpha)
+            b1 = -2 * A * ((A - 1) + (A + 1) * np.cos(omega))
+            b2 = A * ((A + 1) + (A - 1) * np.cos(omega) - 2 * np.sqrt(A) * alpha)
+            a0 = (A + 1) - (A - 1) * np.cos(omega) + 2 * np.sqrt(A) * alpha
+            a1 = 2 * ((A - 1) - (A + 1) * np.cos(omega))
+            a2 = (A + 1) - (A - 1) * np.cos(omega) - 2 * np.sqrt(A) * alpha
+
+        b = np.array([b0, b1, b2]) / a0
+        a = np.array([1, a1 / a0, a2 / a0])
+
+        return b, a
+
+    def get_reward_from_critic(self, audio: np.ndarray) -> Tuple[float, Dict[str, Any]]:
         """
-        Select EQ adjustment action.
+        Get reward from Critic agent.
 
         Args:
-            audio_state: Current ontology state
-            add_noise: Add exploration noise
+            audio: Processed audio to judge
 
         Returns:
-            action: Action vector
-            new_eq_state: New EQ settings after action
+            (reward, judgment_details)
         """
-        # Construct state
-        ontology_vector = audio_state.to_vector()
-        eq_vector = self.current_eq.to_vector()
-        state = np.concatenate([ontology_vector, eq_vector])
-
-        # Get action from policy
-        state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.device)
-        self.actor.eval()
-        with torch.no_grad():
-            action = self.actor(state_tensor).cpu().numpy()[0]
-
-        # Add exploration noise
-        if add_noise:
-            noise = np.random.normal(0, self.exploration_noise, size=action.shape)
-            action = np.clip(action + noise, -1, 1)
-
-        # Convert action to EQ adjustments
-        # Action is delta to current EQ settings
-        current_vector = self.current_eq.to_vector()
-        new_vector = np.clip(current_vector + action * 0.1, -1, 1)  # Small adjustments
-        new_eq_state = EQState.from_vector(new_vector, self.num_bands)
-
-        return action, new_eq_state
-
-    def train_step(self, batch_size: int = 256) -> Optional[Dict]:
-        """
-        Perform one training step using replay buffer.
-
-        Args:
-            batch_size: Batch size
-
-        Returns:
-            Training metrics
-        """
-        if self.replay_buffer.size() < batch_size:
-            return None
-
-        # Sample batch
-        states, actions, rewards, next_states, dones = self.replay_buffer.sample(
-            batch_size
-        )
-
-        # Convert to tensors
-        states = torch.FloatTensor(states).to(self.device)
-        actions = torch.FloatTensor(actions).to(self.device)
-        rewards = torch.FloatTensor(rewards).unsqueeze(-1).to(self.device)
-        next_states = torch.FloatTensor(next_states).to(self.device)
-        dones = torch.FloatTensor(dones).unsqueeze(-1).to(self.device)
-
-        # Update critic
-        with torch.no_grad():
-            # Target policy smoothing
-            noise = (torch.randn_like(actions) * self.policy_noise).clamp(
-                -self.noise_clip, self.noise_clip
+        response = self.message_bus.request(
+            Message(
+                topic=Topics.agent_request(self.critic_agent_id),
+                sender=self.agent_id,
+                message_type=MessageType.CRITIC_JUDGMENT_REQUEST,
+                payload={
+                    'audio': audio,
+                    'sample_rate': self.sample_rate,
+                },
             )
-            next_actions = (self.actor_target(next_states) + noise).clamp(-1, 1)
-
-            # Compute target Q
-            target_q1, target_q2 = self.critic_target(next_states, next_actions)
-            target_q = torch.min(target_q1, target_q2)
-            target_q = rewards + (1 - dones) * self.gamma * target_q
-
-        # Current Q estimates
-        current_q1, current_q2 = self.critic(states, actions)
-
-        # Critic loss
-        critic_loss = nn.MSELoss()(current_q1, target_q) + nn.MSELoss()(
-            current_q2, target_q
         )
 
-        # Optimize critic
-        self.critic_optimizer.zero_grad()
-        critic_loss.backward()
-        self.critic_optimizer.step()
+        if response and response.payload.get('status') == 'success':
+            judgment = response.payload.get('judgment', {})
+            reward = judgment.get('satisfaction_score', 0.0)
+            return reward, judgment
+        else:
+            logger.warning("Failed to get reward from Critic")
+            return 0.0, {}
 
-        # Delayed policy update
-        actor_loss = None
-        if self.total_steps % self.policy_delay == 0:
-            # Compute actor loss
-            actor_loss = -self.critic.q1_forward(states, self.actor(states)).mean()
+    def get_audio_features(self, audio: np.ndarray) -> np.ndarray:
+        """Request a 17-dim feature vector from the Critic agent.
 
-            # Optimize actor
-            self.actor_optimizer.zero_grad()
-            actor_loss.backward()
-            self.actor_optimizer.step()
+        Falls back to a deterministic local extraction when the Critic is
+        unavailable, so training never silently learns from random noise.
+        """
+        response = self.message_bus.request(
+            Message(
+                topic=Topics.agent_request(self.critic_agent_id),
+                sender=self.agent_id,
+                message_type=MessageType.AUDIO_FEATURE_REQUEST,
+                payload={
+                    'audio': audio,
+                    'sample_rate': self.sample_rate,
+                },
+            ),
+            timeout=2.0,
+        )
 
-            # Update target networks
-            self._update_target_networks()
+        if response and response.payload.get('status') == 'success':
+            features = response.payload.get('features')
+            if features is not None:
+                arr = np.asarray(features, dtype=np.float32)
+                if arr.shape == (17,):
+                    return arr
 
-        self.total_steps += 1
+        return self._extract_features_local(audio)
 
-        metrics = {
-            "critic_loss": critic_loss.item(),
-            "actor_loss": actor_loss.item() if actor_loss is not None else None,
-            "total_steps": self.total_steps,
+    def _extract_features_local(self, audio: np.ndarray) -> np.ndarray:
+        """Deterministic 17-dim feature extraction used as a Critic fallback.
+
+        Layout matches CriticAgent.extract_features():
+            [centroid, rolloff, bandwidth, flatness,
+             7 band energies (sub_bass..brilliance, normalized),
+             rms, dynamic_range, crest_factor,
+             zcr, harmonic_pct]
+        """
+        if audio.size == 0:
+            return np.zeros(17, dtype=np.float32)
+
+        sr = self.sample_rate
+        n = audio.size
+        # spectrum
+        spec = np.abs(np.fft.rfft(audio))
+        freqs = np.fft.rfftfreq(n, d=1.0 / sr)
+        spec_sum = spec.sum() + 1e-12
+        centroid = float((freqs * spec).sum() / spec_sum) / sr
+        cumulative = np.cumsum(spec)
+        rolloff_idx = int(np.searchsorted(cumulative, 0.85 * spec_sum))
+        rolloff = float(freqs[min(rolloff_idx, len(freqs) - 1)]) / sr
+        bandwidth = float(np.sqrt(((freqs - centroid * sr) ** 2 * spec).sum() / spec_sum)) / sr
+        geom = float(np.exp(np.mean(np.log(spec + 1e-12))))
+        flatness = geom / (float(spec.mean()) + 1e-12)
+
+        bands = [(20, 60), (60, 250), (250, 500), (500, 2000),
+                 (2000, 4000), (4000, 6000), (6000, 20000)]
+        band_energies = []
+        for lo, hi in bands:
+            mask = (freqs >= lo) & (freqs < hi)
+            band_energies.append(float((spec[mask] ** 2).sum()))
+        total_e = sum(band_energies) + 1e-12
+        band_energies = [e / total_e for e in band_energies]
+
+        rms = float(np.sqrt(np.mean(audio ** 2)))
+        peak = float(np.max(np.abs(audio)))
+        dynamic_range = 20 * np.log10((peak + 1e-12) / (rms + 1e-12))
+        crest = peak / (rms + 1e-12)
+        zcr = float(np.mean(np.abs(np.diff(np.sign(audio)))) / 2)
+        # Cheap harmonic estimate: ratio of low-frequency energy to total
+        harmonic_pct = sum(band_energies[:4])
+
+        # 17-dim layout matches CriticAgent: 4 spectral + 7 bands + 3 dynamic + zcr + tempo + harmonic
+        return np.array([
+            centroid, rolloff, bandwidth, flatness,
+            *band_energies,
+            rms, dynamic_range, crest,
+            zcr, 0.0, harmonic_pct,
+        ], dtype=np.float32)
+
+    def select_action(self, audio_features: np.ndarray, explore: bool = True) -> Tuple[np.ndarray, float, float]:
+        """
+        Select EQ adjustment action using policy network.
+
+        Args:
+            audio_features: Current audio features
+            explore: Whether to add exploration noise
+
+        Returns:
+            (action, log_prob, value)
+        """
+        # Epsilon-greedy exploration
+        if explore and random.random() < self.epsilon:
+            # Random action
+            action = np.random.uniform(-1, 1, size=len(self.center_frequencies) * 2)
+            log_prob = 0.0
+            value = 0.0
+        else:
+            # Policy-based action
+            feature_tensor = torch.FloatTensor(audio_features).unsqueeze(0)
+            with torch.no_grad():
+                action_tensor, log_prob_tensor, value_tensor = self.policy_network.sample_action(feature_tensor)
+                action = action_tensor.squeeze(0).numpy()
+                log_prob = log_prob_tensor.item()
+                value = value_tensor.item()
+
+        return action, log_prob, value
+
+    def action_to_eq_adjustments(self, action: np.ndarray) -> EQState:
+        """
+        Convert RL action to EQ parameter adjustments.
+
+        Args:
+            action: Action vector from policy (-1 to 1)
+
+        Returns:
+            New EQ state
+        """
+        bands = []
+        for i, center_freq in enumerate(self.center_frequencies):
+            gain_action = action[i * 2]  # -1 to 1
+            q_action = action[i * 2 + 1]  # -1 to 1
+
+            # Map action to actual parameter changes
+            gain_delta = gain_action * 2.0  # Max ±2 dB per step
+            q_delta = q_action * 0.5  # Max ±0.5 Q per step
+
+            # Get current values
+            current_band = self.current_eq.bands[i]
+            new_gain = np.clip(current_band.gain + gain_delta, -12, 12)
+            new_q = np.clip(current_band.q_factor + q_delta, 0.1, 10.0)
+
+            bands.append(EQBand(
+                center_freq=center_freq,
+                gain=new_gain,
+                q_factor=new_q,
+            ))
+
+        return EQState(bands=bands)
+
+    def train_episode(self, audio: np.ndarray, max_steps: int = 10) -> Dict[str, Any]:
+        """
+        Run one training episode.
+
+        Args:
+            audio: Input audio to process
+            max_steps: Maximum steps per episode
+
+        Returns:
+            Episode statistics
+        """
+        self.episode_buffer = []
+        episode_reward = 0.0
+
+        # Get initial judgment
+        initial_reward, _ = self.get_reward_from_critic(audio)
+
+        current_audio = audio.copy()
+
+        for step in range(max_steps):
+            # Real features for the current audio (Critic if available, local fallback otherwise)
+            audio_features = self.get_audio_features(current_audio)
+
+            # Select action
+            action, log_prob, value = self.select_action(audio_features, explore=True)
+
+            # Convert action to EQ adjustments
+            new_eq_state = self.action_to_eq_adjustments(action)
+
+            # Apply EQ
+            processed_audio = self.apply_eq(current_audio, new_eq_state)
+
+            # Get reward from Critic
+            reward, judgment = self.get_reward_from_critic(processed_audio)
+
+            # Store experience with REAL next-state features
+            experience = RLExperience(
+                audio_features=audio_features,
+                action=action,
+                reward=reward,
+                next_audio_features=self.get_audio_features(processed_audio),
+                done=(step == max_steps - 1),
+                log_prob=log_prob,
+                value=value,
+            )
+            self.episode_buffer.append(experience)
+
+            # Update state
+            self.current_eq = new_eq_state
+            current_audio = processed_audio
+            episode_reward += reward
+
+            logger.debug(
+                f"Step {step}: reward={reward:.3f}, "
+                f"negative_concepts={judgment.get('negative_concepts', [])}"
+            )
+
+        # Compute GAE advantages and returns over the just-finished trajectory
+        # before mixing it into the random-sampling replay buffer.
+        self._compute_gae(self.episode_buffer)
+        self.replay_buffer.extend(self.episode_buffer)
+
+        # Train on episode
+        if len(self.replay_buffer) >= self.batch_size:
+            train_stats = self._train_on_buffer()
+        else:
+            train_stats = {}
+
+        # Decay exploration
+        self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
+
+        # Update statistics
+        self.episodes_trained += 1
+        self.total_reward += episode_reward
+
+        if episode_reward > self.best_reward:
+            self.best_reward = episode_reward
+            self.best_eq_state = self.current_eq
+
+        return {
+            'episode': self.episodes_trained,
+            'episode_reward': episode_reward,
+            'best_reward': self.best_reward,
+            'epsilon': self.epsilon,
+            'initial_reward': initial_reward,
+            **train_stats
         }
 
-        self.training_history.append(metrics)
-        return metrics
+    def _compute_gae(self, trajectory: List["RLExperience"]) -> None:
+        """Populate `advantage` and `return_` on each step using GAE.
 
-    def _update_target_networks(self):
-        """Soft update of target networks."""
-        for param, target_param in zip(
-            self.actor.parameters(), self.actor_target.parameters()
-        ):
-            target_param.data.copy_(
-                self.tau * param.data + (1 - self.tau) * target_param.data
-            )
+        delta_t = r_t + gamma * V(s_{t+1}) * (1 - done_t) - V(s_t)
+        A_t     = delta_t + gamma * lambda * (1 - done_t) * A_{t+1}
+        return  = A_t + V(s_t)
 
-        for param, target_param in zip(
-            self.critic.parameters(), self.critic_target.parameters()
-        ):
-            target_param.data.copy_(
-                self.tau * param.data + (1 - self.tau) * target_param.data
-            )
-
-    def store_experience(
-        self,
-        state: AudioState,
-        action: np.ndarray,
-        reward: float,
-        next_state: AudioState,
-        done: bool,
-    ):
-        """Store experience in replay buffer."""
-        state_vector = np.concatenate([state.to_vector(), self.current_eq.to_vector()])
-        next_state_vector = np.concatenate(
-            [next_state.to_vector(), self.current_eq.to_vector()]
-        )
-
-        self.replay_buffer.add(state_vector, action, reward, next_state_vector, done)
-
-    def process_audio(
-        self, audio: np.ndarray, audio_state: AudioState
-    ) -> Tuple[np.ndarray, AgentAction]:
+        Operates in-place; meaningless on an empty trajectory.
         """
-        Process audio with EQ.
+        if not trajectory:
+            return
+        gae = 0.0
+        next_value = 0.0
+        for step in reversed(trajectory):
+            mask = 0.0 if step.done else 1.0
+            delta = step.reward + self.gamma * next_value * mask - step.value
+            gae = delta + self.gamma * self.gae_lambda * mask * gae
+            step.advantage = float(gae)
+            step.return_ = float(gae + step.value)
+            next_value = step.value
 
-        Args:
-            audio: Input audio
-            audio_state: Current ontology state
+    def _train_on_buffer(self) -> Dict[str, Any]:
+        """Train policy network on replay buffer using precomputed GAE advantages."""
+        if len(self.replay_buffer) < self.batch_size:
+            return {}
 
-        Returns:
-            processed_audio: Output audio
-            action: Action taken
-        """
-        # Select action
-        action_vector, new_eq_state = self.select_action(audio_state, add_noise=True)
+        # Sample batch
+        batch = random.sample(self.replay_buffer, self.batch_size)
 
-        # Apply EQ
-        processed_audio = self.apply_eq(audio, new_eq_state)
+        # Prepare tensors (advantages and returns were precomputed via GAE)
+        audio_features = torch.FloatTensor([exp.audio_features for exp in batch])
+        actions = torch.FloatTensor([exp.action for exp in batch])
+        old_log_probs = torch.FloatTensor([exp.log_prob for exp in batch])
+        advantages = torch.FloatTensor([exp.advantage for exp in batch])
+        returns = torch.FloatTensor([exp.return_ for exp in batch])
 
-        # Update current EQ
-        self.current_eq = new_eq_state
+        # Standardize advantages on the batch (still useful even with GAE)
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
-        # Create action object
-        action = AgentAction(
-            agent_id="eq_rl_agent",
-            action_type="eq_adjustment",
-            parameters={
-                f"band_{i}_{param}": value
-                for i, band in enumerate(new_eq_state.bands)
-                for param, value in [
-                    ("freq", band.frequency),
-                    ("gain", band.gain),
-                    ("q", band.q_factor),
-                ]
-            },
-            confidence=0.8,
-        )
+        # PPO update
+        total_policy_loss = 0.0
+        total_value_loss = 0.0
+        total_entropy = 0.0
 
-        return processed_audio, action
+        for _ in range(self.update_epochs):
+            # Get current policy outputs
+            action_mean, action_log_std = self.policy_network(audio_features)
+            action_std = action_log_std.exp()
+            dist = torch.distributions.Normal(action_mean, action_std)
 
-    def save_model(self, path: str):
-        """Save model checkpoint."""
-        torch.save(
-            {
-                "actor_state_dict": self.actor.state_dict(),
-                "actor_target_state_dict": self.actor_target.state_dict(),
-                "critic_state_dict": self.critic.state_dict(),
-                "critic_target_state_dict": self.critic_target.state_dict(),
-                "actor_optimizer": self.actor_optimizer.state_dict(),
-                "critic_optimizer": self.critic_optimizer.state_dict(),
-                "total_steps": self.total_steps,
-            },
-            path,
-        )
-        logger.info(f"Saved EQ RL model to {path}")
+            # Compute new log probs
+            new_log_probs = dist.log_prob(actions).sum(dim=-1)
 
-    def load_model(self, path: str):
-        """Load model checkpoint."""
-        checkpoint = torch.load(path, map_location=self.device)
-        self.actor.load_state_dict(checkpoint["actor_state_dict"])
-        self.actor_target.load_state_dict(checkpoint["actor_target_state_dict"])
-        self.critic.load_state_dict(checkpoint["critic_state_dict"])
-        self.critic_target.load_state_dict(checkpoint["critic_target_state_dict"])
-        self.actor_optimizer.load_state_dict(checkpoint["actor_optimizer"])
-        self.critic_optimizer.load_state_dict(checkpoint["critic_optimizer"])
-        self.total_steps = checkpoint["total_steps"]
-        logger.info(f"Loaded EQ RL model from {path}")
+            # Compute ratio
+            ratio = (new_log_probs - old_log_probs).exp()
 
+            # PPO clipped objective
+            surr1 = ratio * advantages
+            surr2 = torch.clamp(ratio, 1 - self.clip_epsilon, 1 + self.clip_epsilon) * advantages
+            policy_loss = -torch.min(surr1, surr2).mean()
 
-if __name__ == "__main__":
-    # Example usage
-    import ray
+            # Value loss against GAE-corrected return targets, not raw rewards
+            values = self.policy_network.get_value(audio_features).squeeze()
+            value_loss = F.mse_loss(values, returns)
 
-    ray.init(ignore_reinit_error=True)
+            # Entropy bonus
+            entropy = dist.entropy().mean()
 
-    # Create EQ agent
-    eq_agent = EQRLAgent.remote(num_bands=8)
+            # Total loss
+            loss = policy_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy
 
-    # Test with dummy audio
-    dummy_audio = np.random.randn(44100)
-    dummy_state = AudioState()
-    dummy_state.set_attribute(AudioAttribute.CLARITY, 0.5)
+            # Optimize
+            self.optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.policy_network.parameters(), 0.5)
+            self.optimizer.step()
 
-    processed, action = ray.get(eq_agent.process_audio.remote(dummy_audio, dummy_state))
-    print(f"Processed audio shape: {processed.shape}")
-    print(f"Action: {action.action_type}")
+            total_policy_loss += policy_loss.item()
+            total_value_loss += value_loss.item()
+            total_entropy += entropy.item()
 
-    ray.shutdown()
+        return {
+            'policy_loss': total_policy_loss / self.update_epochs,
+            'value_loss': total_value_loss / self.update_epochs,
+            'entropy': total_entropy / self.update_epochs,
+        }
+
+    def handle_message(self, message: Message) -> Any:
+        """Handle incoming messages"""
+        try:
+            if message.message_type == MessageType.AUDIO_PROCESSING_REQUEST:
+                audio = message.payload.get('audio')
+                mode = message.payload.get('mode', 'inference')  # or 'training'
+
+                if mode == 'training':
+                    # Run training episode
+                    stats = self.train_episode(audio)
+                    return {
+                        'status': 'success',
+                        'mode': 'training',
+                        'stats': stats,
+                    }
+                else:
+                    # Inference mode - use best EQ
+                    if self.best_eq_state:
+                        processed_audio = self.apply_eq(audio, self.best_eq_state)
+                    else:
+                        processed_audio = audio
+
+                    return {
+                        'status': 'success',
+                        'mode': 'inference',
+                        'audio': processed_audio,
+                        'eq_state': [
+                            {'freq': band.center_freq, 'gain': band.gain, 'q': band.q_factor}
+                            for band in (self.best_eq_state or self.current_eq).bands
+                        ]
+                    }
+
+        except Exception as e:
+            logger.error(f"Error handling message: {e}")
+            return {'status': 'error', 'message': str(e)}
