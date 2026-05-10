@@ -1,11 +1,11 @@
 from PySide6.QtCore import QObject, Signal
 import logging
-from typing import Dict, Any
 
 from src.core.message_bus import get_message_bus
 from src.core.message_types import Message, Priority
 
 logger = logging.getLogger(__name__)
+
 
 class MessageBusAdapter(QObject):
     """
@@ -19,7 +19,7 @@ class MessageBusAdapter(QObject):
     effect_parameter_changed = Signal(str, str, float)  # chain, param, value
     agent_status_changed = Signal(str, str)  # agent_id, status
     meter_update = Signal(str, float, float)  # meter_id, level_l, level_r
-    log_message = Signal(str, str) # level, message
+    log_message = Signal(str, str)  # level, message
 
     def __init__(self):
         super().__init__()
@@ -71,7 +71,7 @@ class MessageBusAdapter(QObject):
                 
             elif message.topic.startswith("system.agent."):
                 agent_id = message.payload.get('agent_id', '')
-                status = message.topic.split('.')[-1] # e.g. started, stopped
+                status = message.topic.split('.')[-1]  # e.g. started, stopped
                 self.agent_status_changed.emit(agent_id, status)
                 
             elif message.topic.startswith("log.event."):
