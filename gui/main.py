@@ -1,12 +1,14 @@
 import sys
 import os
+
+from PySide6.QtWidgets import QApplication
+
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from PySide6.QtWidgets import QApplication
 from gui.main_window import MainWindow
-
 from gui.main_controller import MainController
+
 
 def main():
     # Set up environment
@@ -30,6 +32,7 @@ def main():
         sys.exit(app.exec())
     finally:
         controller.stop()
+
 
 if __name__ == "__main__":
     main()
