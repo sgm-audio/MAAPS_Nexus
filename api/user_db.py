@@ -8,11 +8,16 @@ In production, this should be replaced with a proper database backend.
 from passlib.context import CryptContext
 from typing import Optional, Dict
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def _debug_mode() -> bool:
+    return os.getenv("DEBUG", "").strip().lower() in ("1", "true", "yes")
 
 
 class User:
@@ -39,14 +44,22 @@ class UserDatabase:
         self._initialize_default_users()
 
     def _initialize_default_users(self):
-        """Initialize with some default users for testing"""
-        # Default admin user
+        """Seed demo users only when DEBUG is enabled (never in production)."""
+        if not _debug_mode():
+            logger.info(
+                "Skipping default user seed (set DEBUG=true for local demo users)"
+            )
+            return
+
+        # Default admin user (DEBUG only)
         self.create_user("admin", "admin123", "admin@example.com")
 
-        # Default demo user
+        # Default demo user (DEBUG only)
         self.create_user("demo", "demo123", "demo@example.com")
 
-        logger.info(f"Initialized user database with {len(self.users)} default users")
+        logger.info(
+            f"Initialized user database with {len(self.users)} DEBUG default users"
+        )
 
     def hash_password(self, password: str) -> str:
         """Hash a password using bcrypt"""

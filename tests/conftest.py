@@ -3,6 +3,10 @@ import sys
 import os
 import time
 
+# Auth / demo-user env for tests (must be set before api.auth / api.user_db import)
+os.environ.setdefault("SECRET_KEY", "test-secret-key-for-nexus-auth-unit-tests")
+os.environ.setdefault("DEBUG", "true")
+
 # Add src to path for all tests
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
