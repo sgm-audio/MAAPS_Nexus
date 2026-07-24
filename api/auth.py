@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 import jwt
 import logging
+import os
 from .user_db import user_db
 
 logger = logging.getLogger(__name__)
@@ -17,10 +18,35 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 security = HTTPBearer()
 
-# Configuration (should be in environment variables in production)
-SECRET_KEY = "your-secret-key-change-in-production"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+
+# Placeholder / default values that must never be used for JWT signing
+_FORBIDDEN_SECRETS = frozenset(
+    {
+        "",
+        "your-secret-key-change-in-production",
+        "change-me-before-deploying",
+        "change-me",
+        "changeme",
+        "secret",
+        "secret-key",
+    }
+)
+
+
+def _load_secret_key() -> str:
+    """Load JWT secret from env; refuse placeholder/default values."""
+    key = (os.getenv("SECRET_KEY") or os.getenv("API_SECRET_KEY") or "").strip()
+    if not key or key.lower() in _FORBIDDEN_SECRETS:
+        raise RuntimeError(
+            "SECRET_KEY (or API_SECRET_KEY) must be set to a non-placeholder value. "
+            "Refusing to start with a default/forgeable JWT secret."
+        )
+    return key
+
+
+SECRET_KEY = _load_secret_key()
 
 
 class LoginRequest(BaseModel):

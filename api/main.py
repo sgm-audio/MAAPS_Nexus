@@ -7,7 +7,7 @@ Usage:
     Production:  uvicorn api.main:app --host 0.0.0.0 --port 8000 --workers 4
 """
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File
+from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -18,7 +18,9 @@ import base64
 import asyncio
 from datetime import datetime
 import logging
+import os
 
+from api.auth import router as auth_router, verify_token
 from src.system import create_system
 
 # Configure logging
@@ -34,14 +36,25 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS middleware
+# CORS: explicit origins (CORS_ORIGINS) with credentials, or wildcard without credentials
+_cors_origins = [
+    o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()
+]
+if _cors_origins:
+    _allow_origins, _allow_credentials = _cors_origins, True
+else:
+    _allow_origins, _allow_credentials = ["*"], False
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
-    allow_credentials=True,
+    allow_origins=_allow_origins,
+    allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth_router, prefix="/auth", tags=["Auth"])
+
 
 # Global system instance
 system = None
@@ -173,7 +186,9 @@ async def list_agents():
 # Audio Processing Endpoints
 @app.post("/audio/enhance", tags=["Audio Processing"])
 async def enhance_audio(
-    request: AudioEnhanceRequest, background_tasks: BackgroundTasks
+    request: AudioEnhanceRequest,
+    background_tasks: BackgroundTasks,
+    username: str = Depends(verify_token),
 ):
     """
     Enhance audio with noise reduction and restoration
@@ -230,7 +245,10 @@ async def extract_metadata(request: MetadataExtractRequest):
 
 # Music Generation Endpoints
 @app.post("/music/generate", tags=["Music Generation"])
-async def generate_music(request: MusicGenerateRequest):
+async def generate_music(
+    request: MusicGenerateRequest,
+    username: str = Depends(verify_token),
+):
     """
     Generate AI music (melody, harmony, drums, or bass)
 
@@ -273,7 +291,9 @@ async def generate_music(request: MusicGenerateRequest):
 # Batch Processing Endpoints
 @app.post("/batch/enhance", tags=["Batch Processing"])
 async def batch_enhance(
-    files: List[UploadFile] = File(...), background_tasks: BackgroundTasks = None
+    files: List[UploadFile] = File(...),
+    background_tasks: BackgroundTasks = None,
+    username: str = Depends(verify_token),
 ):
     """
     Batch audio enhancement (async processing)
@@ -320,11 +340,10 @@ async def get_batch_status(job_id: str):
 
 # Utility Endpoints
 @app.post("/system/restart", tags=["System"])
-async def restart_system():
-    """Restart the MAAPS system (admin only)"""
-    # Add authentication check here
+async def restart_system(username: str = Depends(verify_token)):
+    """Restart the MAAPS system (authenticated)"""
     try:
-        logger.info("System restart requested")
+        logger.info(f"System restart requested by '{username}'")
         system.stop()
         await asyncio.sleep(2)
         system.start()

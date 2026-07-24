@@ -69,42 +69,46 @@ def test_user_authentication():
     assert user is None
 
 
-def test_default_users():
-    """Test that default users are created"""
+def test_default_users_debug_only(monkeypatch):
+    """Default admin/demo users are seeded only when DEBUG=true"""
+    monkeypatch.setenv("DEBUG", "true")
     db = UserDatabase()
 
-    # Default admin user should exist
     assert db.user_exists("admin")
-    admin = db.authenticate("admin", "admin123")
-    assert admin is not None
-
-    # Default demo user should exist
+    assert db.authenticate("admin", "admin123") is not None
     assert db.user_exists("demo")
-    demo = db.authenticate("demo", "demo123")
-    assert demo is not None
+    assert db.authenticate("demo", "demo123") is not None
 
 
-def test_get_user():
-    """Test getting user by username"""
+def test_no_default_users_without_debug(monkeypatch):
+    """Production (DEBUG unset/false) must not seed admin/demo"""
+    monkeypatch.setenv("DEBUG", "false")
     db = UserDatabase()
 
-    # Get existing user
+    assert not db.user_exists("admin")
+    assert not db.user_exists("demo")
+    assert db.get_user_count() == 0
+
+
+def test_get_user(monkeypatch):
+    """Test getting user by username"""
+    monkeypatch.setenv("DEBUG", "true")
+    db = UserDatabase()
+
     user = db.get_user("admin")
     assert user is not None
     assert user.username == "admin"
 
-    # Get non-existent user
     user = db.get_user("nonexistent")
     assert user is None
 
 
-def test_user_count():
-    """Test user count"""
+def test_user_count(monkeypatch):
+    """Test user count with DEBUG seed"""
+    monkeypatch.setenv("DEBUG", "true")
     db = UserDatabase()
 
-    # Should have at least the default users
-    count = db.get_user_count()
-    assert count >= 2  # admin and demo users
+    assert db.get_user_count() >= 2  # admin and demo users
 
 
 if __name__ == "__main__":
