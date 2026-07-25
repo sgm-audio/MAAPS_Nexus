@@ -19,7 +19,6 @@ router = APIRouter()
 security = HTTPBearer()
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
 # Placeholder / default values that must never be used for JWT signing
 _FORBIDDEN_SECRETS = frozenset(
@@ -31,19 +30,44 @@ _FORBIDDEN_SECRETS = frozenset(
         "changeme",
         "secret",
         "secret-key",
+        "replace-with-a-long-random-secret",
     }
 )
 
 
-def _load_secret_key() -> str:
-    """Load JWT secret from env; refuse placeholder/default values."""
-    key = (os.getenv("SECRET_KEY") or os.getenv("API_SECRET_KEY") or "").strip()
-    if not key or key.lower() in _FORBIDDEN_SECRETS:
+def _parse_token_expire_minutes() -> int:
+    raw = (os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES") or "60").strip() or "60"
+    try:
+        minutes = int(raw)
+    except ValueError as exc:
         raise RuntimeError(
-            "SECRET_KEY (or API_SECRET_KEY) must be set to a non-placeholder value. "
-            "Refusing to start with a default/forgeable JWT secret."
-        )
-    return key
+            "ACCESS_TOKEN_EXPIRE_MINUTES must be a positive integer"
+        ) from exc
+    if minutes <= 0:
+        raise RuntimeError("ACCESS_TOKEN_EXPIRE_MINUTES must be a positive integer")
+    return minutes
+
+
+ACCESS_TOKEN_EXPIRE_MINUTES = _parse_token_expire_minutes()
+
+
+def _is_forbidden_secret(key: str) -> bool:
+    return not key or key.lower() in _FORBIDDEN_SECRETS
+
+
+def _load_secret_key() -> str:
+    """Load JWT secret from env; refuse placeholder/default values.
+
+    Tries SECRET_KEY first, then API_SECRET_KEY if the first is missing/forbidden.
+    """
+    for env_name in ("SECRET_KEY", "API_SECRET_KEY"):
+        key = (os.getenv(env_name) or "").strip()
+        if key and not _is_forbidden_secret(key):
+            return key
+    raise RuntimeError(
+        "SECRET_KEY (or API_SECRET_KEY) must be set to a non-placeholder value. "
+        "Refusing to start with a default/forgeable JWT secret."
+    )
 
 
 SECRET_KEY = _load_secret_key()

@@ -40,10 +40,10 @@ app = FastAPI(
 _cors_origins = [
     o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()
 ]
-if _cors_origins:
-    _allow_origins, _allow_credentials = _cors_origins, True
-else:
+if not _cors_origins or any(o == "*" for o in _cors_origins):
     _allow_origins, _allow_credentials = ["*"], False
+else:
+    _allow_origins, _allow_credentials = _cors_origins, True
 
 app.add_middleware(
     CORSMiddleware,
@@ -323,8 +323,8 @@ async def batch_enhance(
 
 
 @app.get("/batch/{job_id}", response_model=JobStatusResponse, tags=["Batch Processing"])
-async def get_batch_status(job_id: str):
-    """Get status of batch processing job"""
+async def get_batch_status(job_id: str, username: str = Depends(verify_token)):
+    """Get status of batch processing job (authenticated)"""
     if job_id not in jobs:
         raise HTTPException(status_code=404, detail="Job not found")
 
