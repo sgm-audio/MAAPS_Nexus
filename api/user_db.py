@@ -44,22 +44,25 @@ class UserDatabase:
         self._initialize_default_users()
 
     def _initialize_default_users(self):
-        """Seed demo users only when DEBUG is enabled (never in production)."""
-        if not _debug_mode():
+        """Seed demo users only when DEBUG is enabled (never in production).
+
+        When DEBUG is off, optionally bootstrap one admin from
+        BOOTSTRAP_ADMIN_USER / BOOTSTRAP_ADMIN_PASSWORD so login works.
+        """
+        if _debug_mode():
+            self.create_user("admin", "admin123", "admin@example.com")
+            self.create_user("demo", "demo123", "demo@example.com")
             logger.info(
-                "Skipping default user seed (set DEBUG=true for local demo users)"
+                f"Initialized user database with {len(self.users)} DEBUG default users"
             )
             return
 
-        # Default admin user (DEBUG only)
-        self.create_user("admin", "admin123", "admin@example.com")
-
-        # Default demo user (DEBUG only)
-        self.create_user("demo", "demo123", "demo@example.com")
-
-        logger.info(
-            f"Initialized user database with {len(self.users)} DEBUG default users"
-        )
+        logger.info("Skipping default user seed (set DEBUG=true for local demo users)")
+        bootstrap_user = (os.getenv("BOOTSTRAP_ADMIN_USER") or "").strip()
+        bootstrap_password = (os.getenv("BOOTSTRAP_ADMIN_PASSWORD") or "").strip()
+        if bootstrap_user and bootstrap_password:
+            self.create_user(bootstrap_user, bootstrap_password)
+            logger.info(f"Bootstrapped admin user '{bootstrap_user}' from env")
 
     def hash_password(self, password: str) -> str:
         """Hash a password using bcrypt"""
