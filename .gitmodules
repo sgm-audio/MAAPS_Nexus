@@ -1,0 +1,6 @@
+[submodule "reablink"]
+	path = reablink
+	url = https://github.com/free-audio/reablink.git
+[submodule "vst3_plugin/vst3sdk"]
+	path = vst3_plugin/vst3sdk
+	url = https://github.com/steinbergmedia/vst3sdk.git

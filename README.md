@@ -1,6 +1,6 @@
 # MAAPS Nexus
 
-[![CI](https://github.com/SGM-Studios/MAAPS_Nexus/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/SGM-Studios/MAAPS_Nexus/actions/workflows/ci-cd.yml)
+[![CI](https://github.com/sgm-audio/MAAPS_Nexus/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/sgm-audio/MAAPS_Nexus/actions/workflows/ci-cd.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 

@@ -11,7 +11,7 @@ import numpy as np
 # Add src to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.agents.hgo_coordinator import HGOCoordinator, AgentProposal, ConflictType
+from src.agents.hgo_coordinator import HGOCoordinator, AgentProposal
 from src.core.audio_ontology import (
     AudioState,
     AudioAttribute,

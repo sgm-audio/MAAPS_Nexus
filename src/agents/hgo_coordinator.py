@@ -58,7 +58,17 @@ class AgentAction:
     action_vector: np.ndarray
     predicted_reward: float
     confidence: float
+
+
+@dataclass
+class AgentProposal:
+    """Represents a proposal from an agent for coordination"""
+    agent_id: str
+    action: np.ndarray
+    predicted_reward: float
+    confidence: float
     affected_concepts: List[str]  # Audio concepts this action affects
+    reasoning: str = ""
 
 
 @dataclass
