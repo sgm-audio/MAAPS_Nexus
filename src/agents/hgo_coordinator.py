@@ -85,6 +85,16 @@ class ConflictResolution:
     weight_adjustments: Dict[str, float]
 
 
+@dataclass
+class CoordinationDecision:
+    """Result of coordination process"""
+    approved_proposals: List[AgentProposal]
+    rejected_proposals: List[AgentProposal]
+    execution_order: List[str]
+    compromise_adjustments: Dict[str, Dict[str, float]]
+    reasoning: str = ""
+
+
 class HGOCoordinator(BaseAgent):
     """
     Hierarchical Goal Optimization Coordinator.
