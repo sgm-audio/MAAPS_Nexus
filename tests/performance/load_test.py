@@ -250,8 +250,7 @@ def on_test_stop(environment, **kwargs):
 
 
 if __name__ == "__main__":
-    print(
-        """
+    print("""
 MAAPS Load Testing Suite
 ========================
 
@@ -273,5 +272,4 @@ Example:
     --run-time 3m \\
     --headless \\
     --csv=results/load_test
-"""
-    )
+""")

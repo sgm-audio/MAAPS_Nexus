@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class AudioFeatures:
     """Extracted audio features for critic analysis"""
+
     # Spectral features
     spectral_centroid: float = 0.0
     spectral_rolloff: float = 0.0
@@ -54,30 +55,33 @@ class AudioFeatures:
 
     def to_vector(self) -> np.ndarray:
         """Convert features to numpy vector"""
-        return np.array([
-            self.spectral_centroid,
-            self.spectral_rolloff,
-            self.spectral_bandwidth,
-            self.spectral_flatness,
-            self.sub_bass_energy,
-            self.bass_energy,
-            self.low_mid_energy,
-            self.mid_energy,
-            self.high_mid_energy,
-            self.presence_energy,
-            self.brilliance_energy,
-            self.rms_energy,
-            self.dynamic_range,
-            self.crest_factor,
-            self.zero_crossing_rate,
-            self.tempo,
-            self.harmonic_ratio,
-        ])
+        return np.array(
+            [
+                self.spectral_centroid,
+                self.spectral_rolloff,
+                self.spectral_bandwidth,
+                self.spectral_flatness,
+                self.sub_bass_energy,
+                self.bass_energy,
+                self.low_mid_energy,
+                self.mid_energy,
+                self.high_mid_energy,
+                self.presence_energy,
+                self.brilliance_energy,
+                self.rms_energy,
+                self.dynamic_range,
+                self.crest_factor,
+                self.zero_crossing_rate,
+                self.tempo,
+                self.harmonic_ratio,
+            ]
+        )
 
 
 @dataclass
 class CriticJudgment:
     """Critic's judgment of audio quality"""
+
     satisfaction_score: float  # -1.0 to 1.0
     detected_concepts: List[str]
     positive_concepts: List[str]
@@ -130,7 +134,9 @@ class CriticAgent(BaseAgent):
     5. Can be trained to improve predictions
     """
 
-    def __init__(self, agent_id: str, message_bus, config: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self, agent_id: str, message_bus, config: Optional[Dict[str, Any]] = None
+    ):
         capabilities = [
             AgentCapability.AUDIO_ANALYSIS,
             AgentCapability.MACHINE_LEARNING,
@@ -140,7 +146,7 @@ class CriticAgent(BaseAgent):
             agent_id=agent_id,
             agent_type="critic",
             capabilities=capabilities,
-            message_bus=message_bus
+            message_bus=message_bus,
         )
 
         self.config = config or {}
@@ -151,18 +157,17 @@ class CriticAgent(BaseAgent):
         self.optimizer = torch.optim.Adam(self.network.parameters(), lr=0.001)
 
         # Feature extraction parameters
-        self.sample_rate = self.config.get('sample_rate', 44100)
+        self.sample_rate = self.config.get("sample_rate", 44100)
         if self.sample_rate <= 0:
-            raise ValueError(
-                f"sample_rate must be positive (got {self.sample_rate})"
-            )
-        self.n_fft = self.config.get('n_fft', 2048)
-        self.hop_length = self.config.get('hop_length', 512)
+            raise ValueError(f"sample_rate must be positive (got {self.sample_rate})")
+        self.n_fft = self.config.get("n_fft", 2048)
+        self.hop_length = self.config.get("hop_length", 512)
 
         # Training data — bounded ring buffer to prevent unbounded growth
         # over long sessions. Override via config['max_training_samples'].
-        self.max_training_samples = self.config.get('max_training_samples', 10000)
+        self.max_training_samples = self.config.get("max_training_samples", 10000)
         from collections import deque as _deque
+
         self.training_data: "_deque[Tuple[AudioFeatures, float]]" = _deque(
             maxlen=self.max_training_samples
         )
@@ -170,7 +175,7 @@ class CriticAgent(BaseAgent):
         # Concept detection thresholds — caller may override the defaults
         # by passing config['concept_thresholds'] = {...} (deep-merged).
         self.concept_thresholds = self._initialize_thresholds()
-        override = self.config.get('concept_thresholds')
+        override = self.config.get("concept_thresholds")
         if override:
             for concept, fields in override.items():
                 if concept in self.concept_thresholds:
@@ -244,7 +249,9 @@ class CriticAgent(BaseAgent):
             features.spectral_flatness = np.mean(spectral_flatness)
 
             # Energy per frequency band
-            stft = np.abs(librosa.stft(audio, n_fft=self.n_fft, hop_length=self.hop_length))
+            stft = np.abs(
+                librosa.stft(audio, n_fft=self.n_fft, hop_length=self.hop_length)
+            )
             frequencies = librosa.fft_frequencies(sr=sr, n_fft=self.n_fft)
 
             def get_band_energy(low_freq, high_freq):
@@ -262,9 +269,12 @@ class CriticAgent(BaseAgent):
 
             # Normalize band energies
             total_energy = (
-                features.sub_bass_energy + features.bass_energy
-                + features.low_mid_energy + features.mid_energy
-                + features.high_mid_energy + features.presence_energy
+                features.sub_bass_energy
+                + features.bass_energy
+                + features.low_mid_energy
+                + features.mid_energy
+                + features.high_mid_energy
+                + features.presence_energy
                 + features.brilliance_energy
             )
 
@@ -282,7 +292,9 @@ class CriticAgent(BaseAgent):
 
             # Dynamic range (difference between 95th and 5th percentile)
             audio_db = librosa.amplitude_to_db(np.abs(audio), ref=np.max)
-            features.dynamic_range = float(np.percentile(audio_db, 95) - np.percentile(audio_db, 5))
+            features.dynamic_range = float(
+                np.percentile(audio_db, 95) - np.percentile(audio_db, 5)
+            )
 
             # Crest factor (peak to RMS ratio)
             peak = np.max(np.abs(audio))
@@ -292,12 +304,16 @@ class CriticAgent(BaseAgent):
                 features.crest_factor = 0.0
 
             # Temporal features
-            zcr = librosa.feature.zero_crossing_rate(audio, hop_length=self.hop_length)[0]
+            zcr = librosa.feature.zero_crossing_rate(audio, hop_length=self.hop_length)[
+                0
+            ]
             features.zero_crossing_rate = np.mean(zcr)
 
             # Tempo
             tempo, _ = librosa.beat.beat_track(y=audio, sr=sr)
-            features.tempo = float(tempo) / 200.0  # Normalize to 0-1 range (assuming max 200 BPM)
+            features.tempo = (
+                float(tempo) / 200.0
+            )  # Normalize to 0-1 range (assuming max 200 BPM)
 
             # Harmonic-percussive separation
             y_harmonic, y_percussive = librosa.effects.hpss(audio)
@@ -325,35 +341,42 @@ class CriticAgent(BaseAgent):
         negative_concepts = []
 
         # Detect MUD
-        if (features.low_mid_energy > self.concept_thresholds["mud"]["low_mid_energy"]):
+        if features.low_mid_energy > self.concept_thresholds["mud"]["low_mid_energy"]:
             negative_concepts.append("mud")
 
         # Detect HARSHNESS
         if (
-            features.high_mid_energy > self.concept_thresholds["harshness"]["high_mid_energy"]
-            or features.presence_energy > self.concept_thresholds["harshness"]["presence_energy"]
+            features.high_mid_energy
+            > self.concept_thresholds["harshness"]["high_mid_energy"]
+            or features.presence_energy
+            > self.concept_thresholds["harshness"]["presence_energy"]
         ):
             negative_concepts.append("harshness")
 
         # Detect BOOMINESS
         if (
             features.bass_energy > self.concept_thresholds["boominess"]["bass_energy"]
-            and features.dynamic_range < self.concept_thresholds["boominess"]["dynamic_range"]
+            and features.dynamic_range
+            < self.concept_thresholds["boominess"]["dynamic_range"]
         ):
             negative_concepts.append("boominess")
 
         # Detect CLARITY
-        clarity_centroid = self.concept_thresholds["clarity"]["spectral_centroid"] / self.sample_rate
+        clarity_centroid = (
+            self.concept_thresholds["clarity"]["spectral_centroid"] / self.sample_rate
+        )
         if (
             features.spectral_centroid > clarity_centroid
-            and features.high_mid_energy > self.concept_thresholds["clarity"]["high_mid_energy"]
+            and features.high_mid_energy
+            > self.concept_thresholds["clarity"]["high_mid_energy"]
         ):
             positive_concepts.append("clarity")
 
         # Detect WARMTH
         if (
             features.bass_energy > self.concept_thresholds["warmth"]["bass_energy"]
-            and features.low_mid_energy > self.concept_thresholds["warmth"]["low_mid_energy"]
+            and features.low_mid_energy
+            > self.concept_thresholds["warmth"]["low_mid_energy"]
             and "mud" not in negative_concepts
         ):
             positive_concepts.append("warmth")
@@ -436,7 +459,9 @@ class CriticAgent(BaseAgent):
 
         return judgment
 
-    def train_on_feedback(self, audio: np.ndarray, user_satisfaction: float, sr: int = None):
+    def train_on_feedback(
+        self, audio: np.ndarray, user_satisfaction: float, sr: int = None
+    ):
         """
         Train the critic network on user feedback.
 
@@ -459,7 +484,9 @@ class CriticAgent(BaseAgent):
 
         # Prepare batch
         batch_size = min(32, len(self.training_data))
-        batch_indices = np.random.choice(len(self.training_data), batch_size, replace=False)
+        batch_indices = np.random.choice(
+            len(self.training_data), batch_size, replace=False
+        )
 
         features_batch = []
         labels_batch = []
@@ -488,38 +515,40 @@ class CriticAgent(BaseAgent):
         """Handle incoming messages"""
         try:
             if message.message_type == MessageType.AUDIO_ANALYSIS_REQUEST:
-                audio = message.payload.get('audio')
-                sr = message.payload.get('sample_rate', self.sample_rate)
+                audio = message.payload.get("audio")
+                sr = message.payload.get("sample_rate", self.sample_rate)
 
                 judgment = self.judge_audio(audio, sr)
 
                 return {
-                    'status': 'success',
-                    'judgment': {
-                        'satisfaction_score': judgment.satisfaction_score,
-                        'confidence': judgment.confidence,
-                        'positive_concepts': judgment.positive_concepts,
-                        'negative_concepts': judgment.negative_concepts,
-                        'frequency_balance': judgment.frequency_balance,
-                        'suggested_corrections': [
+                    "status": "success",
+                    "judgment": {
+                        "satisfaction_score": judgment.satisfaction_score,
+                        "confidence": judgment.confidence,
+                        "positive_concepts": judgment.positive_concepts,
+                        "negative_concepts": judgment.negative_concepts,
+                        "frequency_balance": judgment.frequency_balance,
+                        "suggested_corrections": [
                             {
-                                'concept': concept,
-                                'adjustments': [(fr.name, db) for fr, db in adjustments]
+                                "concept": concept,
+                                "adjustments": [
+                                    (fr.name, db) for fr, db in adjustments
+                                ],
                             }
                             for concept, adjustments in judgment.suggested_corrections.items()
-                        ]
-                    }
+                        ],
+                    },
                 }
 
             elif message.message_type == MessageType.TRAINING_DATA:
-                audio = message.payload.get('audio')
-                satisfaction = message.payload.get('satisfaction')
-                sr = message.payload.get('sample_rate', self.sample_rate)
+                audio = message.payload.get("audio")
+                satisfaction = message.payload.get("satisfaction")
+                sr = message.payload.get("sample_rate", self.sample_rate)
 
                 self.train_on_feedback(audio, satisfaction, sr)
 
-                return {'status': 'success', 'message': 'Training data received'}
+                return {"status": "success", "message": "Training data received"}
 
         except Exception as e:
             logger.error(f"Error handling message: {e}")
-            return {'status': 'error', 'message': str(e)}
+            return {"status": "error", "message": str(e)}

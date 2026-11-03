@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 class GoalPriority(Enum):
     """Priority levels for optimization goals"""
+
     CRITICAL = 3
     HIGH = 2
     MEDIUM = 1
@@ -38,6 +39,7 @@ class GoalPriority(Enum):
 @dataclass
 class OptimizationGoal:
     """Represents a high-level optimization goal"""
+
     name: str
     description: str
     target_concepts: List[str]  # Desired audio concepts
@@ -53,6 +55,7 @@ class OptimizationGoal:
 @dataclass
 class AgentAction:
     """Represents an action proposed by an agent"""
+
     agent_id: str
     agent_type: str
     action_vector: np.ndarray
@@ -63,6 +66,7 @@ class AgentAction:
 @dataclass
 class AgentProposal:
     """Represents a proposal from an agent for coordination"""
+
     agent_id: str
     action: np.ndarray
     predicted_reward: float
@@ -74,6 +78,7 @@ class AgentProposal:
 @dataclass
 class ConflictResolution:
     """Resolution strategy for agent conflicts"""
+
     conflict_type: str
     agents_involved: List[str]
     resolution_strategy: str
@@ -88,11 +93,15 @@ class HGOCoordinator(BaseAgent):
     global audio quality goals while minimizing destructive interference.
     """
 
-    def __init__(self, agent_id: str, message_bus,
-                 eq_agent_id: str,
-                 dynamics_agent_id: str,
-                 critic_agent_id: str,
-                 config: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        agent_id: str,
+        message_bus,
+        eq_agent_id: str,
+        dynamics_agent_id: str,
+        critic_agent_id: str,
+        config: Optional[Dict[str, Any]] = None,
+    ):
         capabilities = [
             AgentCapability.COORDINATION,
             AgentCapability.MACHINE_LEARNING,
@@ -102,7 +111,7 @@ class HGOCoordinator(BaseAgent):
             agent_id=agent_id,
             agent_type="hgo_coordinator",
             capabilities=capabilities,
-            message_bus=message_bus
+            message_bus=message_bus,
         )
 
         self.config = config or {}
@@ -131,12 +140,13 @@ class HGOCoordinator(BaseAgent):
             audio_feature_dim=17,
         )
         self.coordination_optimizer = torch.optim.Adam(
-            self.coordination_network.parameters(),
-            lr=1e-4
+            self.coordination_network.parameters(), lr=1e-4
         )
 
         # Training mode
-        self.training_mode = self.config.get('training_mode', 'cooperative')  # or 'competitive'
+        self.training_mode = self.config.get(
+            "training_mode", "cooperative"
+        )  # or 'competitive'
 
         # Statistics
         self.coordination_episodes = 0
@@ -169,7 +179,7 @@ class HGOCoordinator(BaseAgent):
                 goal.eq_subgoals.append(f"adjust_eq_for_{concept}")
 
         # Dynamics sub-goals
-        dynamics_concepts = ['punch', 'tightness', 'control', 'dynamic', 'compressed']
+        dynamics_concepts = ["punch", "tightness", "control", "dynamic", "compressed"]
         for concept in goal.target_concepts:
             if concept in dynamics_concepts:
                 goal.dynamics_subgoals.append(f"adjust_dynamics_for_{concept}")
@@ -188,9 +198,9 @@ class HGOCoordinator(BaseAgent):
             f"Dynamics subgoals={goal.dynamics_subgoals}"
         )
 
-    def coordinate_agents(self, audio: np.ndarray,
-                          training: bool = True,
-                          max_steps: int = 5) -> Dict[str, Any]:
+    def coordinate_agents(
+        self, audio: np.ndarray, training: bool = True, max_steps: int = 5
+    ) -> Dict[str, Any]:
         """
         Coordinate multiple agents to optimize audio.
 
@@ -207,22 +217,18 @@ class HGOCoordinator(BaseAgent):
 
         # Get initial judgment
         initial_judgment = self._get_critic_judgment(current_audio)
-        initial_reward = initial_judgment.get('satisfaction_score', 0.0)
+        initial_reward = initial_judgment.get("satisfaction_score", 0.0)
 
         for step in range(max_steps):
             logger.debug(f"HGO Coordination step {step + 1}/{max_steps}")
 
             # Get proposed actions from each agent
             eq_action = self._get_agent_proposal(
-                self.eq_agent_id,
-                current_audio,
-                training=training
+                self.eq_agent_id, current_audio, training=training
             )
 
             dynamics_action = self._get_agent_proposal(
-                self.dynamics_agent_id,
-                current_audio,
-                training=training
+                self.dynamics_agent_id, current_audio, training=training
             )
 
             # Detect conflicts
@@ -231,7 +237,9 @@ class HGOCoordinator(BaseAgent):
             if conflict:
                 logger.info(f"Conflict detected: {conflict['type']}")
                 # Resolve conflict
-                resolution = self._resolve_conflict(conflict, eq_action, dynamics_action)
+                resolution = self._resolve_conflict(
+                    conflict, eq_action, dynamics_action
+                )
                 self.conflict_history.append(resolution)
 
                 # Adjust agent weights based on resolution
@@ -250,19 +258,19 @@ class HGOCoordinator(BaseAgent):
                             sender=self.agent_id,
                             message_type=MessageType.AUDIO_PROCESSING_REQUEST,
                             payload={
-                                'audio': current_audio,
-                                'mode': 'training' if training else 'inference',
-                                'action': action.action_vector,
+                                "audio": current_audio,
+                                "mode": "training" if training else "inference",
+                                "action": action.action_vector,
                             },
                         )
                     )
 
-                    if response and response.payload.get('status') == 'success':
-                        current_audio = response.payload.get('audio', current_audio)
+                    if response and response.payload.get("status") == "success":
+                        current_audio = response.payload.get("audio", current_audio)
 
             # Get feedback from Critic
             judgment = self._get_critic_judgment(current_audio)
-            step_reward = judgment.get('satisfaction_score', 0.0)
+            step_reward = judgment.get("satisfaction_score", 0.0)
             episode_rewards.append(step_reward)
 
             # Compute cooperation bonus
@@ -280,7 +288,7 @@ class HGOCoordinator(BaseAgent):
 
         # Compute final metrics
         final_judgment = self._get_critic_judgment(current_audio)
-        final_reward = final_judgment.get('satisfaction_score', 0.0)
+        final_reward = final_judgment.get("satisfaction_score", 0.0)
 
         improvement = final_reward - initial_reward
         avg_episode_reward = np.mean(episode_rewards)
@@ -290,22 +298,25 @@ class HGOCoordinator(BaseAgent):
         self.total_global_reward += final_reward
 
         return {
-            'status': 'success',
-            'processed_audio': current_audio,
-            'initial_reward': initial_reward,
-            'final_reward': final_reward,
-            'improvement': improvement,
-            'episode_rewards': episode_rewards,
-            'avg_reward': avg_episode_reward,
-            'cooperation_score': self.cooperation_score,
-            'conflicts_detected': len([
-                c for c in self.conflict_history if c.agents_involved
-            ]),
-            'final_judgment': final_judgment,
+            "status": "success",
+            "processed_audio": current_audio,
+            "initial_reward": initial_reward,
+            "final_reward": final_reward,
+            "improvement": improvement,
+            "episode_rewards": episode_rewards,
+            "avg_reward": avg_episode_reward,
+            "cooperation_score": self.cooperation_score,
+            "conflicts_detected": len(
+                [c for c in self.conflict_history if c.agents_involved]
+            ),
+            "final_judgment": final_judgment,
         }
 
     def _get_agent_proposal(
-        self, agent_id: str, audio: np.ndarray, training: bool,
+        self,
+        agent_id: str,
+        audio: np.ndarray,
+        training: bool,
     ) -> AgentAction:
         """Query the actual EQ or Dynamics agent for an action proposal.
 
@@ -325,7 +336,7 @@ class HGOCoordinator(BaseAgent):
 
         # Pull the union of subgoals across all current goals for this agent type
         subgoals: List[str] = []
-        for goal in getattr(self, 'active_goals', []) or []:
+        for goal in getattr(self, "active_goals", []) or []:
             subgoals.extend(
                 goal.eq_subgoals if agent_type == "eq" else goal.dynamics_subgoals
             )
@@ -338,18 +349,18 @@ class HGOCoordinator(BaseAgent):
                 sender=self.agent_id,
                 message_type=MessageType.AUDIO_PROCESSING_REQUEST,
                 payload={
-                    'mode': 'propose',
-                    'audio': audio,
-                    'training': training,
-                    'subgoals': subgoals,
+                    "mode": "propose",
+                    "audio": audio,
+                    "training": training,
+                    "subgoals": subgoals,
                 },
             ),
             timeout=2.0,
         )
 
-        if response and response.payload.get('status') == 'success':
+        if response and response.payload.get("status") == "success":
             action_vec = np.asarray(
-                response.payload.get('action', np.zeros(action_dim)),
+                response.payload.get("action", np.zeros(action_dim)),
                 dtype=np.float32,
             )
             if action_vec.shape != (action_dim,):
@@ -358,8 +369,8 @@ class HGOCoordinator(BaseAgent):
                 agent_id=agent_id,
                 agent_type=agent_type,
                 action_vector=action_vec,
-                predicted_reward=float(response.payload.get('predicted_reward', 0.0)),
-                confidence=float(response.payload.get('confidence', 0.5)),
+                predicted_reward=float(response.payload.get("predicted_reward", 0.0)),
+                confidence=float(response.payload.get("confidence", 0.5)),
                 affected_concepts=affected,
             )
 
@@ -374,7 +385,9 @@ class HGOCoordinator(BaseAgent):
             affected_concepts=affected,
         )
 
-    def _detect_conflict(self, action1: AgentAction, action2: AgentAction) -> Optional[Dict[str, Any]]:
+    def _detect_conflict(
+        self, action1: AgentAction, action2: AgentAction
+    ) -> Optional[Dict[str, Any]]:
         """
         Detect conflicts between agent actions.
 
@@ -393,9 +406,9 @@ class HGOCoordinator(BaseAgent):
             for opposite in opposites:
                 if opposite.name in concepts2:
                     return {
-                        'type': 'opposing_goals',
-                        'agents': [action1.agent_id, action2.agent_id],
-                        'conflicting_concepts': [concept1, opposite.name],
+                        "type": "opposing_goals",
+                        "agents": [action1.agent_id, action2.agent_id],
+                        "conflicting_concepts": [concept1, opposite.name],
                     }
 
         # Check for reinforcing negatives (both reducing dynamic range)
@@ -404,14 +417,15 @@ class HGOCoordinator(BaseAgent):
             # Example: heavy compression + too much EQ = artifacts
             if action2.predicted_reward < 0 and action1.predicted_reward < 0:
                 return {
-                    'type': 'reinforcing_negative',
-                    'agents': [action1.agent_id, action2.agent_id],
+                    "type": "reinforcing_negative",
+                    "agents": [action1.agent_id, action2.agent_id],
                 }
 
         return None
 
     def _resolve_conflict(
-        self, conflict: Dict[str, Any],
+        self,
+        conflict: Dict[str, Any],
         action1: AgentAction,
         action2: AgentAction,
     ) -> ConflictResolution:
@@ -424,45 +438,46 @@ class HGOCoordinator(BaseAgent):
         3. Blending: Weight actions based on predicted rewards
         4. Negotiate: Reduce both actions' magnitudes
         """
-        conflict_type = conflict['type']
-        agents = conflict['agents']
+        conflict_type = conflict["type"]
+        agents = conflict["agents"]
 
-        if conflict_type == 'opposing_goals':
+        if conflict_type == "opposing_goals":
             # Use goal priorities to decide
             # For now, balance 50/50
             return ConflictResolution(
                 conflict_type=conflict_type,
                 agents_involved=agents,
-                resolution_strategy='balance',
+                resolution_strategy="balance",
                 weight_adjustments={
                     agents[0]: 0.5,
                     agents[1]: 0.5,
-                }
+                },
             )
 
-        elif conflict_type == 'reinforcing_negative':
+        elif conflict_type == "reinforcing_negative":
             # Reduce both actions
             return ConflictResolution(
                 conflict_type=conflict_type,
                 agents_involved=agents,
-                resolution_strategy='reduce_both',
+                resolution_strategy="reduce_both",
                 weight_adjustments={
                     agents[0]: 0.3,
                     agents[1]: 0.3,
-                }
+                },
             )
 
         else:
             # Default: no adjustment
             return ConflictResolution(
-                conflict_type='unknown',
+                conflict_type="unknown",
                 agents_involved=agents,
-                resolution_strategy='none',
+                resolution_strategy="none",
                 weight_adjustments={},
             )
 
-    def _determine_action_order(self, eq_action: AgentAction,
-                                dynamics_action: AgentAction) -> List[Tuple[str, AgentAction]]:
+    def _determine_action_order(
+        self, eq_action: AgentAction, dynamics_action: AgentAction
+    ) -> List[Tuple[str, AgentAction]]:
         """
         Determine optimal order for applying actions.
 
@@ -483,16 +498,16 @@ class HGOCoordinator(BaseAgent):
                 sender=self.agent_id,
                 message_type=MessageType.CRITIC_JUDGMENT_REQUEST,
                 payload={
-                    'audio': audio,
-                    'sample_rate': self.config.get('sample_rate', 44100),
+                    "audio": audio,
+                    "sample_rate": self.config.get("sample_rate", 44100),
                 },
             )
         )
 
-        if response and response.payload.get('status') == 'success':
-            return response.payload.get('judgment', {})
+        if response and response.payload.get("status") == "success":
+            return response.payload.get("judgment", {})
         else:
-            return {'satisfaction_score': 0.0}
+            return {"satisfaction_score": 0.0}
 
     def _compute_cooperation_bonus(self, judgment: Dict[str, Any]) -> float:
         """
@@ -503,8 +518,8 @@ class HGOCoordinator(BaseAgent):
         - Avoid negative concepts
         - Work synergistically
         """
-        positive_concepts = judgment.get('positive_concepts', [])
-        negative_concepts = judgment.get('negative_concepts', [])
+        positive_concepts = judgment.get("positive_concepts", [])
+        negative_concepts = judgment.get("negative_concepts", [])
 
         # Bonus for achieving multiple positive concepts
         diversity_bonus = len(positive_concepts) * 0.05
@@ -519,49 +534,51 @@ class HGOCoordinator(BaseAgent):
 
     def _update_cooperation_score(self, judgment: Dict[str, Any]):
         """Update cooperation score based on judgment"""
-        satisfaction = judgment.get('satisfaction_score', 0.0)
+        satisfaction = judgment.get("satisfaction_score", 0.0)
 
         # Update cooperation score (moving average)
         alpha = 0.1
-        self.cooperation_score = (1 - alpha) * self.cooperation_score + alpha * max(0, satisfaction)
+        self.cooperation_score = (1 - alpha) * self.cooperation_score + alpha * max(
+            0, satisfaction
+        )
 
     def handle_message(self, message: Message) -> Any:
         """Handle incoming messages"""
         try:
             if message.message_type == MessageType.COORDINATION_REQUEST:
-                audio = message.payload.get('audio')
-                training = message.payload.get('training', True)
-                max_steps = message.payload.get('max_steps', 5)
+                audio = message.payload.get("audio")
+                training = message.payload.get("training", True)
+                max_steps = message.payload.get("max_steps", 5)
 
                 result = self.coordinate_agents(audio, training, max_steps)
                 return result
 
             elif message.message_type == MessageType.SET_GOALS:
-                goals_data = message.payload.get('goals', [])
+                goals_data = message.payload.get("goals", [])
 
                 # Convert to OptimizationGoal objects
                 goals = []
                 for g in goals_data:
                     goal = OptimizationGoal(
-                        name=g['name'],
-                        description=g['description'],
-                        target_concepts=g.get('target_concepts', []),
-                        avoid_concepts=g.get('avoid_concepts', []),
-                        priority=GoalPriority[g.get('priority', 'MEDIUM')],
-                        weight=g.get('weight', 1.0),
+                        name=g["name"],
+                        description=g["description"],
+                        target_concepts=g.get("target_concepts", []),
+                        avoid_concepts=g.get("avoid_concepts", []),
+                        priority=GoalPriority[g.get("priority", "MEDIUM")],
+                        weight=g.get("weight", 1.0),
                     )
                     goals.append(goal)
 
                 self.set_goals(goals)
 
                 return {
-                    'status': 'success',
-                    'message': f'Set {len(goals)} optimization goals',
+                    "status": "success",
+                    "message": f"Set {len(goals)} optimization goals",
                 }
 
         except Exception as e:
             logger.error(f"Error handling message: {e}")
-            return {'status': 'error', 'message': str(e)}
+            return {"status": "error", "message": str(e)}
 
 
 class CoordinationNetwork(nn.Module):
@@ -571,8 +588,9 @@ class CoordinationNetwork(nn.Module):
     Learns to predict optimal agent weights given audio features and goals.
     """
 
-    def __init__(self, num_agents: int = 2, audio_feature_dim: int = 17,
-                 goal_dim: int = 10):
+    def __init__(
+        self, num_agents: int = 2, audio_feature_dim: int = 17, goal_dim: int = 10
+    ):
         super(CoordinationNetwork, self).__init__()
 
         self.num_agents = num_agents
@@ -587,8 +605,9 @@ class CoordinationNetwork(nn.Module):
             nn.Softmax(dim=-1),  # Output agent weights summing to 1
         )
 
-    def forward(self, audio_features: torch.Tensor,
-                goal_features: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, audio_features: torch.Tensor, goal_features: torch.Tensor
+    ) -> torch.Tensor:
         """
         Compute optimal agent weights.
 

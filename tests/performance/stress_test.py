@@ -373,8 +373,7 @@ class StressTest:
 
 
 if __name__ == "__main__":
-    print(
-        """
+    print("""
 MAAPS Stress Testing Suite
 ===========================
 
@@ -386,8 +385,7 @@ This will run intensive stress tests:
 Estimated time: 5-10 minutes
 Press Ctrl+C to stop
 
-"""
-    )
+""")
 
     input("Press Enter to start...")
 

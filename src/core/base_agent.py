@@ -30,6 +30,7 @@ class AgentState(Enum):
 
 class AgentCapability(Enum):
     """Declared capabilities for agents in the multi-agent audio system."""
+
     AUDIO_ANALYSIS = "audio_analysis"
     AUDIO_PROCESSING = "audio_processing"
     MACHINE_LEARNING = "machine_learning"

@@ -4,6 +4,7 @@ These tests exercise the full chain: audio in -> features -> RL action ->
 HGO arbitration -> processed audio out. The goal is to catch regressions
 in inter-component contracts that unit tests can miss.
 """
+
 from __future__ import annotations
 
 import time
@@ -21,8 +22,8 @@ from src.agents.hgo_coordinator import (
     GoalPriority,
 )
 
-
 # ---------- Fixtures ----------
+
 
 @pytest.fixture
 def bus():
@@ -51,11 +52,12 @@ def audio_multitone():
 
 # ---------- E2E: critic loop ----------
 
+
 class TestCriticLoop:
     def test_critic_judges_audio_returns_finite_score(self, bus, audio_sine):
         c = CriticAgent(agent_id="critic", message_bus=bus)
         result = c.judge_audio(audio_sine)
-        assert hasattr(result, 'satisfaction_score')
+        assert hasattr(result, "satisfaction_score")
         assert np.isfinite(result.satisfaction_score)
         assert -1.0 <= result.satisfaction_score <= 1.0
 
@@ -68,6 +70,7 @@ class TestCriticLoop:
 
 
 # ---------- E2E: EQ + critic via fallback features ----------
+
 
 class TestEQCriticLoop:
     def test_eq_runs_one_step_with_local_fallback(self, bus, audio_sine):
@@ -94,9 +97,12 @@ class TestEQCriticLoop:
 
 # ---------- E2E: dynamics + critic ----------
 
+
 class TestDynamicsCriticLoop:
     def test_dynamics_runs_one_step_with_local_fallback(self, bus, audio_sine):
-        dy = DynamicsRLAgent(agent_id="dy", message_bus=bus, critic_agent_id="critic-missing")
+        dy = DynamicsRLAgent(
+            agent_id="dy", message_bus=bus, critic_agent_id="critic-missing"
+        )
         features = dy.get_audio_features(audio_sine)
         assert features.shape == (17,)
         action, log_prob, value = dy.select_action(features, explore=False)
@@ -107,38 +113,50 @@ class TestDynamicsCriticLoop:
 
 # ---------- E2E: HGO coordinator orchestrating two agents ----------
 
+
 class TestHGOFullCoordination:
     def test_hgo_collects_proposals_from_two_agents(self, bus, audio_sine):
         h = HGOCoordinator(
-            agent_id="hgo", message_bus=bus,
-            eq_agent_id="eq", dynamics_agent_id="dy", critic_agent_id="critic",
+            agent_id="hgo",
+            message_bus=bus,
+            eq_agent_id="eq",
+            dynamics_agent_id="dy",
+            critic_agent_id="critic",
         )
-        h.set_goals([
-            OptimizationGoal(
-                name="clarity",
-                description="more clarity",
-                target_concepts=["clarity"],
-                avoid_concepts=["mud"],
-                priority=GoalPriority.HIGH,
-            )
-        ])
+        h.set_goals(
+            [
+                OptimizationGoal(
+                    name="clarity",
+                    description="more clarity",
+                    target_concepts=["clarity"],
+                    avoid_concepts=["mud"],
+                    priority=GoalPriority.HIGH,
+                )
+            ]
+        )
 
         # Register fake EQ agent on bus
         def eq_handler(msg):
-            bus.respond(msg, {
-                'status': 'success',
-                'action': [0.1] * 14,
-                'predicted_reward': 0.5,
-                'confidence': 0.8,
-            })
+            bus.respond(
+                msg,
+                {
+                    "status": "success",
+                    "action": [0.1] * 14,
+                    "predicted_reward": 0.5,
+                    "confidence": 0.8,
+                },
+            )
 
         def dy_handler(msg):
-            bus.respond(msg, {
-                'status': 'success',
-                'action': [0.2] * 10,
-                'predicted_reward': 0.4,
-                'confidence': 0.7,
-            })
+            bus.respond(
+                msg,
+                {
+                    "status": "success",
+                    "action": [0.2] * 10,
+                    "predicted_reward": 0.4,
+                    "confidence": 0.7,
+                },
+            )
 
         bus.subscribe(Topics.agent_request("eq"), "eq", eq_handler)
         bus.subscribe(Topics.agent_request("dy"), "dy", dy_handler)
@@ -158,35 +176,48 @@ class TestHGOFullCoordination:
     def test_hgo_handles_partial_agent_failure(self, bus, audio_sine):
         """If only EQ responds, HGO should still produce a proposal for dyn (with conf=0.0)."""
         h = HGOCoordinator(
-            agent_id="hgo", message_bus=bus,
-            eq_agent_id="eq", dynamics_agent_id="dy", critic_agent_id="critic",
+            agent_id="hgo",
+            message_bus=bus,
+            eq_agent_id="eq",
+            dynamics_agent_id="dy",
+            critic_agent_id="critic",
         )
-        h.set_goals([
-            OptimizationGoal(
-                name="g", description="",
-                target_concepts=["clarity"], avoid_concepts=[],
-                priority=GoalPriority.HIGH,
-            )
-        ])
+        h.set_goals(
+            [
+                OptimizationGoal(
+                    name="g",
+                    description="",
+                    target_concepts=["clarity"],
+                    avoid_concepts=[],
+                    priority=GoalPriority.HIGH,
+                )
+            ]
+        )
 
         bus.subscribe(
             Topics.agent_request("eq"),
             "eq",
-            lambda msg: bus.respond(msg, {
-                'status': 'success', 'action': [0.0] * 14,
-                'predicted_reward': 0.0, 'confidence': 0.5,
-            }),
+            lambda msg: bus.respond(
+                msg,
+                {
+                    "status": "success",
+                    "action": [0.0] * 14,
+                    "predicted_reward": 0.0,
+                    "confidence": 0.5,
+                },
+            ),
         )
         time.sleep(0.05)
 
         eq_prop = h._get_agent_proposal("eq", audio_sine, training=False)
         dy_prop = h._get_agent_proposal("dy", audio_sine, training=False)
 
-        assert eq_prop.confidence == 0.5      # real response
-        assert dy_prop.confidence == 0.0      # marker for missing agent
+        assert eq_prop.confidence == 0.5  # real response
+        assert dy_prop.confidence == 0.0  # marker for missing agent
 
 
 # ---------- E2E: PPO step with GAE end-to-end ----------
+
 
 class TestPPOIntegration:
     def test_compute_gae_then_train_no_crash(self, bus, audio_sine):
@@ -194,28 +225,31 @@ class TestPPOIntegration:
         # Build a small synthetic trajectory
         traj = []
         for i in range(8):
-            traj.append(EQRLExperience(
-                audio_features=eq._extract_features_local(audio_sine),
-                action=np.random.uniform(-0.5, 0.5, 14).astype(np.float32),
-                reward=float(np.random.randn() * 0.1),
-                next_audio_features=eq._extract_features_local(audio_sine),
-                done=(i == 7),
-                log_prob=float(np.random.randn() * 0.1),
-                value=float(np.random.randn() * 0.1),
-            ))
+            traj.append(
+                EQRLExperience(
+                    audio_features=eq._extract_features_local(audio_sine),
+                    action=np.random.uniform(-0.5, 0.5, 14).astype(np.float32),
+                    reward=float(np.random.randn() * 0.1),
+                    next_audio_features=eq._extract_features_local(audio_sine),
+                    done=(i == 7),
+                    log_prob=float(np.random.randn() * 0.1),
+                    value=float(np.random.randn() * 0.1),
+                )
+            )
         eq._compute_gae(traj)
         eq.replay_buffer.extend(traj)
         # Force batch_size to fit our buffer for the test
         eq.batch_size = len(eq.replay_buffer)
         stats = eq._train_on_buffer()
         # Should produce real loss numbers, not NaN
-        assert 'policy_loss' in stats
-        assert np.isfinite(stats['policy_loss'])
-        assert np.isfinite(stats['value_loss'])
-        assert np.isfinite(stats['entropy'])
+        assert "policy_loss" in stats
+        assert np.isfinite(stats["policy_loss"])
+        assert np.isfinite(stats["value_loss"])
+        assert np.isfinite(stats["entropy"])
 
 
 # ---------- E2E: message bus roundtrip across the full chain ----------
+
 
 class TestMessageBusEndToEnd:
     def test_request_with_correlation_id_routes_response(self, bus):
@@ -223,7 +257,7 @@ class TestMessageBusEndToEnd:
 
         def echo(msg):
             received.append(msg.payload)
-            bus.respond(msg, {'status': 'success', 'echo': msg.payload['n']})
+            bus.respond(msg, {"status": "success", "echo": msg.payload["n"]})
 
         bus.subscribe(Topics.agent_request("echo"), "echo", echo)
         time.sleep(0.05)
@@ -234,11 +268,11 @@ class TestMessageBusEndToEnd:
                 topic=Topics.agent_request("echo"),
                 sender="caller",
                 message_type=MessageType.AUDIO_PROCESSING_REQUEST,
-                payload={'n': n},
+                payload={"n": n},
             )
             resp = bus.request(req, timeout=1.0)
             assert resp is not None
-            assert resp.payload['echo'] == n
+            assert resp.payload["echo"] == n
 
         assert len(received) == 5
 
@@ -247,7 +281,7 @@ class TestMessageBusEndToEnd:
         msg = Message(
             topic=Topics.agent_request("retry-target"),
             sender="caller",
-            payload={'data': 'first-try-failed'},
+            payload={"data": "first-try-failed"},
         )
         # Manually inject into DLQ as if delivery had failed
         bus._dead_letter_queue.put_nowait((msg, "retry-target", "transient_failure"))
@@ -264,7 +298,7 @@ class TestMessageBusEndToEnd:
         result = bus.retry_dead_letters(max_retries=1)
         time.sleep(0.1)  # let dispatcher deliver
 
-        assert result['attempted'] == 1
-        assert result['succeeded'] == 1
+        assert result["attempted"] == 1
+        assert result["succeeded"] == 1
         assert len(delivered) == 1
-        assert delivered[0]['data'] == 'first-try-failed'
+        assert delivered[0]["data"] == "first-try-failed"

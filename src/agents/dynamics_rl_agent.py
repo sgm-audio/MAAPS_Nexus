@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DynamicsParameters:
     """Parameters for dynamics processing"""
+
     # Compressor parameters
     threshold: float = -20.0  # dB (-60 to 0)
     ratio: float = 4.0  # 1.0 to 20.0
@@ -43,21 +44,23 @@ class DynamicsParameters:
 
     def to_vector(self) -> np.ndarray:
         """Convert parameters to vector for RL"""
-        return np.array([
-            (self.threshold + 60) / 60,  # Normalize to 0-1
-            (self.ratio - 1) / 19,  # Normalize to 0-1
-            np.log10(self.attack_ms / 0.1) / 3,  # Log scale, normalized
-            np.log10(self.release_ms / 10) / 2,  # Log scale, normalized
-            self.knee_width / 12,
-            self.makeup_gain / 24,
-            (self.limiter_threshold + 6) / 6,
-            np.log10(self.limiter_release / 10) / 2,
-            float(self.gate_enabled),
-            (self.gate_threshold + 80) / 80,
-        ])
+        return np.array(
+            [
+                (self.threshold + 60) / 60,  # Normalize to 0-1
+                (self.ratio - 1) / 19,  # Normalize to 0-1
+                np.log10(self.attack_ms / 0.1) / 3,  # Log scale, normalized
+                np.log10(self.release_ms / 10) / 2,  # Log scale, normalized
+                self.knee_width / 12,
+                self.makeup_gain / 24,
+                (self.limiter_threshold + 6) / 6,
+                np.log10(self.limiter_release / 10) / 2,
+                float(self.gate_enabled),
+                (self.gate_threshold + 80) / 80,
+            ]
+        )
 
     @classmethod
-    def from_vector(cls, vector: np.ndarray) -> 'DynamicsParameters':
+    def from_vector(cls, vector: np.ndarray) -> "DynamicsParameters":
         """Create parameters from vector"""
         return cls(
             threshold=vector[0] * 60 - 60,
@@ -101,7 +104,9 @@ class DynamicsPolicyNetwork(nn.Module):
         # Value head
         self.value_head = nn.Linear(hidden_dim // 2, 1)
 
-    def forward(self, audio_features: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, audio_features: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Forward pass - returns (action_mean, action_log_std)"""
         features = self.feature_encoder(audio_features)
         action_mean = torch.tanh(self.policy_mean(features))  # Bound to [-1, 1]
@@ -113,7 +118,9 @@ class DynamicsPolicyNetwork(nn.Module):
         features = self.feature_encoder(audio_features)
         return self.value_head(features)
 
-    def sample_action(self, audio_features: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def sample_action(
+        self, audio_features: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Sample action from policy"""
         action_mean, action_log_std = self.forward(audio_features)
         action_std = action_log_std.exp()
@@ -131,6 +138,7 @@ class DynamicsPolicyNetwork(nn.Module):
 @dataclass
 class RLExperience:
     """Single experience for RL training"""
+
     audio_features: np.ndarray
     action: np.ndarray
     reward: float
@@ -151,8 +159,13 @@ class DynamicsRLAgent(BaseAgent):
     Works alongside EQ agent, sometimes cooperating, sometimes conflicting.
     """
 
-    def __init__(self, agent_id: str, message_bus, critic_agent_id: str,
-                 config: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        agent_id: str,
+        message_bus,
+        critic_agent_id: str,
+        config: Optional[Dict[str, Any]] = None,
+    ):
         capabilities = [
             AgentCapability.AUDIO_PROCESSING,
             AgentCapability.MACHINE_LEARNING,
@@ -162,7 +175,7 @@ class DynamicsRLAgent(BaseAgent):
             agent_id=agent_id,
             agent_type="dynamics_rl",
             capabilities=capabilities,
-            message_bus=message_bus
+            message_bus=message_bus,
         )
 
         self.config = config or {}
@@ -196,15 +209,17 @@ class DynamicsRLAgent(BaseAgent):
         # Training statistics
         self.episodes_trained = 0
         self.total_reward = 0.0
-        self.best_reward = -float('inf')
+        self.best_reward = -float("inf")
         self.best_params = None
 
         # Audio processing
-        self.sample_rate = self.config.get('sample_rate', 44100)
+        self.sample_rate = self.config.get("sample_rate", 44100)
 
         logger.info(f"Dynamics RL Agent {agent_id} initialized")
 
-    def apply_dynamics(self, audio: np.ndarray, params: DynamicsParameters) -> np.ndarray:
+    def apply_dynamics(
+        self, audio: np.ndarray, params: DynamicsParameters
+    ) -> np.ndarray:
         """
         Apply dynamics processing to audio.
 
@@ -256,7 +271,9 @@ class DynamicsRLAgent(BaseAgent):
         # Smooth envelope
         window_size = int(self.sample_rate * 0.01)  # 10ms window
         if window_size > 0:
-            envelope = np.convolve(envelope, np.ones(window_size) / window_size, mode='same')
+            envelope = np.convolve(
+                envelope, np.ones(window_size) / window_size, mode="same"
+            )
 
         # Apply gate
         mask = envelope > threshold_linear
@@ -264,8 +281,15 @@ class DynamicsRLAgent(BaseAgent):
 
         return gated
 
-    def _apply_compressor(self, audio: np.ndarray, threshold: float, ratio: float,
-                          attack_ms: float, release_ms: float, knee_width: float) -> np.ndarray:
+    def _apply_compressor(
+        self,
+        audio: np.ndarray,
+        threshold: float,
+        ratio: float,
+        attack_ms: float,
+        release_ms: float,
+        knee_width: float,
+    ) -> np.ndarray:
         """
         Apply dynamic range compression.
 
@@ -313,7 +337,9 @@ class DynamicsRLAgent(BaseAgent):
                 # Release (gain reduction decreasing)
                 alpha = 1.0 / release_samples if release_samples > 0 else 1.0
 
-            smoothed_gr[i] = alpha * gain_reduction_db[i] + (1 - alpha) * smoothed_gr[i - 1]
+            smoothed_gr[i] = (
+                alpha * gain_reduction_db[i] + (1 - alpha) * smoothed_gr[i - 1]
+            )
 
         # Apply gain reduction
         gain_linear = 10 ** (smoothed_gr / 20)
@@ -322,7 +348,9 @@ class DynamicsRLAgent(BaseAgent):
         return compressed
 
     def _apply_limiter(
-        self, audio: np.ndarray, threshold: float,
+        self,
+        audio: np.ndarray,
+        threshold: float,
         release_ms: float,
     ) -> np.ndarray:
         """
@@ -353,7 +381,9 @@ class DynamicsRLAgent(BaseAgent):
             else:
                 # Release - smooth
                 alpha = 1.0 / release_samples if release_samples > 0 else 1.0
-                smoothed_gain[i] = alpha * gain_reduction[i] + (1 - alpha) * smoothed_gain[i - 1]
+                smoothed_gain[i] = (
+                    alpha * gain_reduction[i] + (1 - alpha) * smoothed_gain[i - 1]
+                )
 
         # Apply limiting
         limited = audio * smoothed_gain
@@ -368,15 +398,15 @@ class DynamicsRLAgent(BaseAgent):
                 sender=self.agent_id,
                 message_type=MessageType.CRITIC_JUDGMENT_REQUEST,
                 payload={
-                    'audio': audio,
-                    'sample_rate': self.sample_rate,
+                    "audio": audio,
+                    "sample_rate": self.sample_rate,
                 },
             )
         )
 
-        if response and response.payload.get('status') == 'success':
-            judgment = response.payload.get('judgment', {})
-            reward = judgment.get('satisfaction_score', 0.0)
+        if response and response.payload.get("status") == "success":
+            judgment = response.payload.get("judgment", {})
+            reward = judgment.get("satisfaction_score", 0.0)
             return reward, judgment
         else:
             logger.warning("Failed to get reward from Critic")
@@ -390,15 +420,15 @@ class DynamicsRLAgent(BaseAgent):
                 sender=self.agent_id,
                 message_type=MessageType.AUDIO_FEATURE_REQUEST,
                 payload={
-                    'audio': audio,
-                    'sample_rate': self.sample_rate,
+                    "audio": audio,
+                    "sample_rate": self.sample_rate,
                 },
             ),
             timeout=2.0,
         )
 
-        if response and response.payload.get('status') == 'success':
-            features = response.payload.get('features')
+        if response and response.payload.get("status") == "success":
+            features = response.payload.get("features")
             if features is not None:
                 arr = np.asarray(features, dtype=np.float32)
                 if arr.shape == (17,):
@@ -420,12 +450,21 @@ class DynamicsRLAgent(BaseAgent):
         cumulative = np.cumsum(spec)
         rolloff_idx = int(np.searchsorted(cumulative, 0.85 * spec_sum))
         rolloff = float(freqs[min(rolloff_idx, len(freqs) - 1)]) / sr
-        bandwidth = float(np.sqrt(((freqs - centroid * sr) ** 2 * spec).sum() / spec_sum)) / sr
+        bandwidth = (
+            float(np.sqrt(((freqs - centroid * sr) ** 2 * spec).sum() / spec_sum)) / sr
+        )
         geom = float(np.exp(np.mean(np.log(spec + 1e-12))))
         flatness = geom / (float(spec.mean()) + 1e-12)
 
-        bands = [(20, 60), (60, 250), (250, 500), (500, 2000),
-                 (2000, 4000), (4000, 6000), (6000, 20000)]
+        bands = [
+            (20, 60),
+            (60, 250),
+            (250, 500),
+            (500, 2000),
+            (2000, 4000),
+            (4000, 6000),
+            (6000, 20000),
+        ]
         band_energies = []
         for lo, hi in bands:
             mask = (freqs >= lo) & (freqs < hi)
@@ -433,7 +472,7 @@ class DynamicsRLAgent(BaseAgent):
         total_e = sum(band_energies) + 1e-12
         band_energies = [e / total_e for e in band_energies]
 
-        rms = float(np.sqrt(np.mean(audio ** 2)))
+        rms = float(np.sqrt(np.mean(audio**2)))
         peak = float(np.max(np.abs(audio)))
         dynamic_range = 20 * np.log10((peak + 1e-12) / (rms + 1e-12))
         crest = peak / (rms + 1e-12)
@@ -441,14 +480,26 @@ class DynamicsRLAgent(BaseAgent):
         harmonic_pct = sum(band_energies[:4])
 
         # 17-dim layout matches CriticAgent: 4 spectral + 7 bands + 3 dynamic + zcr + tempo + harmonic
-        return np.array([
-            centroid, rolloff, bandwidth, flatness,
-            *band_energies,
-            rms, dynamic_range, crest,
-            zcr, 0.0, harmonic_pct,
-        ], dtype=np.float32)
+        return np.array(
+            [
+                centroid,
+                rolloff,
+                bandwidth,
+                flatness,
+                *band_energies,
+                rms,
+                dynamic_range,
+                crest,
+                zcr,
+                0.0,
+                harmonic_pct,
+            ],
+            dtype=np.float32,
+        )
 
-    def select_action(self, audio_features: np.ndarray, explore: bool = True) -> Tuple[np.ndarray, float, float]:
+    def select_action(
+        self, audio_features: np.ndarray, explore: bool = True
+    ) -> Tuple[np.ndarray, float, float]:
         """Select dynamics adjustment action using policy network"""
         if explore and random.random() < self.epsilon:
             # Random exploration
@@ -459,7 +510,9 @@ class DynamicsRLAgent(BaseAgent):
             # Policy-based action
             feature_tensor = torch.FloatTensor(audio_features).unsqueeze(0)
             with torch.no_grad():
-                action_tensor, log_prob_tensor, value_tensor = self.policy_network.sample_action(feature_tensor)
+                action_tensor, log_prob_tensor, value_tensor = (
+                    self.policy_network.sample_action(feature_tensor)
+                )
                 action = action_tensor.squeeze(0).numpy()
                 log_prob = log_prob_tensor.item()
                 value = value_tensor.item()
@@ -556,12 +609,12 @@ class DynamicsRLAgent(BaseAgent):
             self.best_params = self.current_params
 
         return {
-            'episode': self.episodes_trained,
-            'episode_reward': episode_reward,
-            'best_reward': self.best_reward,
-            'epsilon': self.epsilon,
-            'initial_reward': initial_reward,
-            **train_stats
+            "episode": self.episodes_trained,
+            "episode_reward": episode_reward,
+            "best_reward": self.best_reward,
+            "epsilon": self.epsilon,
+            "initial_reward": initial_reward,
+            **train_stats,
         }
 
     def _compute_gae(self, trajectory: List["RLExperience"]) -> None:
@@ -615,7 +668,10 @@ class DynamicsRLAgent(BaseAgent):
             ratio = (new_log_probs - old_log_probs).exp()
 
             surr1 = ratio * advantages
-            surr2 = torch.clamp(ratio, 1 - self.clip_epsilon, 1 + self.clip_epsilon) * advantages
+            surr2 = (
+                torch.clamp(ratio, 1 - self.clip_epsilon, 1 + self.clip_epsilon)
+                * advantages
+            )
             policy_loss = -torch.min(surr1, surr2).mean()
 
             values = self.policy_network.get_value(audio_features).squeeze()
@@ -623,7 +679,11 @@ class DynamicsRLAgent(BaseAgent):
 
             entropy = dist.entropy().mean()
 
-            loss = policy_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy
+            loss = (
+                policy_loss
+                + self.value_loss_coef * value_loss
+                - self.entropy_coef * entropy
+            )
 
             self.optimizer.zero_grad()
             loss.backward()
@@ -635,47 +695,47 @@ class DynamicsRLAgent(BaseAgent):
             total_entropy += entropy.item()
 
         return {
-            'policy_loss': total_policy_loss / self.update_epochs,
-            'value_loss': total_value_loss / self.update_epochs,
-            'entropy': total_entropy / self.update_epochs,
+            "policy_loss": total_policy_loss / self.update_epochs,
+            "value_loss": total_value_loss / self.update_epochs,
+            "entropy": total_entropy / self.update_epochs,
         }
 
     def handle_message(self, message: Message) -> Any:
         """Handle incoming messages"""
         try:
             if message.message_type == MessageType.AUDIO_PROCESSING_REQUEST:
-                audio = message.payload.get('audio')
-                mode = message.payload.get('mode', 'inference')
+                audio = message.payload.get("audio")
+                mode = message.payload.get("mode", "inference")
 
-                if mode == 'training':
+                if mode == "training":
                     stats = self.train_episode(audio)
                     return {
-                        'status': 'success',
-                        'mode': 'training',
-                        'stats': stats,
+                        "status": "success",
+                        "mode": "training",
+                        "stats": stats,
                     }
                 else:
                     # Inference mode
                     if self.best_params:
                         processed_audio = self.apply_dynamics(audio, self.best_params)
                         params_dict = {
-                            'threshold': self.best_params.threshold,
-                            'ratio': self.best_params.ratio,
-                            'attack_ms': self.best_params.attack_ms,
-                            'release_ms': self.best_params.release_ms,
-                            'makeup_gain': self.best_params.makeup_gain,
+                            "threshold": self.best_params.threshold,
+                            "ratio": self.best_params.ratio,
+                            "attack_ms": self.best_params.attack_ms,
+                            "release_ms": self.best_params.release_ms,
+                            "makeup_gain": self.best_params.makeup_gain,
                         }
                     else:
                         processed_audio = audio
                         params_dict = {}
 
                     return {
-                        'status': 'success',
-                        'mode': 'inference',
-                        'audio': processed_audio,
-                        'params': params_dict,
+                        "status": "success",
+                        "mode": "inference",
+                        "audio": processed_audio,
+                        "params": params_dict,
                     }
 
         except Exception as e:
             logger.error(f"Error handling message: {e}")
-            return {'status': 'error', 'message': str(e)}
+            return {"status": "error", "message": str(e)}

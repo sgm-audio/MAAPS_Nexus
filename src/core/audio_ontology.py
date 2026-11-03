@@ -17,9 +17,10 @@ import numpy as np
 @dataclass
 class FrequencyRange:
     """Represents a frequency range with low and high bounds in Hz."""
+
     low: float
     high: float
-    
+
     def __post_init__(self):
         if self.low < 0:
             raise ValueError("Low frequency must be non-negative")
