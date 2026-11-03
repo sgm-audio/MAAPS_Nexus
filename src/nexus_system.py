@@ -26,7 +26,7 @@ from src.core.audio_ontology import (
     AudioOntologyManager,
     create_balanced_mix_goals,
 )
-from src.agents.critic_agent import CriticAgent, CriticEvaluation
+from src.agents.critic_agent import CriticAgent, CriticJudgment
 from src.agents.eq_rl_agent import EQRLAgent
 from src.agents.dynamics_rl_agent import DynamicsRLAgent
 from src.agents.hgo_coordinator import HGOCoordinator, AgentProposal
@@ -281,7 +281,7 @@ class MAAPSNexusSystem:
             # Placeholder: Drift slightly from current state or random
             new_state.set_attribute(attr, np.random.rand() * 0.5 + 0.5)
 
-        evaluation: CriticEvaluation = ray.get(
+        evaluation: CriticJudgment = ray.get(
             self.critic_agent.evaluate.remote(
                 processed_audio, new_state, self.goals, self.sample_rate
             )

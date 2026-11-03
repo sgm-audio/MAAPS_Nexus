@@ -1,0 +1,12 @@
+fix(import): CriticEvaluation->CriticJudgment; add AgentProposal; fix .gitmodules; personal paths
+
+- MAA-01: src/nexus_system.py imports CriticJudgment (was CriticEvaluation)
+- MAA-02: AgentProposal added to hgo_coordinator.py; ConflictType removed from test import
+- MAA-03: .gitmodules added for reablink and vst3sdk submodules
+- MAA-04: README CI badge URL fixed (SGM-Studios -> sgm-audio)
+- MAA-06: Personal F:\ paths replaced with /path/to/agents in DEPLOYMENT.md, GUI_PLAN.md
+- MAA-09: Tests updated (CriticEvaluation->CriticJudgment, ConflictType removed)
+- MAA-08: .gitmodules added for gitlinks
+- actionlint: ci-cd.yml uses vars for matrix, SC2086 fixed (quotes)
+
+exit=0

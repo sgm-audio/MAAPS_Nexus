@@ -313,8 +313,7 @@ class ProfileAnalysis:
 
 
 if __name__ == "__main__":
-    print(
-        """
+    print("""
 MAAPS Performance Profiling Suite
 ==================================
 
@@ -326,8 +325,7 @@ This will profile:
 
 Estimated time: 2-3 minutes
 
-"""
-    )
+""")
 
     profiler = ProfileAnalysis()
     profiler.run_all()

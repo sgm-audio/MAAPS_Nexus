@@ -258,7 +258,9 @@ class MessageBus:
 
         return metrics
 
-    def get_dead_letters(self, n: Optional[int] = None, drain: bool = False) -> List[Dict]:
+    def get_dead_letters(
+        self, n: Optional[int] = None, drain: bool = False
+    ) -> List[Dict]:
         """Retrieve entries from the dead-letter queue.
 
         Args:
@@ -284,14 +286,16 @@ class MessageBus:
                 msg, agent_id, err = entry
             except (ValueError, TypeError):
                 msg, agent_id, err = (entry, None, "unknown")
-            results.append({
-                'message_id': getattr(msg, 'message_id', None),
-                'topic': getattr(msg, 'topic', None),
-                'sender': getattr(msg, 'sender', None),
-                'agent_id': agent_id,
-                'error': err,
-                'original_message': msg,
-            })
+            results.append(
+                {
+                    "message_id": getattr(msg, "message_id", None),
+                    "topic": getattr(msg, "topic", None),
+                    "sender": getattr(msg, "sender", None),
+                    "agent_id": agent_id,
+                    "error": err,
+                    "original_message": msg,
+                }
+            )
 
         # Limit to n
         if n is not None:
@@ -343,10 +347,10 @@ class MessageBus:
                 self._dead_letter_queue.put_nowait(entry)
 
         return {
-            'attempted': attempted,
-            'succeeded': succeeded,
-            'failed': failed,
-            'remaining': self._dead_letter_queue.qsize(),
+            "attempted": attempted,
+            "succeeded": succeeded,
+            "failed": failed,
+            "remaining": self._dead_letter_queue.qsize(),
         }
 
     def _get_queue_for_priority(self, priority: Priority) -> queue.Queue:

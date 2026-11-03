@@ -13,6 +13,7 @@ Covers:
   * HGOCoordinator goal decomposition + agent proposal wiring (Iter 5)
   * BaseAgent post-refactor instantiability (Iter 7)
 """
+
 from __future__ import annotations
 
 import time
@@ -24,15 +25,18 @@ from src.core.message_types import Message, MessageType, Priority, Topics
 from src.core.base_agent import AgentCapability
 from src.agents.critic_agent import CriticAgent
 from src.agents.eq_rl_agent import EQRLAgent, RLExperience as EQRLExperience
-from src.agents.dynamics_rl_agent import DynamicsRLAgent, RLExperience as DynRLExperience
+from src.agents.dynamics_rl_agent import (
+    DynamicsRLAgent,
+    RLExperience as DynRLExperience,
+)
 from src.agents.hgo_coordinator import (
     HGOCoordinator,
     OptimizationGoal,
     GoalPriority,
 )
 
-
 # ---------- Fixtures ----------
+
 
 @pytest.fixture
 def bus():
@@ -49,6 +53,7 @@ def sine_440():
 
 
 # ---------- MessageBus topic helpers ----------
+
 
 class TestTopicsHelpers:
     def test_agent_request_pattern(self):
@@ -76,6 +81,7 @@ class TestNewMessageTypes:
 
 # ---------- BaseAgent instantiability (Iter 7 strategic fix) ----------
 
+
 class TestBaseAgentInstantiability:
     def test_critic_instantiable(self, bus):
         c = CriticAgent(agent_id="c1", message_bus=bus)
@@ -92,13 +98,17 @@ class TestBaseAgentInstantiability:
 
     def test_hgo_instantiable(self, bus):
         h = HGOCoordinator(
-            agent_id="hgo1", message_bus=bus,
-            eq_agent_id="eq1", dynamics_agent_id="dy1", critic_agent_id="c1",
+            agent_id="hgo1",
+            message_bus=bus,
+            eq_agent_id="eq1",
+            dynamics_agent_id="dy1",
+            critic_agent_id="c1",
         )
         assert h.agent_id == "hgo1"
 
 
 # ---------- Critic: memory cap ----------
+
 
 class TestCriticMemoryCap:
     def test_default_cap_is_10000(self, bus):
@@ -106,13 +116,17 @@ class TestCriticMemoryCap:
         assert c.training_data.maxlen == 10000
 
     def test_explicit_cap_enforced(self, bus, sine_440):
-        c = CriticAgent(agent_id="c", message_bus=bus, config={'max_training_samples': 5})
+        c = CriticAgent(
+            agent_id="c", message_bus=bus, config={"max_training_samples": 5}
+        )
         for _ in range(20):
             c.train_on_feedback(sine_440[:22050], 0.5)
         assert len(c.training_data) == 5
 
     def test_oldest_evicted_first(self, bus, sine_440):
-        c = CriticAgent(agent_id="c", message_bus=bus, config={'max_training_samples': 3})
+        c = CriticAgent(
+            agent_id="c", message_bus=bus, config={"max_training_samples": 3}
+        )
         for label in [0.1, 0.2, 0.3, 0.4, 0.5]:
             c.train_on_feedback(sine_440[:22050], label)
         # Oldest two evicted, newest three retained
@@ -122,43 +136,49 @@ class TestCriticMemoryCap:
 
 # ---------- Critic: configurable thresholds ----------
 
+
 class TestCriticThresholds:
     def test_override_specific_field(self, bus):
         c = CriticAgent(
-            agent_id="c", message_bus=bus,
-            config={'concept_thresholds': {'mud': {'low_mid_energy': 0.99}}},
+            agent_id="c",
+            message_bus=bus,
+            config={"concept_thresholds": {"mud": {"low_mid_energy": 0.99}}},
         )
-        assert c.concept_thresholds['mud']['low_mid_energy'] == 0.99
+        assert c.concept_thresholds["mud"]["low_mid_energy"] == 0.99
 
     def test_other_concepts_preserved(self, bus):
         c = CriticAgent(
-            agent_id="c", message_bus=bus,
-            config={'concept_thresholds': {'mud': {'low_mid_energy': 0.99}}},
+            agent_id="c",
+            message_bus=bus,
+            config={"concept_thresholds": {"mud": {"low_mid_energy": 0.99}}},
         )
         # harshness shouldn't be touched
-        assert c.concept_thresholds['harshness']['high_mid_energy'] == 0.8
+        assert c.concept_thresholds["harshness"]["high_mid_energy"] == 0.8
 
     def test_unknown_concept_added(self, bus):
         c = CriticAgent(
-            agent_id="c", message_bus=bus,
-            config={'concept_thresholds': {'sparkle': {'brilliance_energy': 0.5}}},
+            agent_id="c",
+            message_bus=bus,
+            config={"concept_thresholds": {"sparkle": {"brilliance_energy": 0.5}}},
         )
-        assert c.concept_thresholds['sparkle']['brilliance_energy'] == 0.5
+        assert c.concept_thresholds["sparkle"]["brilliance_energy"] == 0.5
 
 
 # ---------- Critic: sample_rate guard ----------
 
+
 class TestCriticSampleRateGuard:
     def test_zero_raises(self, bus):
         with pytest.raises(ValueError, match="sample_rate"):
-            CriticAgent(agent_id="c", message_bus=bus, config={'sample_rate': 0})
+            CriticAgent(agent_id="c", message_bus=bus, config={"sample_rate": 0})
 
     def test_negative_raises(self, bus):
         with pytest.raises(ValueError, match="sample_rate"):
-            CriticAgent(agent_id="c", message_bus=bus, config={'sample_rate': -100})
+            CriticAgent(agent_id="c", message_bus=bus, config={"sample_rate": -100})
 
 
 # ---------- RL agents: local feature fallback ----------
+
 
 class TestRLFeatureExtraction:
     def test_eq_features_17_dim(self, bus, sine_440):
@@ -185,7 +205,9 @@ class TestRLFeatureExtraction:
         sr = eq.sample_rate
         a = (0.5 * np.sin(2 * np.pi * 440 * np.arange(sr) / sr)).astype(np.float32)
         b = (0.5 * np.sin(2 * np.pi * 100 * np.arange(sr) / sr)).astype(np.float32)
-        assert not np.allclose(eq._extract_features_local(a), eq._extract_features_local(b))
+        assert not np.allclose(
+            eq._extract_features_local(a), eq._extract_features_local(b)
+        )
 
     def test_empty_audio_returns_zeros(self, bus):
         eq = EQRLAgent(agent_id="eq", message_bus=bus, critic_agent_id="c")
@@ -196,18 +218,34 @@ class TestRLFeatureExtraction:
 
 # ---------- RL agents: GAE math ----------
 
+
 class TestGAEMath:
     def _trajectory(self, ExpClass, action_dim):
         return [
-            ExpClass(audio_features=np.zeros(17), action=np.zeros(action_dim),
-                     reward=1.0, next_audio_features=np.zeros(17),
-                     done=False, value=0.5),
-            ExpClass(audio_features=np.zeros(17), action=np.zeros(action_dim),
-                     reward=1.0, next_audio_features=np.zeros(17),
-                     done=False, value=0.6),
-            ExpClass(audio_features=np.zeros(17), action=np.zeros(action_dim),
-                     reward=1.0, next_audio_features=np.zeros(17),
-                     done=True, value=0.7),
+            ExpClass(
+                audio_features=np.zeros(17),
+                action=np.zeros(action_dim),
+                reward=1.0,
+                next_audio_features=np.zeros(17),
+                done=False,
+                value=0.5,
+            ),
+            ExpClass(
+                audio_features=np.zeros(17),
+                action=np.zeros(action_dim),
+                reward=1.0,
+                next_audio_features=np.zeros(17),
+                done=False,
+                value=0.6,
+            ),
+            ExpClass(
+                audio_features=np.zeros(17),
+                action=np.zeros(action_dim),
+                reward=1.0,
+                next_audio_features=np.zeros(17),
+                done=True,
+                value=0.7,
+            ),
         ]
 
     def test_eq_gae_matches_hand_calculation(self, bus):
@@ -243,9 +281,14 @@ class TestGAEMath:
         """When done=True at step 0, advantage = reward - value."""
         eq = EQRLAgent(agent_id="eq", message_bus=bus, critic_agent_id="c")
         traj = [
-            EQRLExperience(audio_features=np.zeros(17), action=np.zeros(7),
-                           reward=1.0, next_audio_features=np.zeros(17),
-                           done=True, value=0.3),
+            EQRLExperience(
+                audio_features=np.zeros(17),
+                action=np.zeros(7),
+                reward=1.0,
+                next_audio_features=np.zeros(17),
+                done=True,
+                value=0.3,
+            ),
         ]
         eq._compute_gae(traj)
         # delta = 1.0 + 0.99*0*0 - 0.3 = 0.7; gae = 0.7 + ...*0 = 0.7
@@ -255,10 +298,15 @@ class TestGAEMath:
 
 # ---------- MessageBus DLQ ----------
 
+
 class TestMessageBusDLQ:
     def _seed_dlq(self, bus, n=3):
-        msg = Message(topic="lost.topic", sender="x",
-                      payload={'data': 'lost'}, priority=Priority.MEDIUM)
+        msg = Message(
+            topic="lost.topic",
+            sender="x",
+            payload={"data": "lost"},
+            priority=Priority.MEDIUM,
+        )
         for i in range(n):
             bus._dead_letter_queue.put_nowait((msg, f"agent-{i}", f"err-{i}"))
 
@@ -280,22 +328,23 @@ class TestMessageBusDLQ:
         bus.subscribe("lost.topic", "stub", lambda m: None)
         time.sleep(0.05)
         result = bus.retry_dead_letters(max_retries=5)
-        assert result['attempted'] == 2
-        assert result['succeeded'] == 2
-        assert result['remaining'] == 0
+        assert result["attempted"] == 2
+        assert result["succeeded"] == 2
+        assert result["remaining"] == 0
 
     def test_dead_letters_reflect_metrics(self, bus):
         self._seed_dlq(bus, 4)
         m = bus.get_metrics()
-        assert m['dead_letter_count'] == 4
+        assert m["dead_letter_count"] == 4
 
 
 # ---------- MessageBus end-to-end request/respond ----------
 
+
 class TestMessageBusRoundTrip:
     def test_request_response_via_per_agent_topic(self, bus):
         def handler(msg):
-            bus.respond(msg, {'status': 'success', 'echo': msg.payload['data']})
+            bus.respond(msg, {"status": "success", "echo": msg.payload["data"]})
 
         bus.subscribe(Topics.agent_request("recv"), "recv", handler)
         time.sleep(0.05)
@@ -304,12 +353,12 @@ class TestMessageBusRoundTrip:
             topic=Topics.agent_request("recv"),
             sender="caller",
             message_type=MessageType.AUDIO_PROCESSING_REQUEST,
-            payload={'data': 'hello'},
+            payload={"data": "hello"},
         )
         resp = bus.request(req, timeout=2.0)
         assert resp is not None
-        assert resp.payload['status'] == 'success'
-        assert resp.payload['echo'] == 'hello'
+        assert resp.payload["status"] == "success"
+        assert resp.payload["echo"] == "hello"
 
     def test_request_times_out_with_no_subscriber(self, bus):
         req = Message(
@@ -323,14 +372,19 @@ class TestMessageBusRoundTrip:
 
 # ---------- HGOCoordinator: goal decomposition + proposal ----------
 
+
 class TestHGOGoalDecomposition:
     def test_set_goals_populates_subgoals(self, bus):
         h = HGOCoordinator(
-            agent_id="hgo", message_bus=bus,
-            eq_agent_id="eq", dynamics_agent_id="dy", critic_agent_id="c",
+            agent_id="hgo",
+            message_bus=bus,
+            eq_agent_id="eq",
+            dynamics_agent_id="dy",
+            critic_agent_id="c",
         )
         g = OptimizationGoal(
-            name="clarity_first", description="",
+            name="clarity_first",
+            description="",
             target_concepts=["clarity", "presence_concept"],
             avoid_concepts=["mud", "harshness"],
             priority=GoalPriority.HIGH,
@@ -342,16 +396,23 @@ class TestHGOGoalDecomposition:
 
     def test_get_agent_proposal_no_subscriber_returns_zero_confidence(self, bus):
         h = HGOCoordinator(
-            agent_id="hgo", message_bus=bus,
-            eq_agent_id="eq", dynamics_agent_id="dy", critic_agent_id="c",
+            agent_id="hgo",
+            message_bus=bus,
+            eq_agent_id="eq",
+            dynamics_agent_id="dy",
+            critic_agent_id="c",
         )
-        h.set_goals([
-            OptimizationGoal(
-                name="g", description="",
-                target_concepts=["clarity"], avoid_concepts=["mud"],
-                priority=GoalPriority.HIGH,
-            )
-        ])
+        h.set_goals(
+            [
+                OptimizationGoal(
+                    name="g",
+                    description="",
+                    target_concepts=["clarity"],
+                    avoid_concepts=["mud"],
+                    priority=GoalPriority.HIGH,
+                )
+            ]
+        )
         audio = np.zeros(1024, dtype=np.float32)
         prop = h._get_agent_proposal("eq", audio, training=False)
         assert prop.confidence == 0.0
@@ -360,24 +421,34 @@ class TestHGOGoalDecomposition:
 
     def test_get_agent_proposal_real_response(self, bus):
         h = HGOCoordinator(
-            agent_id="hgo", message_bus=bus,
-            eq_agent_id="eq", dynamics_agent_id="dy", critic_agent_id="c",
+            agent_id="hgo",
+            message_bus=bus,
+            eq_agent_id="eq",
+            dynamics_agent_id="dy",
+            critic_agent_id="c",
         )
-        h.set_goals([
-            OptimizationGoal(
-                name="g", description="",
-                target_concepts=["clarity"], avoid_concepts=["mud"],
-                priority=GoalPriority.HIGH,
-            )
-        ])
+        h.set_goals(
+            [
+                OptimizationGoal(
+                    name="g",
+                    description="",
+                    target_concepts=["clarity"],
+                    avoid_concepts=["mud"],
+                    priority=GoalPriority.HIGH,
+                )
+            ]
+        )
 
         def eq_handler(msg):
-            bus.respond(msg, {
-                'status': 'success',
-                'action': list(np.linspace(0.1, 1.4, 14)),
-                'predicted_reward': 0.8,
-                'confidence': 0.9,
-            })
+            bus.respond(
+                msg,
+                {
+                    "status": "success",
+                    "action": list(np.linspace(0.1, 1.4, 14)),
+                    "predicted_reward": 0.8,
+                    "confidence": 0.9,
+                },
+            )
 
         bus.subscribe(Topics.agent_request("eq"), "eq", eq_handler)
         time.sleep(0.05)
@@ -392,15 +463,21 @@ class TestHGOGoalDecomposition:
 
     def test_get_agent_proposal_dynamics_dim(self, bus):
         h = HGOCoordinator(
-            agent_id="hgo", message_bus=bus,
-            eq_agent_id="eq", dynamics_agent_id="dy", critic_agent_id="c",
+            agent_id="hgo",
+            message_bus=bus,
+            eq_agent_id="eq",
+            dynamics_agent_id="dy",
+            critic_agent_id="c",
         )
-        prop = h._get_agent_proposal("dy", np.zeros(1024, dtype=np.float32), training=False)
+        prop = h._get_agent_proposal(
+            "dy", np.zeros(1024, dtype=np.float32), training=False
+        )
         assert prop.agent_type == "dynamics"
         assert prop.action_vector.shape == (10,)
 
 
 # ---------- EQ filter design ----------
+
 
 class TestEQFilterDesign:
     def test_peak_filter_returns_3_taps(self, bus):
@@ -417,27 +494,34 @@ class TestEQFilterDesign:
 
     def test_shelf_filter_returns_3_taps(self, bus):
         eq = EQRLAgent(agent_id="eq", message_bus=bus, critic_agent_id="c")
-        b, a = eq._design_shelf_filter(80.0, 6.0, 44100, 'low')
+        b, a = eq._design_shelf_filter(80.0, 6.0, 44100, "low")
         assert b.shape == (3,)
         assert a.shape == (3,)
 
     def test_shelf_filter_high_type(self, bus):
         eq = EQRLAgent(agent_id="eq", message_bus=bus, critic_agent_id="c")
-        b, a = eq._design_shelf_filter(8000.0, -3.0, 44100, 'high')
+        b, a = eq._design_shelf_filter(8000.0, -3.0, 44100, "high")
         assert b.shape == (3,)
         assert a.shape == (3,)
 
 
 # ---------- Dynamics processors ----------
 
+
 class TestDynamicsProcessing:
     def test_compressor_reduces_peaks(self, bus):
         dy = DynamicsRLAgent(agent_id="dy", message_bus=bus, critic_agent_id="c")
         sr = dy.sample_rate
-        audio = np.concatenate([np.zeros(sr // 2), np.ones(sr // 2) * 0.95]).astype(np.float32)
+        audio = np.concatenate([np.zeros(sr // 2), np.ones(sr // 2) * 0.95]).astype(
+            np.float32
+        )
         compressed = dy._apply_compressor(
-            audio, threshold=-12.0, ratio=4.0,
-            attack_ms=5.0, release_ms=50.0, knee_width=2.0,
+            audio,
+            threshold=-12.0,
+            ratio=4.0,
+            attack_ms=5.0,
+            release_ms=50.0,
+            knee_width=2.0,
         )
         assert compressed.shape == audio.shape
         assert np.max(np.abs(compressed)) <= np.max(np.abs(audio)) + 1e-6
@@ -460,6 +544,7 @@ class TestDynamicsProcessing:
 
 # ---------- Critic concept detection ----------
 
+
 class TestCriticConceptDetection:
     def test_extract_features_basic(self, bus, sine_440):
         c = CriticAgent(agent_id="c", message_bus=bus)
@@ -472,4 +557,7 @@ class TestCriticConceptDetection:
         c = CriticAgent(agent_id="c", message_bus=bus)
         result = c.judge_audio(sine_440)
         # judge_audio returns a CriticJudgment (dataclass) with satisfaction_score
-        assert hasattr(result, 'satisfaction_score') or 'satisfaction_score' in result.__dict__
+        assert (
+            hasattr(result, "satisfaction_score")
+            or "satisfaction_score" in result.__dict__
+        )

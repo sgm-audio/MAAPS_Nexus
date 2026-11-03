@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class RayClusterConfig:
     """Configuration for Ray cluster setup"""
+
     num_cpus: Optional[int] = None  # Auto-detect if None
     num_gpus: Optional[int] = 0
     memory: Optional[int] = None  # MB, auto-detect if None
@@ -97,7 +98,9 @@ class RayClusterManager:
 
             logger.info("Ray cluster initialized successfully")
             logger.info(f"Available resources: {self._cluster_resources}")
-            logger.info(f"Dashboard: http://{self.config.dashboard_host}:{self.config.dashboard_port}")
+            logger.info(
+                f"Dashboard: http://{self.config.dashboard_host}:{self.config.dashboard_port}"
+            )
 
             return True
 
@@ -196,7 +199,7 @@ class RayAgent:
             *args, **kwargs: Arguments for agent initialization
         """
         self.agent = agent_class(*args, **kwargs)
-        self.agent_id = kwargs.get('agent_id', 'unknown')
+        self.agent_id = kwargs.get("agent_id", "unknown")
 
     def start(self):
         """Start the agent"""
@@ -214,8 +217,8 @@ class RayAgent:
         """Get agent status"""
         return {
             "agent_id": self.agent_id,
-            "status": getattr(self.agent, 'status', 'unknown'),
-            "metrics": getattr(self.agent, 'get_metrics', lambda: {})(),
+            "status": getattr(self.agent, "status", "unknown"),
+            "metrics": getattr(self.agent, "get_metrics", lambda: {})(),
         }
 
 
@@ -237,7 +240,7 @@ class DistributedAgentPool:
         num_replicas: int = 2,
         num_cpus: float = 1.0,
         num_gpus: float = 0.0,
-        **agent_kwargs
+        **agent_kwargs,
     ) -> bool:
         """
         Create a pool of agent actors for load balancing.
@@ -272,7 +275,9 @@ class DistributedAgentPool:
                 ray.get(actor.start.remote())
 
             self.agents[agent_type] = actors
-            logger.info(f"Created agent pool '{agent_type}' with {num_replicas} replicas")
+            logger.info(
+                f"Created agent pool '{agent_type}' with {num_replicas} replicas"
+            )
 
             return True
 
@@ -304,7 +309,9 @@ class DistributedAgentPool:
         if agent_type not in self.agents:
             return []
 
-        status_futures = [actor.get_status.remote() for actor in self.agents[agent_type]]
+        status_futures = [
+            actor.get_status.remote() for actor in self.agents[agent_type]
+        ]
         return ray.get(status_futures)
 
     def shutdown_pool(self, agent_type: str):
@@ -334,7 +341,9 @@ def get_cluster_manager(config: Optional[RayClusterConfig] = None) -> RayCluster
     return _cluster_manager
 
 
-def initialize_ray_cluster(config: Optional[RayClusterConfig] = None) -> RayClusterManager:
+def initialize_ray_cluster(
+    config: Optional[RayClusterConfig] = None,
+) -> RayClusterManager:
     """
     Initialize Ray cluster for MAAPS Nexus.
 

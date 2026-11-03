@@ -12,7 +12,7 @@ import torch
 # Add src to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.agents.critic_agent import CriticAgent, CriticEvaluation
+from src.agents.critic_agent import CriticAgent, CriticJudgment
 from src.core.audio_ontology import AudioState, AudioAttribute, create_clarity_goal
 
 
@@ -56,7 +56,7 @@ class TestCriticAgent(unittest.TestCase):
             )
         )
 
-        self.assertIsInstance(evaluation, CriticEvaluation)
+        self.assertIsInstance(evaluation, CriticJudgment)
         self.assertGreaterEqual(evaluation.satisfaction_score, 0.0)
         self.assertLessEqual(evaluation.satisfaction_score, 1.0)
         self.assertIsInstance(evaluation.attribute_scores, dict)

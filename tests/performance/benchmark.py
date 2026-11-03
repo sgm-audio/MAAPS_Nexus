@@ -386,16 +386,14 @@ class PerformanceBenchmark:
 
 
 if __name__ == "__main__":
-    print(
-        """
+    print("""
 MAAPS Performance Benchmark Suite
 ==================================
 
 This will benchmark all core operations and save results.
 Estimated time: 3-5 minutes
 
-"""
-    )
+""")
 
     benchmark = PerformanceBenchmark()
     benchmark.run_all()
