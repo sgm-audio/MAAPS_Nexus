@@ -88,6 +88,7 @@ class ConflictResolution:
 @dataclass
 class CoordinationDecision:
     """Result of coordination process"""
+
     approved_proposals: List[AgentProposal]
     rejected_proposals: List[AgentProposal]
     execution_order: List[str]
