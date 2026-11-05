@@ -41,8 +41,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# Create non-root user for security
-RUN groupadd -r maaps && useradd -r -g maaps -s /sbin/nologin maaps
+# Create non-root user for security with home directory
+RUN groupadd -r maaps && useradd -r -g maaps -d /home/maaps -m -s /sbin/nologin maaps
 
 # Set working directory
 WORKDIR /app

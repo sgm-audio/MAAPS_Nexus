@@ -1,11 +1,14 @@
 # Docker Fix Summary - Quick Start
 
-## 🔴 Problems (ALL FIXED ✅)
+## 🔴 Problems (ALL FIXED)
 
-Your Docker build had three critical issues:
-1. **Build Error #1:** `E: Unable to locate package libmbedtls12` (package doesn't exist in Debian Bookworm) ✅ **FIXED**
-2. **Build Error #2:** `ERROR: Could not find a version that satisfies the requirement starlette==0.41.4` ✅ **FIXED**
-3. **118 Vulnerabilities:** Detected by Docker Scout (0 critical, 7 high, 8 medium, 103 low) ✅ **FIXED**
+1. **Windows Host File Sharing Error (`F:\...` path not shared)**:
+   - Error: `Error response from daemon: the path "F:\Sonic Mind\Sonic Mind\data" is not shared from the host; add it in Settings > Resources > File Sharing before using it in a container`
+   - **Root Cause**: Docker Desktop on Windows only shares `C:\` by default. Host bind mounts (`./data`, `./logs`, `./backups`) referencing `F:\` are blocked by the daemon unless drive sharing is configured.
+   - **Fix**: Replaced host bind mounts in `docker-compose.yml`, `docker-compose.production.yml`, and `docker-compose.secure.yml` with Docker managed named volumes (`maaps-data`, `maaps-logs`, `maaps-backups`). Named volumes live directly in Docker's WSL2 VM, require zero host file sharing permissions, and run at native Linux I/O speeds.
+2. **Build Error #1:** `E: Unable to locate package libmbedtls12` (package doesn't exist in Debian Bookworm) - **FIXED**
+3. **Build Error #2:** `ERROR: Could not find a version that satisfies the requirement starlette==0.41.4` - **FIXED**
+4. **118 Vulnerabilities:** Detected by Docker Scout (0 critical, 7 high, 8 medium, 103 low) - **FIXED**
 
 ## ✅ Solutions Applied
 

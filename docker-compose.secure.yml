@@ -29,9 +29,9 @@ services:
 
     # Persistent volumes (only what needs to persist)
     volumes:
-      - ./data:/app/data:rw
-      - ./logs:/app/logs:rw
-      - ./backups:/app/backups:rw
+      - maaps-data:/app/data:rw
+      - maaps-logs:/app/logs:rw
+      - maaps-backups:/app/backups:rw
 
     # Security: Read-only root filesystem
     read_only: true
@@ -327,6 +327,12 @@ networks:
 
 # Persistent volumes
 volumes:
+  maaps-data:
+    driver: local
+  maaps-logs:
+    driver: local
+  maaps-backups:
+    driver: local
   postgres-data:
     driver: local
   redis-data:

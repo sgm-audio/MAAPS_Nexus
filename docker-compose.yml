@@ -10,12 +10,11 @@ services:
     env_file:
       - .env.production
 
-    # Volume mounts for persistence
+    # Volume mounts for persistence (named volumes bypass Windows host file sharing requirements)
     volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-      - ./backups:/app/backups
-      - ./config.json:/app/config.json:ro
+      - maaps-data:/app/data
+      - maaps-logs:/app/logs
+      - maaps-backups:/app/backups
 
     # Resource limits
     deploy:

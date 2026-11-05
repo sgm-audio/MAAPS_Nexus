@@ -24,8 +24,8 @@ services:
       - JWT_SECRET=${JWT_SECRET:-changeme-generate-random-key}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,https://yourdomain.com}
     volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
+      - maaps-data:/app/data
+      - maaps-logs:/app/logs
     depends_on:
       - postgres
       - redis
@@ -150,6 +150,10 @@ networks:
     driver: bridge
 
 volumes:
+  maaps-data:
+    driver: local
+  maaps-logs:
+    driver: local
   postgres-data:
     driver: local
   redis-data:
