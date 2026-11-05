@@ -34,10 +34,8 @@ class TagRequest(BaseModel):
 # Dependency to get system instance
 def get_system():
     """Get the MAAPS system instance"""
-    from api.main import system
-    if system is None:
-        raise HTTPException(status_code=503, detail="System not initialized")
-    return system
+    from api.main import _ensure_system_ready
+    return _ensure_system_ready()
 
 
 @router.post("/extract")

@@ -11,13 +11,14 @@ import os
 # Import auth verification
 from api.auth import verify_token
 
-# Security scheme
-security = HTTPBearer()
+# Security schemes
+security = HTTPBearer(auto_error=True)
+optional_security = HTTPBearer(auto_error=False)
 
 
 # Optional authentication - routes can use this to optionally require auth
 def get_optional_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_security)
 ) -> Optional[str]:
     """
     Optional authentication dependency.
@@ -40,7 +41,7 @@ def get_current_user(
 ) -> str:
     """
     Required authentication dependency.
-    Raises 401 if no valid token provided.
+    Raises 401/403 if no valid token provided.
     """
     username = verify_token(credentials)
     return username
@@ -59,5 +60,4 @@ async def rate_limit_check():
     Rate limiting dependency (placeholder).
     In production, implement with Redis or similar.
     """
-    # TODO: Implement actual rate limiting
     pass

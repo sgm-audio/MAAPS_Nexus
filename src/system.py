@@ -283,13 +283,14 @@ class MultiAgentSystem:
         else:
             raise RuntimeError("Metadata extraction request timed out")
 
-    def search_metadata(self, query: str, filters: Optional[Dict] = None) -> Dict:
+    def search_metadata(self, query: str, filters: Optional[Dict] = None, limit: int = 10) -> Dict:
         """
         Search for audio files by metadata.
 
         Args:
             query: Search query string
             filters: Optional filters
+            limit: Max results
 
         Returns:
             Search results dict
@@ -305,7 +306,8 @@ class MultiAgentSystem:
             "metadata.search.request",
             {
                 'query': query,
-                'filters': filters or {}
+                'filters': filters or {},
+                'limit': limit
             },
             timeout=30.0
         )

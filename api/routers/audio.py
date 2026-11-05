@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 import logging
 
+from api.dependencies import get_optional_user
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/audio", tags=["Audio Processing"])
 
@@ -34,16 +36,15 @@ class MusicGenerateRequest(BaseModel):
 # Dependency to get system instance
 def get_system():
     """Get the MAAPS system instance"""
-    from api.main import system
-    if system is None:
-        raise HTTPException(status_code=503, detail="System not initialized")
-    return system
+    from api.main import _ensure_system_ready
+    return _ensure_system_ready()
 
 
 @router.post("/enhance")
 async def enhance_audio(
     request: AudioEnhanceRequest,
     background_tasks: BackgroundTasks,
+    username: Optional[str] = Depends(get_optional_user),
     system=Depends(get_system)
 ):
     """
@@ -64,6 +65,9 @@ async def enhance_audio(
             }
         )
 
+        if username:
+            result['authenticated_user'] = username
+
         logger.info(f"Enhancement complete: {result.get('processing_time_ms', 0):.1f}ms")
         return JSONResponse(content=result)
 
@@ -75,6 +79,7 @@ async def enhance_audio(
 @router.post("/generate")
 async def generate_music(
     request: MusicGenerateRequest,
+    username: Optional[str] = Depends(get_optional_user),
     system=Depends(get_system)
 ):
     """
@@ -101,9 +106,14 @@ async def generate_music(
 
         result = system.generate_music(request.content_type, musical_context)
 
+        if username:
+            result['authenticated_user'] = username
+
         logger.info(f"Music generation complete: {len(result.get('notes', []))} notes")
         return JSONResponse(content=result)
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Music generation failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -124,7 +134,6 @@ async def get_supported_formats():
 async def get_processing_stats(system=Depends(get_system)):
     """Get audio processing statistics"""
     try:
-        # This would typically come from telemetry
         return {
             "total_processed": 0,
             "average_processing_time_ms": 0,

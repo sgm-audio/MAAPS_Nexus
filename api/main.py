@@ -1,13 +1,13 @@
 """
 MAAPS REST API - Production-Ready FastAPI Interface
-Provides HTTP endpoints for audio processing, music generation, and system management
+Provides HTTP endpoints for audio processing, music generation, live performance, and system management
 
 Usage:
     Development: uvicorn api.main:app --reload
     Production:  uvicorn api.main:app --host 0.0.0.0 --port 8000 --workers 4
 """
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Depends
+from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Depends, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -18,13 +18,30 @@ import base64
 import asyncio
 from datetime import datetime
 import logging
+import os
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 from src.system import create_system
 
 # Import routers
-from api.routers import audio, metadata
+from api.routers import (
+    audio,
+    metadata,
+    effects,
+    looping,
+    sync,
+    automation,
+    system as system_router
+)
 from api import auth
 from api.dependencies import get_current_user, get_optional_user
+from api.message_bus_adapter import get_message_bus_adapter
+from api.websocket import websocket_manager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -40,8 +57,10 @@ app = FastAPI(
 )
 
 # CORS middleware - environment-based configuration
-import os
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
+allowed_origins = os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:3000,http://localhost:3001,http://localhost:5173,http://localhost:8000"
+).split(",")
 
 app.add_middleware(
     CORSMiddleware,
@@ -51,24 +70,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
+# Include root routers
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
-app.include_router(audio.router)  # Already has /audio prefix
-app.include_router(metadata.router)  # Already has /metadata prefix
+app.include_router(audio.router)      # /audio/*
+app.include_router(metadata.router)   # /metadata/*
+
+# Include /api/v1 routers (Phase 2 & 3 + UI client)
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication V1"])
+app.include_router(effects.router, prefix="/api/v1/effects", tags=["Effects Chain"])
+app.include_router(looping.router, prefix="/api/v1/looping", tags=["Live Looping"])
+app.include_router(sync.router, prefix="/api/v1/sync", tags=["Sync & Clock"])
+app.include_router(automation.router, prefix="/api/v1/automation", tags=["Performance Automation"])
+app.include_router(system_router.router, prefix="/api/v1/system", tags=["System V1"])
+app.include_router(audio.router, prefix="/api/v1")
+app.include_router(metadata.router, prefix="/api/v1")
 
 # Global system instance
 system = None
 
 
 def _ensure_system_ready() -> "MultiAgentSystem":
-    """Return initialized system or raise 503 if not ready."""
+    """Return initialized system, initializing lazily if needed, or raise 503."""
+    global system
     from src.system import MultiAgentSystem  # local import to avoid cycles
 
-    if system is None or not isinstance(system, MultiAgentSystem) or not getattr(system, "initialized", False):
-        raise HTTPException(
-            status_code=503,
-            detail="System not initialized yet"
-        )
+    if system is None or not isinstance(system, MultiAgentSystem):
+        system = create_system()
+    if not getattr(system, "initialized", False):
+        system.start()
     return system
 
 
@@ -95,6 +124,7 @@ class AudioEnhanceRequest(BaseModel):
             raise ValueError(f"audio_data too large (max {MAX_AUDIO_SAMPLES} samples)")
         return obj
 
+
 class MusicGenerateRequest(BaseModel):
     content_type: str = Field(..., description="Type: melody, harmony, drums, bass")
     key: str = Field("C major", description="Musical key")
@@ -102,6 +132,7 @@ class MusicGenerateRequest(BaseModel):
     time_signature: str = Field("4/4", description="Time signature")
     chord_progression: List[str] = Field(["C", "Am", "F", "G"], description="Chord progression")
     length_bars: int = Field(8, description="Length in bars", ge=1, le=64)
+
 
 class MetadataExtractRequest(BaseModel):
     audio_data: List[float] = Field(..., description="Audio samples")
@@ -115,12 +146,14 @@ class MetadataExtractRequest(BaseModel):
             raise ValueError(f"audio_data too large (max {MAX_AUDIO_SAMPLES} samples)")
         return obj
 
+
 class HealthResponse(BaseModel):
     health_score: float
     agents_healthy: int
     agents_total: int
     system_uptime_seconds: float
     timestamp: str
+
 
 class JobStatusResponse(BaseModel):
     job_id: str
@@ -142,6 +175,9 @@ async def startup_event():
     logger.info("Starting MAAPS system...")
     system = create_system()
     system.start()
+    adapter = get_message_bus_adapter()
+    await adapter.start()
+    await websocket_manager.start()
     logger.info("MAAPS system started successfully")
 
 
@@ -149,10 +185,29 @@ async def startup_event():
 async def shutdown_event():
     """Shutdown MAAPS system gracefully"""
     global system
+    await websocket_manager.stop()
+    adapter = get_message_bus_adapter()
+    await adapter.stop()
     if system:
         logger.info("Shutting down MAAPS system...")
         system.stop()
         logger.info("MAAPS system stopped")
+
+
+# WebSocket Endpoint
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """Real-time event WebSocket endpoint"""
+    client_id = await websocket_manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_json()
+            await websocket_manager.handle_message(client_id, data)
+    except WebSocketDisconnect:
+        websocket_manager.disconnect(client_id)
+    except Exception as e:
+        logger.error(f"WebSocket error for {client_id}: {e}")
+        websocket_manager.disconnect(client_id)
 
 
 # Health & Status Endpoints
@@ -210,47 +265,6 @@ async def list_agents():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# Audio Processing Endpoints
-@app.post("/audio/enhance", tags=["Audio Processing"])
-async def enhance_audio(
-    request: AudioEnhanceRequest,
-    background_tasks: BackgroundTasks,
-    username: Optional[str] = Depends(get_optional_user),
-    sys=Depends(get_system_dep)
-):
-    """
-    Enhance audio with noise reduction and restoration
-
-    Optional authentication - authenticated users get priority processing
-
-    Returns enhanced audio data with processing metrics
-    """
-    try:
-        user_context = f" (user: {username})" if username else " (anonymous)"
-        logger.info(f"Audio enhancement request{user_context}: {len(request.audio_data)} samples @ {request.sample_rate}Hz")
-
-        result = sys.enhance_audio(
-            audio_data=request.audio_data,
-            sample_rate=request.sample_rate,
-            params={
-                'noise_reduction_amount': request.noise_reduction,
-                'declicking_sensitivity': request.declicking_sensitivity,
-                'preserve_transients': request.preserve_transients
-            }
-        )
-
-        # Add user context to response
-        if username:
-            result['authenticated_user'] = username
-
-        logger.info(f"Enhancement complete: {result.get('processing_time_ms', 0):.1f}ms")
-        return JSONResponse(content=result)
-
-    except Exception as e:
-        logger.error(f"Audio enhancement failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.post("/audio/metadata", tags=["Audio Processing"])
 async def extract_metadata(
     request: MetadataExtractRequest,
@@ -259,27 +273,22 @@ async def extract_metadata(
 ):
     """
     Extract metadata from audio
-
-    Optional authentication - authenticated users get enhanced metadata
-
-    Returns musical, technical, and quality features
     """
     try:
         user_context = f" (user: {username})" if username else " (anonymous)"
         logger.info(f"Metadata extraction{user_context}: {len(request.audio_data)} samples")
 
-        metadata = sys.extract_metadata(
+        metadata_res = sys.extract_metadata(
             audio_data=request.audio_data,
             sample_rate=request.sample_rate,
             deep_analysis=request.deep_analysis
         )
 
-        # Add user context to response
         if username:
-            metadata['authenticated_user'] = username
+            metadata_res['authenticated_user'] = username
 
         logger.info("Metadata extraction complete")
-        return JSONResponse(content=metadata)
+        return JSONResponse(content=metadata_res)
 
     except Exception as e:
         logger.error(f"Metadata extraction failed: {e}")
@@ -295,10 +304,6 @@ async def generate_music(
 ):
     """
     Generate AI music (melody, harmony, drums, or bass)
-
-    Optional authentication - authenticated users get priority queue
-
-    Returns generated MIDI data and note events
     """
     try:
         if request.content_type not in ['melody', 'harmony', 'drums', 'bass']:
@@ -320,7 +325,6 @@ async def generate_music(
 
         result = sys.generate_music(request.content_type, musical_context)
 
-        # Add user context to response
         if username:
             result['authenticated_user'] = username
 
@@ -342,8 +346,6 @@ async def batch_enhance(
 ):
     """
     Batch audio enhancement (async processing)
-
-    Returns job ID for tracking
     """
     job_id = f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
@@ -354,9 +356,6 @@ async def batch_enhance(
         'processed_files': 0,
         'results': []
     }
-
-    # Process in background
-    # background_tasks.add_task(process_batch, job_id, files)
 
     return JSONResponse(content={
         'job_id': job_id,
@@ -389,7 +388,7 @@ async def restart_system(username: str = Depends(get_current_user)):
         logger.info(f"System restart requested by {username}")
         sys = get_system_dep()
         sys.stop()
-        await asyncio.sleep(2)
+        await asyncio.sleep(0.5)
         sys.start()
         logger.info("System restarted successfully")
         return {"status": "success", "message": "System restarted", "requested_by": username}
@@ -405,7 +404,7 @@ async def get_version():
         "api_version": "1.0.0",
         "system_version": "1.0.0",
         "python_version": "3.11+",
-        "agents": 5
+        "agents": 10
     }
 
 

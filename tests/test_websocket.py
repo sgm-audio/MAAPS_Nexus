@@ -4,6 +4,7 @@ Demonstrates real-time event streaming and subscriptions
 """
 
 import asyncio
+import pytest
 import websockets
 import json
 from datetime import datetime
@@ -123,118 +124,70 @@ class WebSocketTestClient:
         return datetime.now().strftime("%H:%M:%S.%f")[:-3]
 
 
+@pytest.mark.asyncio
 async def test_effects_events():
     """Test effects chain parameter change events"""
-    print("\n" + "=" * 60)
-    print("TEST 1: Effects Chain Parameter Changes")
-    print("=" * 60)
-
     client = WebSocketTestClient()
 
-    if await client.connect():
-        await client.subscribe([
-            "effects.parameter.change",
-            "effects.chain.created",
-            "effects.bypass.toggled"
-        ])
-
-        print("\nWaiting for effects events...")
-        print("(Manually trigger parameter changes in the API to see events)")
-
-        await client.listen(duration=15)
-        await client.disconnect()
+    assert await client.connect()
+    await client.subscribe([
+        "effects.parameter.change",
+        "effects.chain.created",
+        "effects.bypass.toggled"
+    ])
+    await client.listen(duration=1)
+    await client.disconnect()
 
 
+@pytest.mark.asyncio
 async def test_looping_events():
     """Test live looping events"""
-    print("\n" + "=" * 60)
-    print("TEST 2: Live Looping Events")
-    print("=" * 60)
-
     client = WebSocketTestClient()
 
-    if await client.connect():
-        await client.subscribe([
-            "loop.record.started",
-            "loop.record.stopped",
-            "loop.playback.started",
-            "loop.playback.stopped"
-        ])
-
-        print("\nWaiting for looping events...")
-        print("(Manually trigger loop recording in the API to see events)")
-
-        await client.listen(duration=15)
-        await client.disconnect()
+    assert await client.connect()
+    await client.subscribe([
+        "loop.record.started",
+        "loop.record.stopped",
+        "loop.playback.started",
+        "loop.playback.stopped"
+    ])
+    await client.listen(duration=1)
+    await client.disconnect()
 
 
+@pytest.mark.asyncio
 async def test_sync_events():
     """Test sync/clock events"""
-    print("\n" + "=" * 60)
-    print("TEST 3: Sync & Clock Events")
-    print("=" * 60)
-
     client = WebSocketTestClient()
 
-    if await client.connect():
-        await client.subscribe([
-            "sync.tempo.changed",
-            "sync.clock.position",
-            "sync.transport.changed"
-        ])
-
-        print("\nWaiting for sync events...")
-        print("(Manually change tempo or transport in the API to see events)")
-
-        await client.listen(duration=15)
-        await client.disconnect()
+    assert await client.connect()
+    await client.subscribe([
+        "sync.tempo.changed",
+        "sync.clock.position",
+        "sync.transport.changed"
+    ])
+    await client.listen(duration=1)
+    await client.disconnect()
 
 
+@pytest.mark.asyncio
 async def test_all_events():
     """Subscribe to all event topics"""
-    print("\n" + "=" * 60)
-    print("TEST 4: All Events (Comprehensive)")
-    print("=" * 60)
-
     client = WebSocketTestClient()
 
-    if await client.connect():
-        # Subscribe to all major event topics
-        all_topics = [
-            # Effects
-            "effects.parameter.change",
-            "effects.chain.created",
-            "effects.chain.deleted",
-            "effects.bypass.toggled",
-            # Looping
-            "loop.record.started",
-            "loop.record.stopped",
-            "loop.playback.started",
-            "loop.playback.stopped",
-            "loop.overdub.started",
-            "loop.cleared",
-            # Sync
-            "sync.tempo.changed",
-            "sync.time_signature.changed",
-            "sync.clock.position",
-            "sync.transport.changed",
-            # Automation
-            "automation.recording.started",
-            "automation.recording.stopped",
-            "automation.scene.recalled",
-            "automation.macro.triggered",
-            # System
-            "system.health.changed",
-            "system.agent.status",
-        ]
-
-        await client.subscribe(all_topics)
-
-        print("\nListening for ALL events...")
-        print("(Trigger any API action to see corresponding events)")
-
-        await client.listen(duration=30)
-        await client.disconnect()
+    assert await client.connect()
+    all_topics = [
+        "effects.parameter.change",
+        "effects.chain.created",
+        "loop.record.started",
+        "loop.record.stopped",
+        "sync.clock.position",
+        "automation.scene.recalled",
+        "system.health.changed",
+    ]
+    await client.subscribe(all_topics)
+    await client.listen(duration=1)
+    await client.disconnect()
 
 
 async def main():

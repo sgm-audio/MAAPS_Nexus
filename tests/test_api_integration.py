@@ -13,6 +13,75 @@ BASE_URL = "http://localhost:8000"
 API_V1 = f"{BASE_URL}/api/v1"
 
 
+@pytest.fixture(scope="module")
+def created_chain():
+    payload = {
+        "chain_name": "Fixture Vocal Chain",
+        "effects": [
+            {
+                "type": "compressor",
+                "parameters": {"threshold": -18.0, "ratio": 4.0},
+                "bypass": False,
+                "wet_dry": 1.0,
+            }
+        ],
+    }
+    resp = requests.post(f"{API_V1}/effects/chains", json=payload)
+    assert resp.status_code == 201
+    return resp.json()["data"]
+
+
+@pytest.fixture(scope="module")
+def chain_id(created_chain):
+    return created_chain["chain_id"]
+
+
+@pytest.fixture(scope="module")
+def effect_id(created_chain):
+    effects = created_chain.get("effects", [])
+    if effects:
+        return effects[0]["effect_id"]
+    chain_resp = requests.get(f"{API_V1}/effects/chains/{created_chain['chain_id']}").json()
+    return chain_resp["data"]["effects"][0]["effect_id"]
+
+
+@pytest.fixture(scope="module")
+def track_id():
+    payload = {
+        "track_name": "Fixture Drums",
+        "length_beats": 4,
+        "sync_to_tempo": True,
+        "volume": 0.8,
+        "pan": 0.0,
+    }
+    resp = requests.post(f"{API_V1}/looping/tracks", json=payload)
+    assert resp.status_code == 201
+    return resp.json()["data"]["track_id"]
+
+
+@pytest.fixture(scope="module")
+def macro_id():
+    payload = {
+        "macro_name": "Fixture Energy",
+        "target_parameters": [
+            {"param": "effects.eq.gain3", "min": 0.0, "max": 6.0, "curve": "exponential"}
+        ],
+    }
+    resp = requests.post(f"{API_V1}/automation/macros", json=payload)
+    assert resp.status_code == 201
+    return resp.json()["data"]["macro_id"]
+
+
+@pytest.fixture(scope="module")
+def token():
+    resp = requests.post(
+        f"{API_V1}/auth/login",
+        json={"username": "admin", "password": "password"},
+    )
+    assert resp.status_code == 200
+    return resp.json()["token"]
+
+
 class TestEffectsChainAPI:
     """Test Effects Chain endpoints"""
 

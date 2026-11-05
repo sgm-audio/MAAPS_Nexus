@@ -33,7 +33,6 @@ interface Chain {
 
 export const EffectsChain: React.FC = () => {
   const [chains, setChains] = useState<Chain[]>([]);
-  const [selectedChain, setSelectedChain] = useState<Chain | null>(null);
 
   useEffect(() => {
     fetchChains();
