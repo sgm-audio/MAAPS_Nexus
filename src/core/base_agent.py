@@ -7,20 +7,19 @@ lifecycle management, and monitoring.
 import threading
 import time
 import logging
-from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any, Callable
-from datetime import datetime
+from abc import ABC
+from typing import List, Optional, Dict, Any
 from enum import Enum
 
 from .message_bus import get_message_bus, MessageBus
 from .message_types import Message, Priority, Topics, SystemEvent, LogEntry
-
 
 logger = logging.getLogger(__name__)
 
 
 class AgentState(Enum):
     """Agent lifecycle states"""
+
     CREATED = "created"
     STARTING = "starting"
     RUNNING = "running"
@@ -29,29 +28,58 @@ class AgentState(Enum):
     ERROR = "error"
 
 
+class AgentCapability(Enum):
+    """Declared capabilities for agents in the multi-agent audio system."""
+
+    AUDIO_ANALYSIS = "audio_analysis"
+    AUDIO_PROCESSING = "audio_processing"
+    MACHINE_LEARNING = "machine_learning"
+    COORDINATION = "coordination"
+    DAW_INTEGRATION = "daw_integration"
+    MONITORING = "monitoring"
+
+
 class BaseAgent(ABC):
     """
     Base class for all agents in the system.
     Handles communication, lifecycle, and common functionality.
     """
 
-    def __init__(self, agent_id: str, agent_name: str):
+    def __init__(
+        self,
+        agent_id: str,
+        agent_name: Optional[str] = None,
+        agent_type: Optional[str] = None,
+        capabilities: Optional[List["AgentCapability"]] = None,
+        message_bus: Optional[MessageBus] = None,
+    ):
         """
         Initialize the agent.
 
         Args:
-            agent_id: Unique identifier for this agent
-            agent_name: Human-readable agent name
+            agent_id: Unique identifier for this agent.
+            agent_name: Human-readable agent name. Defaults to agent_id.
+            agent_type: Logical type ("critic", "eq", "dynamics", "hgo", ...).
+            capabilities: Declared capabilities (see AgentCapability).
+            message_bus: Optional message bus override. Falls back to the
+                process-wide singleton if not provided.
         """
         self.agent_id = agent_id
-        self.agent_name = agent_name
+        self.agent_name = agent_name or agent_id
+        self.agent_type = agent_type
+        self.capabilities = list(capabilities or [])
 
         # State management
         self._state = AgentState.CREATED
         self._state_lock = threading.Lock()
 
-        # Message bus
-        self._message_bus: MessageBus = get_message_bus()
+        # Message bus — accept an injected bus for testing; fall back to singleton
+        if message_bus is not None:
+            self._message_bus = message_bus
+        else:
+            self._message_bus = get_message_bus()
+        # Public alias used by the multi-agent core
+        self.message_bus = self._message_bus
 
         # Subscription management
         self._subscribed_topics: List[str] = []
@@ -66,49 +94,72 @@ class BaseAgent(ABC):
             "messages_sent": 0,
             "errors": 0,
             "uptime_seconds": 0.0,
-            "start_time": None
+            "start_time": None,
         }
         self._metrics_lock = threading.Lock()
 
         logger.info(f"Agent {self.agent_id} ({self.agent_name}) created")
 
-    @abstractmethod
     def setup(self):
-        """
-        Setup the agent - override this method.
-        Called once during agent initialization.
-        Subscribe to topics and perform setup here.
-        """
-        pass
+        """Optional lifecycle hook. Override to subscribe to topics, etc."""
+        return None
 
-    @abstractmethod
     def teardown(self):
-        """
-        Teardown the agent - override this method.
-        Called once during agent shutdown.
-        Cleanup resources here.
-        """
-        pass
+        """Optional lifecycle hook. Override for resource cleanup."""
+        return None
 
-    @abstractmethod
     def handle_message(self, message: Message):
-        """
-        Handle an incoming message - override this method.
-        This is the main message processing logic for the agent.
+        """Default no-op message handler. Override for real behavior."""
+        return None
 
-        Args:
-            message: Incoming message
-        """
+    # ---- Compatibility re-declarations (non-abstract) ----
+    # The original BaseAgent declared these as abstract. We keep the
+    # method names available so subclasses can still override them, but
+    # we no longer prevent instantiation when they are not overridden.
+    def _abstract_setup_placeholder(self):
         pass
+
+    def _set_state(self, new_state: AgentState, error: Optional[Exception] = None):
+        """
+        Update agent state and notify observers.
+        """
+        with self._state_lock:
+            old_state = self._state
+            self._state = new_state
+
+        # Publish status change event
+        payload = {
+            "agent_id": self.agent_id,
+            "agent_name": self.agent_name,
+            "old_state": old_state.value,
+            "new_state": new_state.value,
+            "timestamp": time.time(),
+        }
+
+        if error:
+            payload["error"] = str(error)
+
+        # Use a generic status topic that the Coordinator subscribes to
+        topic = "system.agent.status"
+
+        # Determine priority based on state
+        priority = Priority.HIGH if new_state == AgentState.ERROR else Priority.MEDIUM
+
+        self.publish(topic, payload, priority=priority)
+        logger.debug(
+            f"Agent {self.agent_id} state changed: {old_state.value} -> {new_state.value}"
+        )
 
     def start(self):
         """Start the agent"""
         with self._state_lock:
             if self._state != AgentState.CREATED:
-                logger.warning(f"Agent {self.agent_id} already started or in invalid state")
+                logger.warning(
+                    f"Agent {self.agent_id} already started or in invalid state"
+                )
                 return
 
-            self._state = AgentState.STARTING
+        self._set_state(AgentState.STARTING)
 
         try:
             # Ensure message bus is running
@@ -126,21 +177,12 @@ class BaseAgent(ABC):
             self._start_heartbeat()
 
             # Update state
-            with self._state_lock:
-                self._state = AgentState.RUNNING
-
-            # Publish agent started event
-            self._publish_system_event(
-                Topics.SYSTEM_AGENT_STARTED,
-                {"agent_id": self.agent_id, "agent_name": self.agent_name}
-            )
+            self._set_state(AgentState.RUNNING)
 
             logger.info(f"Agent {self.agent_id} started")
 
         except Exception as e:
-            with self._state_lock:
-                self._state = AgentState.ERROR
-
+            self._set_state(AgentState.ERROR, error=e)
             logger.error(f"Error starting agent {self.agent_id}: {e}")
             raise
 
@@ -150,7 +192,7 @@ class BaseAgent(ABC):
             if self._state not in [AgentState.RUNNING, AgentState.ERROR]:
                 return
 
-            self._state = AgentState.STOPPING
+        self._set_state(AgentState.STOPPING)
 
         try:
             # Stop heartbeat
@@ -164,21 +206,13 @@ class BaseAgent(ABC):
             self.teardown()
 
             # Update state
-            with self._state_lock:
-                self._state = AgentState.STOPPED
-
-            # Publish agent stopped event
-            self._publish_system_event(
-                Topics.SYSTEM_AGENT_STOPPED,
-                {"agent_id": self.agent_id, "agent_name": self.agent_name}
-            )
+            self._set_state(AgentState.STOPPED)
 
             logger.info(f"Agent {self.agent_id} stopped")
 
         except Exception as e:
             logger.error(f"Error stopping agent {self.agent_id}: {e}")
-            with self._state_lock:
-                self._state = AgentState.ERROR
+            self._set_state(AgentState.ERROR, error=e)
             raise
 
     def subscribe(self, topic: str):
@@ -204,7 +238,9 @@ class BaseAgent(ABC):
             self._subscribed_topics.remove(topic)
         logger.debug(f"Agent {self.agent_id} unsubscribed from {topic}")
 
-    def publish(self, topic: str, payload: Dict[str, Any], priority: Priority = Priority.MEDIUM) -> bool:
+    def publish(
+        self, topic: str, payload: Dict[str, Any], priority: Priority = Priority.MEDIUM
+    ) -> bool:
         """
         Publish a message.
 
@@ -217,10 +253,7 @@ class BaseAgent(ABC):
             True if message was published successfully
         """
         message = Message(
-            topic=topic,
-            sender=self.agent_id,
-            payload=payload,
-            priority=priority
+            topic=topic, sender=self.agent_id, payload=payload, priority=priority
         )
 
         success = self._message_bus.publish(message)
@@ -231,8 +264,13 @@ class BaseAgent(ABC):
 
         return success
 
-    def request(self, topic: str, payload: Dict[str, Any],
-                timeout: float = 5.0, priority: Priority = Priority.MEDIUM) -> Optional[Message]:
+    def request(
+        self,
+        topic: str,
+        payload: Dict[str, Any],
+        timeout: float = 5.0,
+        priority: Priority = Priority.MEDIUM,
+    ) -> Optional[Message]:
         """
         Send a request and wait for response.
 
@@ -246,10 +284,7 @@ class BaseAgent(ABC):
             Response message or None if timeout
         """
         message = Message(
-            topic=topic,
-            sender=self.agent_id,
-            payload=payload,
-            priority=priority
+            topic=topic, sender=self.agent_id, payload=payload, priority=priority
         )
 
         response = self._message_bus.request(message, timeout)
@@ -261,7 +296,9 @@ class BaseAgent(ABC):
 
         return response
 
-    def respond(self, original_message: Message, response_payload: Dict[str, Any]) -> bool:
+    def respond(
+        self, original_message: Message, response_payload: Dict[str, Any]
+    ) -> bool:
         """
         Send a response to a request.
 
@@ -288,14 +325,14 @@ class BaseAgent(ABC):
             agent_id=self.agent_id,
             message=message,
             context=context or {},
-            metrics=self.get_metrics()
+            metrics=self.get_metrics(),
         )
 
         # Publish to logging topic
         topic_map = {
             "INFO": Topics.LOG_EVENT_INFO,
             "WARNING": Topics.LOG_EVENT_WARNING,
-            "ERROR": Topics.LOG_EVENT_ERROR
+            "ERROR": Topics.LOG_EVENT_ERROR,
         }
 
         topic = topic_map.get(level, Topics.LOG_EVENT_INFO)
@@ -305,7 +342,7 @@ class BaseAgent(ABC):
         logger.log(
             getattr(logging, level),
             f"[{self.agent_id}] {message}",
-            extra={"context": context}
+            extra={"context": context},
         )
 
     def get_metrics(self) -> Dict[str, Any]:
@@ -355,12 +392,14 @@ class BaseAgent(ABC):
                     "agent_id": self.agent_id,
                     "error": str(e),
                     "message_id": message.message_id,
-                    "topic": message.topic
+                    "topic": message.topic,
                 },
-                severity="error"
+                severity="error",
             )
 
-    def _publish_system_event(self, topic: str, data: Dict[str, Any], severity: str = "info"):
+    def _publish_system_event(
+        self, topic: str, data: Dict[str, Any], severity: str = "info"
+    ):
         """
         Publish a system event.
 
@@ -370,10 +409,7 @@ class BaseAgent(ABC):
             severity: Event severity
         """
         event = SystemEvent(
-            event_type=topic,
-            agent_id=self.agent_id,
-            severity=severity,
-            data=data
+            event_type=topic, agent_id=self.agent_id, severity=severity, data=data
         )
 
         self.publish(topic, event.__dict__, priority=Priority.HIGH)
@@ -381,9 +417,7 @@ class BaseAgent(ABC):
     def _start_heartbeat(self):
         """Start the heartbeat thread"""
         self._heartbeat_thread = threading.Thread(
-            target=self._heartbeat_loop,
-            name=f"{self.agent_id}_heartbeat",
-            daemon=True
+            target=self._heartbeat_loop, name=f"{self.agent_id}_heartbeat", daemon=True
         )
         self._heartbeat_thread.start()
 
@@ -400,7 +434,7 @@ class BaseAgent(ABC):
                 self._publish_system_event(
                     Topics.SYSTEM_HEARTBEAT,
                     {"agent_id": self.agent_id, "metrics": self.get_metrics()},
-                    severity="info"
+                    severity="info",
                 )
             except Exception as e:
                 logger.error(f"Error sending heartbeat from {self.agent_id}: {e}")

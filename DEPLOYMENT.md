@@ -25,7 +25,7 @@ Version 1.0.0 - Production Deployment Guide
 
 ```bash
 # 1. Navigate to project directory
-cd F:\agents
+cd /path/to/agents
 
 # 2. Verify Python version
 python --version  # Should be 3.8+
@@ -103,7 +103,7 @@ Configuration files are already created:
 ### Configuration Files Overview
 
 #### `.env` - Environment Variables
-Located at: `F:\agents\.env`
+Located at: `/path/to/agents/.env`
 
 Key settings:
 ```bash
@@ -124,7 +124,7 @@ ENABLE_GPU=false  # Set to true if GPU available
 ```
 
 #### `config.json` - Agent Configuration
-Located at: `F:\agents\config.json`
+Located at: `/path/to/agents/config.json`
 
 Configures:
 - Audio enhancement parameters
@@ -201,7 +201,7 @@ python your_script.py
 
 #### Step 1: Copy project to server
 ```bash
-scp -r F:\agents user@server:/opt/maaps
+scp -r /path/to/agents user@server:/opt/maaps
 ```
 
 #### Step 2: Create systemd service

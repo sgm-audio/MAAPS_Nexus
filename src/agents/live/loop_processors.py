@@ -45,9 +45,9 @@ class TimeStretcher:
         f, t, stft = signal.stft(
             audio,
             fs=self.sample_rate,
-            window='hann',
+            window="hann",
             nperseg=self.frame_size,
-            noverlap=self.frame_size - self.hop_size
+            noverlap=self.frame_size - self.hop_size,
         )
 
         # Phase vocoder processing
@@ -57,7 +57,7 @@ class TimeStretcher:
 
         # Compute phase increment
         for i in range(1, num_frames):
-            phase_diff = np.angle(stft[:, i]) - np.angle(stft[:, i-1])
+            phase_diff = np.angle(stft[:, i]) - np.angle(stft[:, i - 1])
 
             # Unwrap phase
             phase_diff = np.angle(np.exp(1j * phase_diff))
@@ -66,7 +66,7 @@ class TimeStretcher:
             inst_freq = phase_diff + 2 * np.pi * f / self.sample_rate * self.hop_size
 
             # Update phase
-            phase = np.angle(phase_advance[:, i-1]) + inst_freq * stretch_factor
+            phase = np.angle(phase_advance[:, i - 1]) + inst_freq * stretch_factor
             magnitude = np.abs(stft[:, i])
             phase_advance[:, i] = magnitude * np.exp(1j * phase)
 
@@ -74,9 +74,9 @@ class TimeStretcher:
         _, stretched = signal.istft(
             phase_advance,
             fs=self.sample_rate,
-            window='hann',
+            window="hann",
             nperseg=self.frame_size,
-            noverlap=self.frame_size - output_hop
+            noverlap=self.frame_size - output_hop,
         )
 
         return stretched
@@ -119,7 +119,7 @@ class PitchShifter:
 
         # Trim or pad to match original length
         if len(stretched) > len(audio):
-            return stretched[:len(audio)]
+            return stretched[: len(audio)]
         elif len(stretched) < len(audio):
             return np.pad(stretched, (0, len(audio) - len(stretched)))
         return stretched
@@ -129,7 +129,9 @@ class LoopSlicer:
     """Loop slicing and rearrangement utilities"""
 
     @staticmethod
-    def slice_by_beats(audio: np.ndarray, num_beats: int, bpm: float, sample_rate: int) -> List[np.ndarray]:
+    def slice_by_beats(
+        audio: np.ndarray, num_beats: int, bpm: float, sample_rate: int
+    ) -> List[np.ndarray]:
         """
         Slice loop into beat-aligned segments
 
@@ -161,7 +163,9 @@ class LoopSlicer:
         return slices
 
     @staticmethod
-    def slice_by_transients(audio: np.ndarray, sample_rate: int, threshold: float = 0.3) -> List[Tuple[int, int]]:
+    def slice_by_transients(
+        audio: np.ndarray, sample_rate: int, threshold: float = 0.3
+    ) -> List[Tuple[int, int]]:
         """
         Detect transients and return slice points
 
@@ -185,7 +189,9 @@ class LoopSlicer:
         if window_size > len(onset_env):
             window_size = len(onset_env)
 
-        onset_smooth = np.convolve(onset_env, np.ones(window_size)/window_size, mode='same')
+        onset_smooth = np.convolve(
+            onset_env, np.ones(window_size) / window_size, mode="same"
+        )
 
         # Normalize
         max_onset = np.max(onset_smooth)
@@ -195,9 +201,11 @@ class LoopSlicer:
         # Find peaks above threshold
         peaks = []
         for i in range(1, len(onset_smooth) - 1):
-            if (onset_smooth[i] > threshold and
-                onset_smooth[i] > onset_smooth[i-1] and
-                onset_smooth[i] > onset_smooth[i+1]):
+            if (
+                onset_smooth[i] > threshold
+                and onset_smooth[i] > onset_smooth[i - 1]
+                and onset_smooth[i] > onset_smooth[i + 1]
+            ):
                 peaks.append(i)
 
         # Create slices
@@ -241,7 +249,9 @@ class CrossfadeProcessor:
     """Crossfading utilities for smooth loop transitions"""
 
     @staticmethod
-    def crossfade(audio1: np.ndarray, audio2: np.ndarray, crossfade_samples: int) -> np.ndarray:
+    def crossfade(
+        audio1: np.ndarray, audio2: np.ndarray, crossfade_samples: int
+    ) -> np.ndarray:
         """
         Crossfade between two audio segments
 
@@ -265,21 +275,23 @@ class CrossfadeProcessor:
             return np.concatenate([audio1, audio2])
 
         # Create fade curves (equal power crossfade)
-        fade_out = np.cos(np.linspace(0, np.pi/2, crossfade_samples)) ** 2
-        fade_in = np.sin(np.linspace(0, np.pi/2, crossfade_samples)) ** 2
+        fade_out = np.cos(np.linspace(0, np.pi / 2, crossfade_samples)) ** 2
+        fade_in = np.sin(np.linspace(0, np.pi / 2, crossfade_samples)) ** 2
 
         # Apply crossfade
         crossfaded_section = (
-            audio1[-crossfade_samples:] * fade_out +
-            audio2[:crossfade_samples] * fade_in
+            audio1[-crossfade_samples:] * fade_out
+            + audio2[:crossfade_samples] * fade_in
         )
 
         # Combine segments
-        result = np.concatenate([
-            audio1[:-crossfade_samples],
-            crossfaded_section,
-            audio2[crossfade_samples:]
-        ])
+        result = np.concatenate(
+            [
+                audio1[:-crossfade_samples],
+                crossfaded_section,
+                audio2[crossfade_samples:],
+            ]
+        )
 
         return result
 
@@ -299,13 +311,12 @@ class CrossfadeProcessor:
             return audio
 
         # Equal power crossfade between end and beginning
-        fade_out = np.cos(np.linspace(0, np.pi/2, crossfade_samples)) ** 2
-        fade_in = np.sin(np.linspace(0, np.pi/2, crossfade_samples)) ** 2
+        fade_out = np.cos(np.linspace(0, np.pi / 2, crossfade_samples)) ** 2
+        fade_in = np.sin(np.linspace(0, np.pi / 2, crossfade_samples)) ** 2
 
         # Crossfade end with beginning
         audio[-crossfade_samples:] = (
-            audio[-crossfade_samples:] * fade_out +
-            audio[:crossfade_samples] * fade_in
+            audio[-crossfade_samples:] * fade_out + audio[:crossfade_samples] * fade_in
         )
 
         return audio
@@ -318,7 +329,9 @@ class LoopQuantizer:
         self.sample_rate = sample_rate
         self.time_stretcher = TimeStretcher(sample_rate)
 
-    def quantize_to_beats(self, audio: np.ndarray, target_beats: int, bpm: float) -> np.ndarray:
+    def quantize_to_beats(
+        self, audio: np.ndarray, target_beats: int, bpm: float
+    ) -> np.ndarray:
         """
         Quantize loop length to exact number of beats
 
@@ -407,7 +420,7 @@ class LoopRecorder:
 
         # Trim to max length
         if len(recorded) > self.max_samples:
-            recorded = recorded[:self.max_samples]
+            recorded = recorded[: self.max_samples]
 
         return recorded
 
@@ -424,7 +437,9 @@ class OverdubProcessor:
     """Overdub processing with mixing"""
 
     @staticmethod
-    def overdub(original: np.ndarray, new_audio: np.ndarray, mix: float = 0.5) -> np.ndarray:
+    def overdub(
+        original: np.ndarray, new_audio: np.ndarray, mix: float = 0.5
+    ) -> np.ndarray:
         """
         Mix new audio over original (overdubbing)
 

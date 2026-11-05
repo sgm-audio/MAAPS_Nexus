@@ -1,0 +1,23 @@
+Metadata-Version: 2.4
+Name: spectral-luthier
+Version: 0.1.0
+Summary: Autonomous Stem-Aware Spectral Mastering with Dynamic DSP
+Author: Agentic Systems 2026
+Requires-Python: >=3.12
+Requires-Dist: torch>=2.2.0
+Requires-Dist: torchaudio>=2.2.0
+Requires-Dist: demucs>=4.0.1
+Requires-Dist: pedalboard>=0.9.0
+Requires-Dist: librosa>=0.11.0
+Requires-Dist: soundfile>=0.13.0
+Requires-Dist: pyloudnorm>=0.1.1
+Requires-Dist: numpy>=2.0.0
+Requires-Dist: scipy>=1.13.0
+Requires-Dist: loguru>=0.7.2
+Requires-Dist: pydantic>=2.6.0
+Requires-Dist: typer>=0.9.0
+Requires-Dist: rich>=13.7.0
+Dynamic: author
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary

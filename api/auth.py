@@ -52,12 +52,14 @@ else:  # pragma: no cover
 
 class LoginRequest(BaseModel):
     """Login request model"""
+
     username: str
     password: str
 
 
 class TokenResponse(BaseModel):
     """Token response model"""
+
     token: str
     token_type: str = "bearer"
     expires_in: int
@@ -180,9 +182,10 @@ async def login(request: LoginRequest):
         expires_delta=access_token_expires
     )
 
+    logger.info(f"User '{request.username}' logged in successfully")
+
     return TokenResponse(
-        token=access_token,
-        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60  # in seconds
+        token=access_token, expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60  # in seconds
     )
 
 

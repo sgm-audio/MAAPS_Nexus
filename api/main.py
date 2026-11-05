@@ -26,6 +26,7 @@ try:
 except ImportError:
     pass
 
+from api.auth import router as auth_router, verify_token
 from src.system import create_system
 
 # Import routers
@@ -53,7 +54,7 @@ app = FastAPI(
     description="Multi-Agent Audio Processing System REST API",
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
 )
 
 # CORS middleware - environment-based configuration
@@ -113,8 +114,12 @@ MAX_AUDIO_SAMPLES = 2_000_000  # ~45 seconds at 44.1kHz
 class AudioEnhanceRequest(BaseModel):
     audio_data: List[float] = Field(..., description="Audio samples as array of floats")
     sample_rate: int = Field(44100, description="Sample rate in Hz", ge=8000, le=192000)
-    noise_reduction: float = Field(0.8, description="Noise reduction amount", ge=0.0, le=1.0)
-    declicking_sensitivity: float = Field(0.5, description="Click removal sensitivity", ge=0.0, le=1.0)
+    noise_reduction: float = Field(
+        0.8, description="Noise reduction amount", ge=0.0, le=1.0
+    )
+    declicking_sensitivity: float = Field(
+        0.5, description="Click removal sensitivity", ge=0.0, le=1.0
+    )
     preserve_transients: bool = Field(True, description="Preserve sharp transients")
 
     @classmethod
@@ -130,7 +135,9 @@ class MusicGenerateRequest(BaseModel):
     key: str = Field("C major", description="Musical key")
     tempo: float = Field(120.0, description="Tempo in BPM", ge=60.0, le=200.0)
     time_signature: str = Field("4/4", description="Time signature")
-    chord_progression: List[str] = Field(["C", "Am", "F", "G"], description="Chord progression")
+    chord_progression: List[str] = Field(
+        ["C", "Am", "F", "G"], description="Chord progression"
+    )
     length_bars: int = Field(8, description="Length in bars", ge=1, le=64)
 
 
@@ -219,7 +226,7 @@ async def root():
         "version": "1.0.0",
         "status": "operational",
         "docs": "/docs",
-        "health": "/health"
+        "health": "/health",
     }
 
 
@@ -230,11 +237,11 @@ async def health_check():
         sys = get_system_dep()
         health = sys.get_health()
         return HealthResponse(
-            health_score=health['health_score'],
-            agents_healthy=health['agents_healthy'],
-            agents_total=health['agents_total'],
-            system_uptime_seconds=health['system_uptime_seconds'],
-            timestamp=datetime.now().isoformat()
+            health_score=health["health_score"],
+            agents_healthy=health["agents_healthy"],
+            agents_total=health["agents_total"],
+            system_uptime_seconds=health["system_uptime_seconds"],
+            timestamp=datetime.now().isoformat(),
         )
     except Exception as e:
         logger.error(f"Health check failed: {e}")
@@ -281,7 +288,7 @@ async def extract_metadata(
         metadata_res = sys.extract_metadata(
             audio_data=request.audio_data,
             sample_rate=request.sample_rate,
-            deep_analysis=request.deep_analysis
+            deep_analysis=request.deep_analysis,
         )
 
         if username:
@@ -306,21 +313,24 @@ async def generate_music(
     Generate AI music (melody, harmony, drums, or bass)
     """
     try:
-        if request.content_type not in ['melody', 'harmony', 'drums', 'bass']:
+        if request.content_type not in ["melody", "harmony", "drums", "bass"]:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid content_type: {request.content_type}. Must be melody, harmony, drums, or bass"
+                detail=(
+                    f"Invalid content_type: {request.content_type}. "
+                    "Must be melody, harmony, drums, or bass"
+                ),
             )
 
         user_context = f" (user: {username})" if username else " (anonymous)"
         logger.info(f"Music generation{user_context}: {request.content_type} in {request.key} @ {request.tempo}BPM")
 
         musical_context = {
-            'key': request.key,
-            'tempo': request.tempo,
-            'time_signature': request.time_signature,
-            'chord_progression': request.chord_progression,
-            'length_bars': request.length_bars
+            "key": request.key,
+            "tempo": request.tempo,
+            "time_signature": request.time_signature,
+            "chord_progression": request.chord_progression,
+            "length_bars": request.length_bars,
         }
 
         result = sys.generate_music(request.content_type, musical_context)
@@ -342,7 +352,8 @@ async def generate_music(
 @app.post("/batch/enhance", tags=["Batch Processing"])
 async def batch_enhance(
     files: List[UploadFile] = File(...),
-    background_tasks: BackgroundTasks = None
+    background_tasks: BackgroundTasks = None,
+    username: str = Depends(verify_token),
 ):
     """
     Batch audio enhancement (async processing)
@@ -350,11 +361,11 @@ async def batch_enhance(
     job_id = f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
     jobs[job_id] = {
-        'status': 'queued',
-        'progress': 0.0,
-        'total_files': len(files),
-        'processed_files': 0,
-        'results': []
+        "status": "queued",
+        "progress": 0.0,
+        "total_files": len(files),
+        "processed_files": 0,
+        "results": [],
     }
 
     return JSONResponse(content={
@@ -365,18 +376,18 @@ async def batch_enhance(
 
 
 @app.get("/batch/{job_id}", response_model=JobStatusResponse, tags=["Batch Processing"])
-async def get_batch_status(job_id: str):
-    """Get status of batch processing job"""
+async def get_batch_status(job_id: str, username: str = Depends(verify_token)):
+    """Get status of batch processing job (authenticated)"""
     if job_id not in jobs:
         raise HTTPException(status_code=404, detail="Job not found")
 
     job = jobs[job_id]
     return JobStatusResponse(
         job_id=job_id,
-        status=job['status'],
-        progress=job['progress'],
-        result=job.get('results'),
-        error=job.get('error')
+        status=job["status"],
+        progress=job["progress"],
+        result=job.get("results"),
+        error=job.get("error"),
     )
 
 
@@ -418,17 +429,13 @@ async def global_exception_handler(request, exc):
         content={
             "error": "Internal server error",
             "detail": str(exc),
-            "timestamp": datetime.now().isoformat()
-        }
+            "timestamp": datetime.now().isoformat(),
+        },
     )
 
 
 # Run server
 if __name__ == "__main__":
     uvicorn.run(
-        "api.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
-        log_level="info"
+        "api.main:app", host="0.0.0.0", port=8000, reload=True, log_level="info"
     )

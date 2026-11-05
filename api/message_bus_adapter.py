@@ -43,7 +43,9 @@ class MessageBusAdapter:
         self.running = True
 
         # Subscribe to response topics
-        self.message_bus.subscribe("api.response.*", "api_adapter", self._handle_response)
+        self.message_bus.subscribe(
+            "api.response.*", "api_adapter", self._handle_response
+        )
 
         # Subscribe to events for WebSocket broadcasting
         self._subscribe_to_events()
@@ -81,7 +83,7 @@ class MessageBusAdapter:
             "automation.record.started",
             "automation.record.stopped",
             "system.agent.heartbeat",
-            "system.agent.error"
+            "system.agent.error",
         ]
 
         for topic in event_topics:
@@ -111,7 +113,7 @@ class MessageBusAdapter:
         topic: str,
         payload: Dict[str, Any],
         timeout: float = 5.0,
-        priority: Priority = Priority.MEDIUM
+        priority: Priority = Priority.MEDIUM,
     ) -> Any:
         """
         Send a request to an agent and wait for response
@@ -141,10 +143,7 @@ class MessageBusAdapter:
         return response
 
     def publish_event(
-        self,
-        topic: str,
-        payload: Dict[str, Any],
-        priority: Priority = Priority.LOW
+        self, topic: str, payload: Dict[str, Any], priority: Priority = Priority.LOW
     ):
         """
         Publish an event (fire-and-forget, no response expected)

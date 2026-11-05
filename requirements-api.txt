@@ -22,7 +22,7 @@ pydantic-settings>=2.1.0
 # Authentication & Security
 pyjwt>=2.8.0
 passlib[bcrypt]>=1.7.4
-python-dotenv>=1.0.0
+python-dotenv>=1.2.2
 
 # Rate Limiting
 slowapi>=0.1.9
@@ -34,7 +34,7 @@ psycopg2-binary>=2.9.9
 
 # API documentation and testing
 httpx==0.28.1
-pytest>=7.4.0
+pytest>=9.0.3
 pytest-asyncio>=0.21.0
 
 # Monitoring (Optional)

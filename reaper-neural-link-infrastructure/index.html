@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>REAPER Neural Link v3.0 — TITAN Release</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    :root{color-scheme:dark;}
+    .grid-bg{
+      background-image:
+        radial-gradient(circle at 1px 1px, rgba(148,163,184,.14) 1px, transparent 0);
+      background-size: 18px 18px;
+    }
+    .scanline:before{
+      content:"";
+      position:absolute; inset:0;
+      background: linear-gradient(to bottom, transparent, rgba(56,189,248,.08), transparent);
+      background-size: 100% 8px;
+      animation: scan 7s linear infinite;
+      pointer-events:none;
+      mix-blend-mode: screen;
+      opacity: .65;
+    }
+    @keyframes scan{from{background-position:0 0}to{background-position:0 320px}}
+
+    .glow{box-shadow: 0 0 0 1px rgba(56,189,248,.22), 0 0 24px rgba(56,189,248,.12);}
+    .mono{font-variant-ligatures:none;}
+
+    .toast-enter{transform: translateY(10px); opacity:0}
+    .toast-enter-active{transform: translateY(0); opacity:1; transition: all .18s ease}
+
+    .kbd{border:1px solid rgba(148,163,184,.25); background: rgba(15,23,42,.65); padding:.1rem .35rem; border-radius:.35rem; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:.75rem;}
+
+    /* Reaper color int handling: we show it as hex-ish label, not accurate conversion */
+  </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100">
+  <div class="relative grid-bg">
+    <div class="absolute inset-0 opacity-40 pointer-events-none" style="background: radial-gradient(600px 300px at 15% 10%, rgba(56,189,248,.25), transparent 70%), radial-gradient(500px 280px at 80% 25%, rgba(168,85,247,.18), transparent 70%), radial-gradient(420px 300px at 40% 90%, rgba(34,197,94,.10), transparent 75%);"></div>
+
+    <header class="relative max-w-6xl mx-auto px-5 pt-10 pb-6">
+      <div class="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/70 backdrop-blur-xl glow scanline">
+        <div class="px-6 py-6">
+          <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div class="space-y-1">
+              <div class="flex items-center gap-3">
+                <div class="h-10 w-10 rounded-xl bg-gradient-to-br from-sky-400/30 via-fuchsia-400/20 to-emerald-400/20 border border-slate-800 grid place-items-center">
+                  <span class="mono text-sky-200 font-semibold">NL</span>
+                </div>
+                <div>
+                  <h1 class="text-xl md:text-2xl font-semibold tracking-tight">REAPER Neural Link <span class="text-sky-300">v3.0</span> <span class="text-slate-400">(TITAN)</span></h1>
+                  <p class="text-sm text-slate-400">Local DSP → WebSocket → Vertex AI / Custom GPU Swarm</p>
+                </div>
+              </div>
+              <div class="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                <span class="inline-flex items-center gap-1 rounded-full border border-slate-800 bg-slate-900/50 px-2 py-1 mono">Target: REAPER 7+ x64</span>
+                <span class="inline-flex items-center gap-1 rounded-full border border-slate-800 bg-slate-900/50 px-2 py-1 mono">Python 3.10+</span>
+                <span class="inline-flex items-center gap-1 rounded-full border border-slate-800 bg-slate-900/50 px-2 py-1 mono">ws://127.0.0.1:8000/ws/neural-link</span>
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-3 min-w-[280px]">
+              <div class="flex items-center justify-between gap-2">
+                <div class="text-xs text-slate-400">Link status</div>
+                <div id="connBadge" class="text-xs mono px-2 py-1 rounded-full border border-slate-800 bg-slate-900/50 text-slate-300">DISCONNECTED</div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button id="btnConnect" class="flex-1 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-200 px-4 py-2 text-sm font-medium">Connect</button>
+                <button id="btnDisconnect" class="rounded-xl bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800 px-4 py-2 text-sm">Disconnect</button>
+              </div>
+              <div class="text-xs text-slate-500">Tip: Press <span class="kbd">G</span> to fetch tracks, <span class="kbd">T</span> to generate texture.</div>
+            </div>
+          </div>
+
+          <hr class="my-6 border-slate-800" />
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <section class="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+              <div class="flex items-center justify-between">
+                <h2 class="font-semibold">Telemetry</h2>
+                <span id="lastUpdate" class="text-xs mono text-slate-500">—</span>
+              </div>
+              <p class="text-sm text-slate-400 mt-1">Pull selected tracks from REAPER and render feature vectors (LUFS, centroid, bandwidth, tempo, key, clipping).</p>
+              <div class="mt-4 flex gap-2">
+                <button id="btnGetTracks" class="flex-1 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-200 px-4 py-2 text-sm font-medium">Get Selected Tracks</button>
+                <button id="btnAuto" class="rounded-xl bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800 px-4 py-2 text-sm" title="Auto-poll">Auto</button>
+              </div>
+              <div class="mt-3 text-xs text-slate-500">Auto polling: <span id="autoState" class="mono">OFF</span> (2s)</div>
+            </section>
+
+            <section class="rounded-2xl border border-slate-800 bg-slate-950/50 p-4 md:col-span-2">
+              <div class="flex items-center justify-between">
+                <h2 class="font-semibold">Texture Generator (Stable Audio)</h2>
+                <span class="text-xs mono text-slate-500">Command: GENERATE_TEXTURE</span>
+              </div>
+              <div class="mt-3 grid grid-cols-1 md:grid-cols-5 gap-3">
+                <div class="md:col-span-3">
+                  <label class="text-xs text-slate-400">Prompt</label>
+                  <input id="prompt" class="mt-1 w-full rounded-xl border border-slate-800 bg-slate-900/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500/30" placeholder="e.g., cyan granular pad, subtle tape wow, wide, cinematic" />
+                </div>
+                <div>
+                  <label class="text-xs text-slate-400">BPM</label>
+                  <input id="bpm" type="number" min="40" max="240" value="120" class="mt-1 w-full rounded-xl border border-slate-800 bg-slate-900/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500/30" />
+                </div>
+                <div class="flex items-end">
+                  <button id="btnGenerate" class="w-full rounded-xl bg-fuchsia-500/15 hover:bg-fuchsia-500/25 border border-fuchsia-500/30 text-fuchsia-200 px-4 py-2 text-sm font-medium">Generate</button>
+                </div>
+              </div>
+              <div class="mt-3 text-xs text-slate-500">Note: Your server code currently returns a WAV payload from your GPU swarm endpoint and imports it into REAPER if successful.</div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="relative max-w-6xl mx-auto px-5 pb-16">
+      <div class="flex items-end justify-between gap-4">
+        <div>
+          <h3 class="text-lg font-semibold">Selected Tracks</h3>
+          <p class="text-sm text-slate-400">Live cards update on <span class="mono">TRACK_UPDATE</span>.</p>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-slate-500">
+          <span class="mono">Messages:</span>
+          <span id="msgCount" class="mono">0</span>
+        </div>
+      </div>
+
+      <div id="tracks" class="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+
+      <section class="mt-8 rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold">Console</h3>
+          <div class="flex gap-2">
+            <button id="btnCopy" class="rounded-xl bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800 px-3 py-2 text-sm">Copy</button>
+            <button id="btnClear" class="rounded-xl bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800 px-3 py-2 text-sm">Clear</button>
+          </div>
+        </div>
+        <pre id="console" class="mt-3 max-h-[260px] overflow-auto rounded-xl border border-slate-800 bg-slate-900/30 p-3 text-xs text-slate-300 mono whitespace-pre-wrap"></pre>
+      </section>
+
+      <footer class="mt-10 text-xs text-slate-600">
+        <p class="mono">UI only. Assumes your FastAPI WebSocket is running at <span class="text-slate-400">127.0.0.1:8000</span>.</p>
+      </footer>
+    </main>
+
+    <div id="toasts" class="fixed bottom-4 right-4 space-y-2 z-50"></div>
+  </div>
+
+  <script>
+    const WS_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + '127.0.0.1:8000/ws/neural-link';
+
+    /** @type {WebSocket|null} */
+    let ws = null;
+    let autoTimer = null;
+    let messageCount = 0;
+
+    const el = (id) => document.getElementById(id);
+
+    const state = {
+      connected: false,
+      tracks: [],
+    };
+
+    function fmt(num, digits=2){
+      if (num === null || num === undefined) return '—';
+      if (Number.isNaN(Number(num))) return String(num);
+      return Number(num).toFixed(digits);
+    }
+
+    function ts(){
+      const d = new Date();
+      return d.toLocaleTimeString();
+    }
+
+    function log(line, kind='INFO'){
+      const prefix = `[${ts()}] [${kind}] `;
+      el('console').textContent += prefix + line + "\n";
+      el('console').scrollTop = el('console').scrollHeight;
+    }
+
+    function toast(text, tone='slate'){
+      const tones = {
+        slate: 'border-slate-700 bg-slate-950/90 text-slate-200',
+        ok: 'border-emerald-500/30 bg-emerald-950/60 text-emerald-100',
+        warn: 'border-amber-500/30 bg-amber-950/60 text-amber-100',
+        err: 'border-rose-500/30 bg-rose-950/60 text-rose-100',
+        info: 'border-sky-500/30 bg-sky-950/60 text-sky-100',
+        ai: 'border-fuchsia-500/30 bg-fuchsia-950/60 text-fuchsia-100',
+      };
+      const div = document.createElement('div');
+      div.className = `toast-enter rounded-xl border px-3 py-2 text-sm shadow-lg backdrop-blur ${tones[tone] || tones.slate}`;
+      div.textContent = text;
+      el('toasts').appendChild(div);
+      requestAnimationFrame(() => div.classList.add('toast-enter-active'));
+      setTimeout(() => {
+        div.style.opacity = '0';
+        div.style.transform = 'translateY(8px)';
+        div.style.transition = 'all .18s ease';
+        setTimeout(() => div.remove(), 220);
+      }, 2200);
+    }
+
+    function setConn(connected){
+      state.connected = connected;
+      const badge = el('connBadge');
+      if (connected){
+        badge.textContent = 'CONNECTED';
+        badge.className = 'text-xs mono px-2 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-200';
+      } else {
+        badge.textContent = 'DISCONNECTED';
+        badge.className = 'text-xs mono px-2 py-1 rounded-full border border-slate-800 bg-slate-900/50 text-slate-300';
+      }
+    }
+
+    function send(obj){
+      if (!ws || ws.readyState !== WebSocket.OPEN){
+        toast('WebSocket not connected.', 'warn');
+        log('Attempted to send but WS not open.', 'WARN');
+        return;
+      }
+      ws.send(JSON.stringify(obj));
+      log(`→ ${JSON.stringify(obj)}`, 'TX');
+    }
+
+    function renderTracks(){
+      const root = el('tracks');
+      root.innerHTML = '';
+
+      if (!state.tracks.length){
+        const empty = document.createElement('div');
+        empty.className = 'col-span-full rounded-2xl border border-slate-800 bg-slate-950/40 p-6 text-slate-400';
+        empty.innerHTML = `
+          <div class="text-sm">No tracks in view.</div>
+          <div class="text-xs mt-2">Connect, then click <span class="mono">Get Selected Tracks</span> in REAPER.</div>
+        `;
+        root.appendChild(empty);
+        return;
+      }
+
+      for (const t of state.tracks){
+        const card = document.createElement('div');
+        card.className = 'rounded-2xl border border-slate-800 bg-slate-950/50 p-4 hover:border-slate-700 transition';
+
+        const f = t.features;
+        const clipping = f?.is_clipping;
+        const clipBadge = clipping
+          ? '<span class="text-xs mono px-2 py-1 rounded-full border border-rose-500/30 bg-rose-500/10 text-rose-200">CLIPPING</span>'
+          : '<span class="text-xs mono px-2 py-1 rounded-full border border-slate-800 bg-slate-900/40 text-slate-300">OK</span>';
+
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <div class="font-semibold truncate" title="${escapeHtml(t.name || 'Unnamed Track')}">${escapeHtml(t.name || 'Unnamed Track')}</div>
+              <div class="mt-1 text-xs text-slate-500 mono">GUID: ${escapeHtml(String(t.guid || '—'))}</div>
+            </div>
+            <div class="flex flex-col items-end gap-2">
+              ${clipBadge}
+              <div class="text-xs text-slate-500 mono">vol: ${fmt(t.volume, 3)}</div>
+            </div>
+          </div>
+
+          <div class="mt-4 grid grid-cols-2 gap-3">
+            <div class="rounded-xl border border-slate-800 bg-slate-900/25 p-3">
+              <div class="text-[11px] text-slate-500">LUFS</div>
+              <div class="mono text-lg">${f ? fmt(f.lufs, 1) : '—'}</div>
+            </div>
+            <div class="rounded-xl border border-slate-800 bg-slate-900/25 p-3">
+              <div class="text-[11px] text-slate-500">Tempo</div>
+              <div class="mono text-lg">${f ? fmt(f.tempo, 1) : '—'}</div>
+            </div>
+            <div class="rounded-xl border border-slate-800 bg-slate-900/25 p-3">
+              <div class="text-[11px] text-slate-500">Centroid</div>
+              <div class="mono text-lg">${f ? fmt(f.centroid, 0) : '—'}</div>
+            </div>
+            <div class="rounded-xl border border-slate-800 bg-slate-900/25 p-3">
+              <div class="text-[11px] text-slate-500">Bandwidth</div>
+              <div class="mono text-lg">${f ? fmt(f.bandwidth, 0) : '—'}</div>
+            </div>
+          </div>
+
+          <div class="mt-3 flex items-center justify-between gap-2">
+            <div class="text-xs text-slate-500">Key</div>
+            <div class="mono text-sm">${f ? escapeHtml(String(f.key)) : '—'}</div>
+          </div>
+        `;
+
+        root.appendChild(card);
+      }
+    }
+
+    function escapeHtml(str){
+      return String(str)
+        .replaceAll('&','&amp;')
+        .replaceAll('<','&lt;')
+        .replaceAll('>','&gt;')
+        .replaceAll('"','&quot;')
+        .replaceAll("'",'&#039;');
+    }
+
+    function connect(){
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)){
+        toast('Already connecting/connected.', 'info');
+        return;
+      }
+      log(`Connecting to ${WS_URL}`, 'SYSTEM');
+      try{
+        ws = new WebSocket(WS_URL);
+      } catch (e){
+        toast('Failed to create WebSocket.', 'err');
+        log(String(e), 'ERROR');
+        return;
+      }
+
+      ws.addEventListener('open', () => {
+        setConn(true);
+        toast('Neural Link connected.', 'ok');
+        log('WebSocket open.', 'SYSTEM');
+      });
+
+      ws.addEventListener('message', (evt) => {
+        messageCount++;
+        el('msgCount').textContent = String(messageCount);
+        let payload;
+        try{ payload = JSON.parse(evt.data); }
+        catch{ payload = evt.data; }
+
+        log(`← ${typeof payload === 'string' ? payload : JSON.stringify(payload)}`, 'RX');
+
+        if (payload && payload.type === 'TRACK_UPDATE'){
+          state.tracks = Array.isArray(payload.data) ? payload.data : [];
+          el('lastUpdate').textContent = ts();
+          renderTracks();
+          toast(`Tracks updated (${state.tracks.length}).`, 'info');
+        } else if (payload && payload.type === 'SUCCESS'){
+          toast(payload.msg || 'Success', 'ai');
+        }
+      });
+
+      ws.addEventListener('close', () => {
+        setConn(false);
+        toast('Disconnected.', 'warn');
+        log('WebSocket closed.', 'SYSTEM');
+        stopAuto();
+      });
+
+      ws.addEventListener('error', () => {
+        toast('WebSocket error. Is FastAPI running?', 'err');
+        log('WebSocket error event.', 'ERROR');
+      });
+    }
+
+    function disconnect(){
+      if (ws){
+        ws.close();
+        ws = null;
+      }
+      setConn(false);
+      stopAuto();
+    }
+
+    function getTracks(){
+      send({command:'GET_TRACKS'});
+    }
+
+    function generate(){
+      const prompt = el('prompt').value.trim();
+      const bpm = Number(el('bpm').value || 120);
+      if (!prompt){
+        toast('Enter a prompt.', 'warn');
+        return;
+      }
+      send({command:'GENERATE_TEXTURE', prompt, bpm});
+      toast('Generation triggered (server-side).', 'ai');
+    }
+
+    function startAuto(){
+      if (autoTimer) return;
+      autoTimer = setInterval(() => {
+        if (state.connected) getTracks();
+      }, 2000);
+      el('autoState').textContent = 'ON';
+      toast('Auto polling enabled.', 'info');
+    }
+
+    function stopAuto(){
+      if (!autoTimer) return;
+      clearInterval(autoTimer);
+      autoTimer = null;
+      el('autoState').textContent = 'OFF';
+    }
+
+    // Wire UI
+    el('btnConnect').addEventListener('click', connect);
+    el('btnDisconnect').addEventListener('click', disconnect);
+    el('btnGetTracks').addEventListener('click', getTracks);
+    el('btnGenerate').addEventListener('click', generate);
+
+    el('btnAuto').addEventListener('click', () => {
+      if (autoTimer) stopAuto(); else startAuto();
+    });
+
+    el('btnClear').addEventListener('click', () => {
+      el('console').textContent = '';
+      messageCount = 0;
+      el('msgCount').textContent = '0';
+      toast('Console cleared.', 'ok');
+    });
+
+    el('btnCopy').addEventListener('click', async () => {
+      try{
+        await navigator.clipboard.writeText(el('console').textContent);
+        toast('Console copied.', 'ok');
+      } catch {
+        toast('Clipboard blocked by browser.', 'warn');
+      }
+    });
+
+    // Shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (e.target && ['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
+      const k = e.key.toLowerCase();
+      if (k === 'g') getTracks();
+      if (k === 't') generate();
+      if (k === 'c') connect();
+      if (k === 'd') disconnect();
+    });
+
+    // Initial render
+    setConn(false);
+    renderTracks();
+    log('UI ready. Click Connect to attach to FastAPI WebSocket.', 'SYSTEM');
+  </script>
+</body>
+</html>

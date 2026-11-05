@@ -8,8 +8,8 @@ from .performance_optimization_agent import PerformanceOptimizationAgent
 from .metadata_management_agent import MetadataManagementAgent
 
 __all__ = [
-    'AudioEnhancementAgent',
-    'ContentGenerationAgent',
-    'PerformanceOptimizationAgent',
-    'MetadataManagementAgent',
+    "AudioEnhancementAgent",
+    "ContentGenerationAgent",
+    "PerformanceOptimizationAgent",
+    "MetadataManagementAgent",
 ]

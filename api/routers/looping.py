@@ -7,10 +7,17 @@ from fastapi import APIRouter, HTTPException, Depends
 import logging
 
 from api.schemas.looping import (
-    CreateTrackRequest, TrackResponse,
-    StartRecordingRequest, RecordingStartedResponse, RecordingStoppedResponse,
-    PlaybackResponse, ManipulateRequest, ManipulationResponse,
-    UndoResponse, TrackStatusResponse, TrackListResponse
+    CreateTrackRequest,
+    TrackResponse,
+    StartRecordingRequest,
+    RecordingStartedResponse,
+    RecordingStoppedResponse,
+    PlaybackResponse,
+    ManipulateRequest,
+    ManipulationResponse,
+    UndoResponse,
+    TrackStatusResponse,
+    TrackListResponse,
 )
 from api.schemas.common import success_response
 from api.message_bus_adapter import get_message_bus_adapter, MessageBusAdapter
@@ -22,14 +29,12 @@ router = APIRouter()
 @router.post("/tracks", response_model=dict, status_code=201)
 async def create_loop_track(
     request: CreateTrackRequest,
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    adapter: MessageBusAdapter = Depends(get_message_bus_adapter),
 ):
     """Create a new loop track"""
     try:
         response = await adapter.request(
-            "loop.track.create",
-            request.dict(),
-            timeout=3.0
+            "loop.track.create", request.dict(), timeout=3.0
         )
 
         return success_response(response)
@@ -43,15 +48,11 @@ async def create_loop_track(
 
 @router.get("/tracks", response_model=dict)
 async def list_loop_tracks(
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    adapter: MessageBusAdapter = Depends(get_message_bus_adapter),
 ):
     """List all loop tracks"""
     try:
-        response = await adapter.request(
-            "loop.track.list",
-            {},
-            timeout=3.0
-        )
+        response = await adapter.request("loop.track.list", {}, timeout=3.0)
 
         return success_response(response)
 
@@ -64,15 +65,12 @@ async def list_loop_tracks(
 
 @router.get("/tracks/{track_id}", response_model=dict)
 async def get_loop_track(
-    track_id: str,
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    track_id: str, adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
 ):
     """Get loop track details"""
     try:
         response = await adapter.request(
-            "loop.track.get",
-            {"track_id": track_id},
-            timeout=3.0
+            "loop.track.get", {"track_id": track_id}, timeout=3.0
         )
 
         return success_response(response)
@@ -88,17 +86,14 @@ async def get_loop_track(
 async def start_recording(
     track_id: str,
     request: StartRecordingRequest,
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    adapter: MessageBusAdapter = Depends(get_message_bus_adapter),
 ):
     """Start recording on a loop track"""
     try:
         response = await adapter.request(
             "loop.record.start",
-            {
-                "track_id": track_id,
-                "mode": request.mode
-            },
-            timeout=2.0
+            {"track_id": track_id, "mode": request.mode},
+            timeout=2.0,
         )
 
         return success_response(response)
@@ -112,15 +107,12 @@ async def start_recording(
 
 @router.post("/tracks/{track_id}/record/stop", response_model=dict)
 async def stop_recording(
-    track_id: str,
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    track_id: str, adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
 ):
     """Stop recording on a loop track"""
     try:
         response = await adapter.request(
-            "loop.record.stop",
-            {"track_id": track_id},
-            timeout=2.0
+            "loop.record.stop", {"track_id": track_id}, timeout=2.0
         )
 
         return success_response(response)
@@ -134,15 +126,12 @@ async def stop_recording(
 
 @router.post("/tracks/{track_id}/playback/toggle", response_model=dict)
 async def toggle_playback(
-    track_id: str,
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    track_id: str, adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
 ):
     """Toggle playback on a loop track"""
     try:
         response = await adapter.request(
-            "loop.playback.toggle",
-            {"track_id": track_id},
-            timeout=2.0
+            "loop.playback.toggle", {"track_id": track_id}, timeout=2.0
         )
 
         return success_response(response)
@@ -158,7 +147,7 @@ async def toggle_playback(
 async def manipulate_loop(
     track_id: str,
     request: ManipulateRequest,
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    adapter: MessageBusAdapter = Depends(get_message_bus_adapter),
 ):
     """Manipulate loop (reverse, pitch shift, time stretch, etc.)"""
     try:
@@ -167,9 +156,9 @@ async def manipulate_loop(
             {
                 "track_id": track_id,
                 "operation": request.operation,
-                "parameters": request.parameters or {}
+                "parameters": request.parameters or {},
             },
-            timeout=10.0  # Longer timeout for processing
+            timeout=10.0,  # Longer timeout for processing
         )
 
         return success_response(response)
@@ -183,15 +172,12 @@ async def manipulate_loop(
 
 @router.post("/tracks/{track_id}/undo", response_model=dict)
 async def undo_loop(
-    track_id: str,
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    track_id: str, adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
 ):
     """Undo last operation on loop track"""
     try:
         response = await adapter.request(
-            "loop.undo",
-            {"track_id": track_id},
-            timeout=3.0
+            "loop.undo", {"track_id": track_id}, timeout=3.0
         )
 
         return success_response(response)
@@ -205,15 +191,12 @@ async def undo_loop(
 
 @router.post("/tracks/{track_id}/redo", response_model=dict)
 async def redo_loop(
-    track_id: str,
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    track_id: str, adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
 ):
     """Redo last undone operation on loop track"""
     try:
         response = await adapter.request(
-            "loop.redo",
-            {"track_id": track_id},
-            timeout=3.0
+            "loop.redo", {"track_id": track_id}, timeout=3.0
         )
 
         return success_response(response)
@@ -227,15 +210,12 @@ async def redo_loop(
 
 @router.post("/tracks/{track_id}/clear", response_model=dict)
 async def clear_loop(
-    track_id: str,
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    track_id: str, adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
 ):
     """Clear loop track"""
     try:
         response = await adapter.request(
-            "loop.clear",
-            {"track_id": track_id},
-            timeout=2.0
+            "loop.clear", {"track_id": track_id}, timeout=2.0
         )
 
         return success_response(response)
@@ -249,15 +229,12 @@ async def clear_loop(
 
 @router.delete("/tracks/{track_id}", response_model=dict)
 async def delete_loop_track(
-    track_id: str,
-    adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
+    track_id: str, adapter: MessageBusAdapter = Depends(get_message_bus_adapter)
 ):
     """Delete a loop track"""
     try:
         response = await adapter.request(
-            "loop.track.delete",
-            {"track_id": track_id},
-            timeout=3.0
+            "loop.track.delete", {"track_id": track_id}, timeout=3.0
         )
 
         return success_response(response, message=f"Track {track_id} deleted")

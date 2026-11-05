@@ -9,6 +9,7 @@ from api.schemas.common import LoopStatus, RecordingMode, LoopOperation
 
 class CreateTrackRequest(BaseModel):
     """Request to create a loop track"""
+
     track_name: str = Field(..., description="Track name", min_length=1, max_length=100)
     length_beats: int = Field(4, description="Length in beats", ge=1, le=64)
     sync_to_tempo: bool = Field(True, description="Sync to tempo clock")
@@ -18,6 +19,7 @@ class CreateTrackRequest(BaseModel):
 
 class TrackResponse(BaseModel):
     """Loop track response"""
+
     track_id: str
     track_name: str
     length_beats: int
@@ -28,11 +30,13 @@ class TrackResponse(BaseModel):
 
 class StartRecordingRequest(BaseModel):
     """Request to start recording"""
+
     mode: RecordingMode = Field(RecordingMode.REPLACE, description="Recording mode")
 
 
 class RecordingStartedResponse(BaseModel):
     """Recording started response"""
+
     track_id: str
     recording: bool
     mode: RecordingMode
@@ -41,6 +45,7 @@ class RecordingStartedResponse(BaseModel):
 
 class RecordingStoppedResponse(BaseModel):
     """Recording stopped response"""
+
     track_id: str
     recording: bool
     recorded_length_samples: int
@@ -50,18 +55,21 @@ class RecordingStoppedResponse(BaseModel):
 
 class PlaybackResponse(BaseModel):
     """Playback toggle response"""
+
     track_id: str
     playing: bool
 
 
 class ManipulateRequest(BaseModel):
     """Request to manipulate loop"""
+
     operation: LoopOperation = Field(..., description="Manipulation operation")
     parameters: Optional[dict] = Field(None, description="Operation parameters")
 
 
 class ManipulationResponse(BaseModel):
     """Loop manipulation response"""
+
     track_id: str
     operation: LoopOperation
     applied: bool
@@ -70,6 +78,7 @@ class ManipulationResponse(BaseModel):
 
 class UndoResponse(BaseModel):
     """Undo/redo response"""
+
     track_id: str
     undo_available: int
     redo_available: int
@@ -77,12 +86,14 @@ class UndoResponse(BaseModel):
 
 class TrackStatusResponse(BaseModel):
     """Track status response"""
+
     track_id: str
     status: LoopStatus
 
 
 class TrackListItem(BaseModel):
     """Loop track list item"""
+
     track_id: str
     track_name: str
     status: LoopStatus
@@ -95,5 +106,6 @@ class TrackListItem(BaseModel):
 
 class TrackListResponse(BaseModel):
     """List of loop tracks"""
+
     tracks: list[TrackListItem]
     total_tracks: int

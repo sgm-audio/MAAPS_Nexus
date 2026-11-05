@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class EnhancementResult:
     """Result from audio enhancement operation"""
+
     enhanced_audio: np.ndarray
     quality_improvement: Dict[str, float]
     processing_chain: List[str]
@@ -43,6 +44,7 @@ class EnhancementResult:
 @dataclass
 class QualityMetrics:
     """Audio quality metrics"""
+
     snr: float  # Signal-to-noise ratio
     thd: float  # Total harmonic distortion
     dynamic_range: float
@@ -66,7 +68,7 @@ class AudioEnhancementAgent(BaseAgent):
     def __init__(self):
         super().__init__(
             agent_id="audio_enhancement_agent",
-            agent_name="Audio Enhancement & Restoration Agent"
+            agent_name="Audio Enhancement & Restoration Agent",
         )
 
         # Processing queue
@@ -75,18 +77,18 @@ class AudioEnhancementAgent(BaseAgent):
 
         # Enhancement parameters
         self.default_params = {
-            'noise_reduction_amount': 0.8,
-            'preserve_transients': True,
-            'declicking_sensitivity': 0.5,
-            'declipping_threshold': 0.95,
-            'enhancement_profile': 'balanced'
+            "noise_reduction_amount": 0.8,
+            "preserve_transients": True,
+            "declicking_sensitivity": 0.5,
+            "declipping_threshold": 0.95,
+            "enhancement_profile": "balanced",
         }
 
         # Statistics
         self.stats = {
-            'files_processed': 0,
-            'total_enhancement_time': 0.0,
-            'avg_quality_improvement': 0.0
+            "files_processed": 0,
+            "total_enhancement_time": 0.0,
+            "avg_quality_improvement": 0.0,
         }
         self.stats_lock = threading.Lock()
 
@@ -130,93 +132,81 @@ class AudioEnhancementAgent(BaseAgent):
     def _handle_enhancement_request(self, message: Message):
         """Handle general audio enhancement request"""
         payload = message.payload
-        audio_data = payload.get('audio_data')
-        sample_rate = payload.get('sample_rate', 44100)
-        params = {**self.default_params, **payload.get('params', {})}
+        audio_data = payload.get("audio_data")
+        sample_rate = payload.get("sample_rate", 44100)
+        params = {**self.default_params, **payload.get("params", {})}
 
         if audio_data is None:
-            self.respond(message, {
-                'success': False,
-                'error': 'No audio data provided'
-            })
+            self.respond(message, {"success": False, "error": "No audio data provided"})
             return
 
         # Queue the enhancement job
         job = {
-            'type': 'enhancement',
-            'message': message,
-            'audio_data': audio_data,
-            'sample_rate': sample_rate,
-            'params': params
+            "type": "enhancement",
+            "message": message,
+            "audio_data": audio_data,
+            "sample_rate": sample_rate,
+            "params": params,
         }
         self.processing_queue.put(job)
 
     def _handle_noise_reduction_request(self, message: Message):
         """Handle noise reduction request"""
         payload = message.payload
-        audio_data = payload.get('audio_data')
-        sample_rate = payload.get('sample_rate', 44100)
-        reduction_amount = payload.get('reduction_amount', 0.8)
+        audio_data = payload.get("audio_data")
+        sample_rate = payload.get("sample_rate", 44100)
+        reduction_amount = payload.get("reduction_amount", 0.8)
 
         if audio_data is None:
-            self.respond(message, {
-                'success': False,
-                'error': 'No audio data provided'
-            })
+            self.respond(message, {"success": False, "error": "No audio data provided"})
             return
 
         job = {
-            'type': 'noise_reduction',
-            'message': message,
-            'audio_data': audio_data,
-            'sample_rate': sample_rate,
-            'reduction_amount': reduction_amount
+            "type": "noise_reduction",
+            "message": message,
+            "audio_data": audio_data,
+            "sample_rate": sample_rate,
+            "reduction_amount": reduction_amount,
         }
         self.processing_queue.put(job)
 
     def _handle_restoration_request(self, message: Message):
         """Handle restoration request (declicking, declipping)"""
         payload = message.payload
-        audio_data = payload.get('audio_data')
-        sample_rate = payload.get('sample_rate', 44100)
-        restoration_type = payload.get('restoration_type', 'auto')
+        audio_data = payload.get("audio_data")
+        sample_rate = payload.get("sample_rate", 44100)
+        restoration_type = payload.get("restoration_type", "auto")
 
         if audio_data is None:
-            self.respond(message, {
-                'success': False,
-                'error': 'No audio data provided'
-            })
+            self.respond(message, {"success": False, "error": "No audio data provided"})
             return
 
         job = {
-            'type': 'restoration',
-            'message': message,
-            'audio_data': audio_data,
-            'sample_rate': sample_rate,
-            'restoration_type': restoration_type
+            "type": "restoration",
+            "message": message,
+            "audio_data": audio_data,
+            "sample_rate": sample_rate,
+            "restoration_type": restoration_type,
         }
         self.processing_queue.put(job)
 
     def _handle_superresolution_request(self, message: Message):
         """Handle super-resolution enhancement request"""
         payload = message.payload
-        audio_data = payload.get('audio_data')
-        current_sr = payload.get('current_sample_rate', 22050)
-        target_sr = payload.get('target_sample_rate', 44100)
+        audio_data = payload.get("audio_data")
+        current_sr = payload.get("current_sample_rate", 22050)
+        target_sr = payload.get("target_sample_rate", 44100)
 
         if audio_data is None:
-            self.respond(message, {
-                'success': False,
-                'error': 'No audio data provided'
-            })
+            self.respond(message, {"success": False, "error": "No audio data provided"})
             return
 
         job = {
-            'type': 'superresolution',
-            'message': message,
-            'audio_data': audio_data,
-            'current_sr': current_sr,
-            'target_sr': target_sr
+            "type": "superresolution",
+            "message": message,
+            "audio_data": audio_data,
+            "current_sr": current_sr,
+            "target_sr": target_sr,
         }
         self.processing_queue.put(job)
 
@@ -225,7 +215,7 @@ class AudioEnhancementAgent(BaseAgent):
         self.processing_thread = threading.Thread(
             target=self._processing_worker,
             name=f"{self.agent_id}_processor",
-            daemon=True
+            daemon=True,
         )
         self.processing_thread.start()
 
@@ -250,66 +240,60 @@ class AudioEnhancementAgent(BaseAgent):
                 start_time = time.time()
 
                 # Process based on job type
-                if job['type'] == 'enhancement':
+                if job["type"] == "enhancement":
                     result = self._process_enhancement(job)
-                elif job['type'] == 'noise_reduction':
+                elif job["type"] == "noise_reduction":
                     result = self._process_noise_reduction(job)
-                elif job['type'] == 'restoration':
+                elif job["type"] == "restoration":
                     result = self._process_restoration(job)
-                elif job['type'] == 'superresolution':
+                elif job["type"] == "superresolution":
                     result = self._process_superresolution(job)
                 else:
                     result = {
-                        'success': False,
-                        'error': f"Unknown job type: {job['type']}"
+                        "success": False,
+                        "error": f"Unknown job type: {job['type']}",
                     }
 
                 processing_time = time.time() - start_time
 
                 # Update statistics
                 with self.stats_lock:
-                    self.stats['files_processed'] += 1
-                    self.stats['total_enhancement_time'] += processing_time
+                    self.stats["files_processed"] += 1
+                    self.stats["total_enhancement_time"] += processing_time
 
                 # Add processing time to result
-                result['processing_time_seconds'] = processing_time
+                result["processing_time_seconds"] = processing_time
 
                 # Send response
-                self.respond(job['message'], result)
+                self.respond(job["message"], result)
 
                 # Publish completion event
                 self.publish(
                     "audio.enhancement.complete",
                     {
-                        'job_type': job['type'],
-                        'success': result.get('success', False),
-                        'processing_time': processing_time
+                        "job_type": job["type"],
+                        "success": result.get("success", False),
+                        "processing_time": processing_time,
                     },
-                    priority=Priority.LOW
+                    priority=Priority.LOW,
                 )
 
             except queue.Empty:
                 continue
             except Exception as e:
                 logger.error(f"Error in processing worker: {e}")
-                if 'job' in locals() and 'message' in job:
-                    self.respond(job['message'], {
-                        'success': False,
-                        'error': str(e)
-                    })
+                if "job" in locals() and "message" in job:
+                    self.respond(job["message"], {"success": False, "error": str(e)})
 
     def _process_enhancement(self, job: Dict[str, Any]) -> Dict[str, Any]:
         """Process comprehensive audio enhancement"""
         if librosa is None:
-            return {
-                'success': False,
-                'error': 'librosa not installed'
-            }
+            return {"success": False, "error": "librosa not installed"}
 
         try:
-            audio_data = job['audio_data']
-            sample_rate = job['sample_rate']
-            params = job['params']
+            audio_data = job["audio_data"]
+            sample_rate = job["sample_rate"]
+            params = job["params"]
 
             # Ensure audio is numpy array
             if not isinstance(audio_data, np.ndarray):
@@ -322,112 +306,105 @@ class AudioEnhancementAgent(BaseAgent):
             processing_chain = []
 
             # Apply noise reduction
-            if params.get('noise_reduction_amount', 0) > 0:
+            if params.get("noise_reduction_amount", 0) > 0:
                 enhanced_audio = self._apply_noise_reduction(
-                    enhanced_audio,
-                    sample_rate,
-                    params['noise_reduction_amount']
+                    enhanced_audio, sample_rate, params["noise_reduction_amount"]
                 )
-                processing_chain.append('noise_reduction')
+                processing_chain.append("noise_reduction")
 
             # Apply declicking
-            if params.get('declicking_sensitivity', 0) > 0:
+            if params.get("declicking_sensitivity", 0) > 0:
                 enhanced_audio = self._apply_declicking(
-                    enhanced_audio,
-                    sample_rate,
-                    params['declicking_sensitivity']
+                    enhanced_audio, sample_rate, params["declicking_sensitivity"]
                 )
-                processing_chain.append('declicking')
+                processing_chain.append("declicking")
 
             # Apply declipping
-            if params.get('declipping_threshold', 0) < 1.0:
+            if params.get("declipping_threshold", 0) < 1.0:
                 enhanced_audio = self._apply_declipping(
-                    enhanced_audio,
-                    params['declipping_threshold']
+                    enhanced_audio, params["declipping_threshold"]
                 )
-                processing_chain.append('declipping')
+                processing_chain.append("declipping")
 
             # Quality analysis after
             quality_after = self._analyze_quality(enhanced_audio, sample_rate)
 
             # Calculate improvement
             quality_improvement = {
-                'snr_improvement_db': quality_after.snr - quality_before.snr,
-                'dynamic_range_improvement_db': quality_after.dynamic_range - quality_before.dynamic_range,
-                'thd_reduction_percent': ((quality_before.thd - quality_after.thd) / quality_before.thd * 100) if quality_before.thd > 0 else 0
+                "snr_improvement_db": quality_after.snr - quality_before.snr,
+                "dynamic_range_improvement_db": quality_after.dynamic_range
+                - quality_before.dynamic_range,
+                "thd_reduction_percent": (
+                    (
+                        (quality_before.thd - quality_after.thd)
+                        / quality_before.thd
+                        * 100
+                    )
+                    if quality_before.thd > 0
+                    else 0
+                ),
             }
 
             return {
-                'success': True,
-                'enhanced_audio': enhanced_audio.tolist(),
-                'sample_rate': sample_rate,
-                'quality_improvement': quality_improvement,
-                'processing_chain': processing_chain,
-                'quality_before': {
-                    'snr_db': quality_before.snr,
-                    'dynamic_range_db': quality_before.dynamic_range,
-                    'thd_percent': quality_before.thd
+                "success": True,
+                "enhanced_audio": enhanced_audio.tolist(),
+                "sample_rate": sample_rate,
+                "quality_improvement": quality_improvement,
+                "processing_chain": processing_chain,
+                "quality_before": {
+                    "snr_db": quality_before.snr,
+                    "dynamic_range_db": quality_before.dynamic_range,
+                    "thd_percent": quality_before.thd,
                 },
-                'quality_after': {
-                    'snr_db': quality_after.snr,
-                    'dynamic_range_db': quality_after.dynamic_range,
-                    'thd_percent': quality_after.thd
-                }
+                "quality_after": {
+                    "snr_db": quality_after.snr,
+                    "dynamic_range_db": quality_after.dynamic_range,
+                    "thd_percent": quality_after.thd,
+                },
             }
 
         except Exception as e:
             return {
-                'success': False,
-                'error': f"Enhancement processing failed: {str(e)}"
+                "success": False,
+                "error": f"Enhancement processing failed: {str(e)}",
             }
 
     def _process_noise_reduction(self, job: Dict[str, Any]) -> Dict[str, Any]:
         """Process noise reduction"""
         if librosa is None:
-            return {
-                'success': False,
-                'error': 'librosa not installed'
-            }
+            return {"success": False, "error": "librosa not installed"}
 
         try:
-            audio_data = job['audio_data']
-            sample_rate = job['sample_rate']
-            reduction_amount = job['reduction_amount']
+            audio_data = job["audio_data"]
+            sample_rate = job["sample_rate"]
+            reduction_amount = job["reduction_amount"]
 
             if not isinstance(audio_data, np.ndarray):
                 audio_data = np.array(audio_data, dtype=np.float32)
 
             enhanced_audio = self._apply_noise_reduction(
-                audio_data,
-                sample_rate,
-                reduction_amount
+                audio_data, sample_rate, reduction_amount
             )
 
             return {
-                'success': True,
-                'enhanced_audio': enhanced_audio.tolist(),
-                'sample_rate': sample_rate,
-                'reduction_amount': reduction_amount
+                "success": True,
+                "enhanced_audio": enhanced_audio.tolist(),
+                "sample_rate": sample_rate,
+                "reduction_amount": reduction_amount,
             }
 
         except Exception as e:
-            return {
-                'success': False,
-                'error': f"Noise reduction failed: {str(e)}"
-            }
+            return {"success": False, "error": f"Noise reduction failed: {str(e)}"}
 
     def _process_restoration(self, job: Dict[str, Any]) -> Dict[str, Any]:
         """Process audio restoration"""
         if librosa is None:
-            return {
-                'success': False,
-                'error': 'librosa not installed'
-            }
+            return {"success": False, "error": "librosa not installed"}
 
         try:
-            audio_data = job['audio_data']
-            sample_rate = job['sample_rate']
-            restoration_type = job['restoration_type']
+            audio_data = job["audio_data"]
+            sample_rate = job["sample_rate"]
+            restoration_type = job["restoration_type"]
 
             if not isinstance(audio_data, np.ndarray):
                 audio_data = np.array(audio_data, dtype=np.float32)
@@ -435,39 +412,35 @@ class AudioEnhancementAgent(BaseAgent):
             restored_audio = audio_data.copy()
             operations = []
 
-            if restoration_type in ['auto', 'declicking']:
-                restored_audio = self._apply_declicking(restored_audio, sample_rate, 0.5)
-                operations.append('declicking')
+            if restoration_type in ["auto", "declicking"]:
+                restored_audio = self._apply_declicking(
+                    restored_audio, sample_rate, 0.5
+                )
+                operations.append("declicking")
 
-            if restoration_type in ['auto', 'declipping']:
+            if restoration_type in ["auto", "declipping"]:
                 restored_audio = self._apply_declipping(restored_audio, 0.95)
-                operations.append('declipping')
+                operations.append("declipping")
 
             return {
-                'success': True,
-                'restored_audio': restored_audio.tolist(),
-                'sample_rate': sample_rate,
-                'operations_applied': operations
+                "success": True,
+                "restored_audio": restored_audio.tolist(),
+                "sample_rate": sample_rate,
+                "operations_applied": operations,
             }
 
         except Exception as e:
-            return {
-                'success': False,
-                'error': f"Restoration failed: {str(e)}"
-            }
+            return {"success": False, "error": f"Restoration failed: {str(e)}"}
 
     def _process_superresolution(self, job: Dict[str, Any]) -> Dict[str, Any]:
         """Process super-resolution enhancement"""
         if librosa is None:
-            return {
-                'success': False,
-                'error': 'librosa not installed'
-            }
+            return {"success": False, "error": "librosa not installed"}
 
         try:
-            audio_data = job['audio_data']
-            current_sr = job['current_sr']
-            target_sr = job['target_sr']
+            audio_data = job["audio_data"]
+            current_sr = job["current_sr"]
+            target_sr = job["target_sr"]
 
             if not isinstance(audio_data, np.ndarray):
                 audio_data = np.array(audio_data, dtype=np.float32)
@@ -477,24 +450,23 @@ class AudioEnhancementAgent(BaseAgent):
                 audio_data,
                 orig_sr=current_sr,
                 target_sr=target_sr,
-                res_type='kaiser_best'
+                res_type="kaiser_best",
             )
 
             return {
-                'success': True,
-                'enhanced_audio': enhanced_audio.tolist(),
-                'original_sr': current_sr,
-                'target_sr': target_sr,
-                'length_ratio': len(enhanced_audio) / len(audio_data)
+                "success": True,
+                "enhanced_audio": enhanced_audio.tolist(),
+                "original_sr": current_sr,
+                "target_sr": target_sr,
+                "length_ratio": len(enhanced_audio) / len(audio_data),
             }
 
         except Exception as e:
-            return {
-                'success': False,
-                'error': f"Super-resolution failed: {str(e)}"
-            }
+            return {"success": False, "error": f"Super-resolution failed: {str(e)}"}
 
-    def _apply_noise_reduction(self, audio: np.ndarray, sample_rate: int, reduction_amount: float) -> np.ndarray:
+    def _apply_noise_reduction(
+        self, audio: np.ndarray, sample_rate: int, reduction_amount: float
+    ) -> np.ndarray:
         """Apply spectral subtraction noise reduction"""
         if librosa is None or signal is None:
             return audio
@@ -510,10 +482,13 @@ class AudioEnhancementAgent(BaseAgent):
 
         # Estimate noise spectrum from first and last 10% of audio
         noise_frames = max(1, int(0.1 * magnitude.shape[1]))
-        noise_spectrum = np.mean(np.concatenate([
-            magnitude[:, :noise_frames],
-            magnitude[:, -noise_frames:]
-        ], axis=1), axis=1, keepdims=True)
+        noise_spectrum = np.mean(
+            np.concatenate(
+                [magnitude[:, :noise_frames], magnitude[:, -noise_frames:]], axis=1
+            ),
+            axis=1,
+            keepdims=True,
+        )
 
         # Spectral subtraction with oversubtraction
         alpha = 2.0  # Oversubtraction factor
@@ -528,15 +503,21 @@ class AudioEnhancementAgent(BaseAgent):
             gain = ndimage.gaussian_filter1d(gain, sigma=2.0, axis=1)
 
         # Apply gain
-        enhanced_magnitude = magnitude * gain * reduction_amount + magnitude * (1 - reduction_amount)
+        enhanced_magnitude = magnitude * gain * reduction_amount + magnitude * (
+            1 - reduction_amount
+        )
 
         # Reconstruct audio
         enhanced_stft = enhanced_magnitude * np.exp(1j * phase)
-        enhanced_audio = librosa.istft(enhanced_stft, hop_length=hop_length, length=len(audio))
+        enhanced_audio = librosa.istft(
+            enhanced_stft, hop_length=hop_length, length=len(audio)
+        )
 
         return enhanced_audio
 
-    def _apply_declicking(self, audio: np.ndarray, sample_rate: int, sensitivity: float) -> np.ndarray:
+    def _apply_declicking(
+        self, audio: np.ndarray, sample_rate: int, sensitivity: float
+    ) -> np.ndarray:
         """Apply declicking using median filtering"""
         # Simple declicking using median filter
         # In production, this would use more sophisticated click detection
@@ -567,7 +548,9 @@ class AudioEnhancementAgent(BaseAgent):
         clipped_indices = np.where(clipped_mask)[0]
         if len(clipped_indices) > 0:
             # Group consecutive indices
-            groups = np.split(clipped_indices, np.where(np.diff(clipped_indices) != 1)[0] + 1)
+            groups = np.split(
+                clipped_indices, np.where(np.diff(clipped_indices) != 1)[0] + 1
+            )
 
             for group in groups:
                 if len(group) > 0:
@@ -588,7 +571,7 @@ class AudioEnhancementAgent(BaseAgent):
     def _analyze_quality(self, audio: np.ndarray, sample_rate: int) -> QualityMetrics:
         """Analyze audio quality metrics"""
         # Calculate RMS level
-        rms_level = np.sqrt(np.mean(audio ** 2))
+        rms_level = np.sqrt(np.mean(audio**2))
 
         # Calculate peak level
         peak_level = np.max(np.abs(audio))
@@ -614,5 +597,5 @@ class AudioEnhancementAgent(BaseAgent):
             dynamic_range=dynamic_range,
             peak_level=peak_level,
             rms_level=rms_level,
-            crest_factor=crest_factor
+            crest_factor=crest_factor,
         )

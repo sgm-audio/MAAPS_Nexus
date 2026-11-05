@@ -21,13 +21,13 @@ except ImportError as e:
 from ...core.base_agent import BaseAgent
 from ...core.message_types import Message, Priority, Topics
 
-
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class BeatGrid:
     """Represents a beat grid"""
+
     beats: List[float]  # Beat timestamps in seconds
     downbeats: List[float]  # Downbeat timestamps
     tempo_curve: List[Tuple[float, float]]  # time, BPM
@@ -37,6 +37,7 @@ class BeatGrid:
 @dataclass
 class RhythmicAnalysis:
     """Complete rhythmic analysis results"""
+
     beat_grid: BeatGrid
     groove_type: str  # "straight", "swing", "shuffle"
     swing_percentage: float  # 0-100%
@@ -62,18 +63,17 @@ class RhythmAnalysisAgent(BaseAgent):
 
     def __init__(self):
         super().__init__(
-            agent_id="rhythm_analysis_agent",
-            agent_name="Rhythm Analysis Agent"
+            agent_id="rhythm_analysis_agent", agent_name="Rhythm Analysis Agent"
         )
 
         self._lock = threading.Lock()
 
         # Statistics
         self._stats = {
-            'analyses_performed': 0,
-            'beats_tracked': 0,
-            'groove_analyses': 0,
-            'errors': 0
+            "analyses_performed": 0,
+            "beats_tracked": 0,
+            "groove_analyses": 0,
+            "errors": 0,
         }
 
     def setup(self):
@@ -108,7 +108,7 @@ class RhythmAnalysisAgent(BaseAgent):
             elif topic == "rhythm.complexity":
                 result = self._analyze_complexity(payload)
             else:
-                result = {'success': False, 'error': f'Unknown topic: {topic}'}
+                result = {"success": False, "error": f"Unknown topic: {topic}"}
 
             # Send response
             self.respond(message, result)
@@ -116,17 +116,17 @@ class RhythmAnalysisAgent(BaseAgent):
         except Exception as e:
             logger.error(f"Error handling message: {e}", exc_info=True)
             with self._lock:
-                self._stats['errors'] += 1
-            self.respond(message, {'success': False, 'error': str(e)})
+                self._stats["errors"] += 1
+            self.respond(message, {"success": False, "error": str(e)})
 
     def _track_beats(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Track beats and downbeats"""
         try:
-            audio = payload.get('audio')
-            sr = payload.get('sample_rate', 22050)
+            audio = payload.get("audio")
+            sr = payload.get("sample_rate", 22050)
 
             if audio is None:
-                return {'success': False, 'error': 'No audio data provided'}
+                return {"success": False, "error": "No audio data provided"}
 
             # Convert to mono if stereo
             if len(audio.shape) > 1:
@@ -147,35 +147,35 @@ class RhythmAnalysisAgent(BaseAgent):
                 beats=beat_times.tolist(),
                 downbeats=downbeat_times,
                 tempo_curve=tempo_curve,
-                grid_resolution="1/16"
+                grid_resolution="1/16",
             )
 
             with self._lock:
-                self._stats['beats_tracked'] += len(beat_times)
+                self._stats["beats_tracked"] += len(beat_times)
 
             return {
-                'success': True,
-                'beat_grid': {
-                    'beats': beat_grid.beats,
-                    'downbeats': beat_grid.downbeats,
-                    'tempo_curve': beat_grid.tempo_curve,
-                    'grid_resolution': beat_grid.grid_resolution
+                "success": True,
+                "beat_grid": {
+                    "beats": beat_grid.beats,
+                    "downbeats": beat_grid.downbeats,
+                    "tempo_curve": beat_grid.tempo_curve,
+                    "grid_resolution": beat_grid.grid_resolution,
                 },
-                'tempo_bpm': float(tempo)
+                "tempo_bpm": float(tempo),
             }
 
         except Exception as e:
             logger.error(f"Error tracking beats: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
     def _analyze_groove(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze groove characteristics"""
         try:
-            audio = payload.get('audio')
-            sr = payload.get('sample_rate', 22050)
+            audio = payload.get("audio")
+            sr = payload.get("sample_rate", 22050)
 
             if audio is None:
-                return {'success': False, 'error': 'No audio data provided'}
+                return {"success": False, "error": "No audio data provided"}
 
             if len(audio.shape) > 1:
                 audio = librosa.to_mono(audio)
@@ -209,7 +209,7 @@ class RhythmAnalysisAgent(BaseAgent):
             beat_grid = BeatGrid(
                 beats=beat_times.tolist(),
                 downbeats=downbeat_times,
-                tempo_curve=tempo_curve
+                tempo_curve=tempo_curve,
             )
 
             analysis = RhythmicAnalysis(
@@ -219,44 +219,44 @@ class RhythmAnalysisAgent(BaseAgent):
                 syncopation_score=syncopation,
                 complexity_score=complexity,
                 polyrhythms=polyrhythms,
-                microtiming_deviation=microtiming
+                microtiming_deviation=microtiming,
             )
 
             with self._lock:
-                self._stats['analyses_performed'] += 1
-                self._stats['groove_analyses'] += 1
+                self._stats["analyses_performed"] += 1
+                self._stats["groove_analyses"] += 1
 
             return {
-                'success': True,
-                'analysis': {
-                    'beat_grid': {
-                        'beats': analysis.beat_grid.beats,
-                        'downbeats': analysis.beat_grid.downbeats,
-                        'tempo_curve': analysis.beat_grid.tempo_curve,
-                        'grid_resolution': analysis.beat_grid.grid_resolution
+                "success": True,
+                "analysis": {
+                    "beat_grid": {
+                        "beats": analysis.beat_grid.beats,
+                        "downbeats": analysis.beat_grid.downbeats,
+                        "tempo_curve": analysis.beat_grid.tempo_curve,
+                        "grid_resolution": analysis.beat_grid.grid_resolution,
                     },
-                    'groove_type': analysis.groove_type,
-                    'swing_percentage': float(analysis.swing_percentage),
-                    'syncopation_score': float(analysis.syncopation_score),
-                    'complexity_score': float(analysis.complexity_score),
-                    'polyrhythms': analysis.polyrhythms,
-                    'microtiming_deviation': float(analysis.microtiming_deviation)
-                }
+                    "groove_type": analysis.groove_type,
+                    "swing_percentage": float(analysis.swing_percentage),
+                    "syncopation_score": float(analysis.syncopation_score),
+                    "complexity_score": float(analysis.complexity_score),
+                    "polyrhythms": analysis.polyrhythms,
+                    "microtiming_deviation": float(analysis.microtiming_deviation),
+                },
             }
 
         except Exception as e:
             logger.error(f"Error analyzing groove: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
     def _suggest_quantization(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Suggest quantization settings"""
         try:
-            audio = payload.get('audio')
-            sr = payload.get('sample_rate', 22050)
-            note_times = payload.get('note_times')
+            audio = payload.get("audio")
+            sr = payload.get("sample_rate", 22050)
+            note_times = payload.get("note_times")
 
             if audio is None:
-                return {'success': False, 'error': 'No audio data provided'}
+                return {"success": False, "error": "No audio data provided"}
 
             if len(audio.shape) > 1:
                 audio = librosa.to_mono(audio)
@@ -270,34 +270,36 @@ class RhythmAnalysisAgent(BaseAgent):
 
             # If note times provided, calculate quantization suggestions
             if note_times:
-                quantized_times = self._quantize_times(note_times, beat_times, grid_resolution, tempo)
+                quantized_times = self._quantize_times(
+                    note_times, beat_times, grid_resolution, tempo
+                )
 
                 return {
-                    'success': True,
-                    'grid_resolution': grid_resolution,
-                    'tempo_bpm': float(tempo),
-                    'quantized_times': quantized_times,
-                    'original_times': note_times
+                    "success": True,
+                    "grid_resolution": grid_resolution,
+                    "tempo_bpm": float(tempo),
+                    "quantized_times": quantized_times,
+                    "original_times": note_times,
                 }
             else:
                 return {
-                    'success': True,
-                    'grid_resolution': grid_resolution,
-                    'tempo_bpm': float(tempo)
+                    "success": True,
+                    "grid_resolution": grid_resolution,
+                    "tempo_bpm": float(tempo),
                 }
 
         except Exception as e:
             logger.error(f"Error suggesting quantization: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
     def _analyze_complexity(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze rhythmic complexity"""
         try:
-            audio = payload.get('audio')
-            sr = payload.get('sample_rate', 22050)
+            audio = payload.get("audio")
+            sr = payload.get("sample_rate", 22050)
 
             if audio is None:
-                return {'success': False, 'error': 'No audio data provided'}
+                return {"success": False, "error": "No audio data provided"}
 
             if len(audio.shape) > 1:
                 audio = librosa.to_mono(audio)
@@ -316,17 +318,19 @@ class RhythmAnalysisAgent(BaseAgent):
             syncopation = self._calculate_syncopation(audio, sr, beat_times)
 
             return {
-                'success': True,
-                'complexity_score': float(complexity),
-                'syncopation_score': float(syncopation),
-                'tempo_variation': float(np.std([t for _, t in tempo_curve]))
+                "success": True,
+                "complexity_score": float(complexity),
+                "syncopation_score": float(syncopation),
+                "tempo_variation": float(np.std([t for _, t in tempo_curve])),
             }
 
         except Exception as e:
             logger.error(f"Error analyzing complexity: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
-    def _detect_downbeats(self, audio: np.ndarray, sr: int, beat_times: np.ndarray) -> List[float]:
+    def _detect_downbeats(
+        self, audio: np.ndarray, sr: int, beat_times: np.ndarray
+    ) -> List[float]:
         """Detect downbeats (first beat of measure)"""
         # Calculate onset strength
         onset_env = librosa.onset.onset_strength(y=audio, sr=sr)
@@ -358,11 +362,15 @@ class RhythmAnalysisAgent(BaseAgent):
 
         # Mark every Nth beat as downbeat
         downbeat_indices = list(range(first_downbeat_idx, len(beat_times), time_sig))
-        downbeat_times = [beat_times[i] for i in downbeat_indices if i < len(beat_times)]
+        downbeat_times = [
+            beat_times[i] for i in downbeat_indices if i < len(beat_times)
+        ]
 
         return downbeat_times
 
-    def _calculate_tempo_curve(self, beat_times: np.ndarray) -> List[Tuple[float, float]]:
+    def _calculate_tempo_curve(
+        self, beat_times: np.ndarray
+    ) -> List[Tuple[float, float]]:
         """Calculate tempo variation over time"""
         if len(beat_times) < 2:
             return [(0.0, 120.0)]
@@ -382,7 +390,9 @@ class RhythmAnalysisAgent(BaseAgent):
 
         return tempo_curve
 
-    def _detect_groove_type(self, audio: np.ndarray, sr: int, beat_times: np.ndarray) -> Tuple[str, float]:
+    def _detect_groove_type(
+        self, audio: np.ndarray, sr: int, beat_times: np.ndarray
+    ) -> Tuple[str, float]:
         """Detect groove type (straight, swing, shuffle)"""
         if len(beat_times) < 4:
             return "straight", 0.0
@@ -401,7 +411,9 @@ class RhythmAnalysisAgent(BaseAgent):
             beat_duration = beat_end - beat_start
 
             # Find onsets within this beat
-            beat_onsets = onset_times[(onset_times >= beat_start) & (onset_times < beat_end)]
+            beat_onsets = onset_times[
+                (onset_times >= beat_start) & (onset_times < beat_end)
+            ]
 
             # Calculate positions within beat (0.0 to 1.0)
             if len(beat_onsets) > 0:
@@ -434,7 +446,9 @@ class RhythmAnalysisAgent(BaseAgent):
 
         return "straight", 0.0
 
-    def _calculate_syncopation(self, audio: np.ndarray, sr: int, beat_times: np.ndarray) -> float:
+    def _calculate_syncopation(
+        self, audio: np.ndarray, sr: int, beat_times: np.ndarray
+    ) -> float:
         """Calculate syncopation score"""
         if len(beat_times) < 2:
             return 0.0
@@ -474,9 +488,7 @@ class RhythmAnalysisAgent(BaseAgent):
         return float(np.clip(syncopation, 0.0, 1.0))
 
     def _calculate_rhythmic_complexity(
-        self,
-        beat_times: np.ndarray,
-        tempo_curve: List[Tuple[float, float]]
+        self, beat_times: np.ndarray, tempo_curve: List[Tuple[float, float]]
     ) -> float:
         """Calculate rhythmic complexity score"""
         complexity_factors = []
@@ -501,7 +513,9 @@ class RhythmAnalysisAgent(BaseAgent):
 
         return float(np.mean(complexity_factors))
 
-    def _detect_polyrhythms(self, audio: np.ndarray, sr: int, base_tempo: float) -> List[str]:
+    def _detect_polyrhythms(
+        self, audio: np.ndarray, sr: int, base_tempo: float
+    ) -> List[str]:
         """Detect polyrhythmic patterns"""
         polyrhythms = []
 
@@ -556,7 +570,9 @@ class RhythmAnalysisAgent(BaseAgent):
 
         return float(avg_deviation_ms)
 
-    def _determine_grid_resolution(self, audio: np.ndarray, sr: int, beat_times: np.ndarray) -> str:
+    def _determine_grid_resolution(
+        self, audio: np.ndarray, sr: int, beat_times: np.ndarray
+    ) -> str:
         """Determine optimal grid resolution for quantization"""
         if len(beat_times) < 2:
             return "1/16"
@@ -571,10 +587,12 @@ class RhythmAnalysisAgent(BaseAgent):
 
         onsets_per_beat = 0
         for i in range(len(beat_times) - 1):
-            beat_onsets = onset_times[(onset_times >= beat_times[i]) & (onset_times < beat_times[i + 1])]
+            beat_onsets = onset_times[
+                (onset_times >= beat_times[i]) & (onset_times < beat_times[i + 1])
+            ]
             onsets_per_beat += len(beat_onsets)
 
-        onsets_per_beat /= (len(beat_times) - 1)
+        onsets_per_beat /= len(beat_times) - 1
 
         # Determine resolution based on density
         if onsets_per_beat < 2:
@@ -591,15 +609,10 @@ class RhythmAnalysisAgent(BaseAgent):
         note_times: List[float],
         beat_times: np.ndarray,
         grid_resolution: str,
-        tempo: float
+        tempo: float,
     ) -> List[float]:
         """Quantize note times to grid"""
-        resolution_map = {
-            '1/4': 1.0,
-            '1/8': 0.5,
-            '1/16': 0.25,
-            '1/32': 0.125
-        }
+        resolution_map = {"1/4": 1.0, "1/8": 0.5, "1/16": 0.25, "1/32": 0.125}
 
         beat_fraction = resolution_map.get(grid_resolution, 0.25)
 

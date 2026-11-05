@@ -10,12 +10,11 @@ import time
 from typing import Dict, List, Optional
 import logging
 
-from ..core import BaseAgent, get_agent_registry, get_message_bus, AgentState
-from ..agents import (
-    AudioEnhancementAgent,
-    ContentGenerationAgent,
-    PerformanceOptimizationAgent,
-    MetadataManagementAgent
+from ..core import (
+    BaseAgent,
+    get_agent_registry,
+    get_message_bus,
+    AgentState,
 )
 from ..agents.live import (
     RealtimeAudioIOAgent,
@@ -59,11 +58,11 @@ class AgentCoordinator:
 
         # System statistics
         self.stats = {
-            'system_start_time': None,
-            'total_messages_processed': 0,
-            'total_agent_errors': 0,
-            'agents_started': 0,
-            'agents_stopped': 0
+            "system_start_time": None,
+            "total_messages_processed": 0,
+            "total_agent_errors": 0,
+            "agents_started": 0,
+            "agents_stopped": 0,
         }
 
     def initialize_system(self):
@@ -78,19 +77,53 @@ class AgentCoordinator:
             if not self.message_bus._running:
                 self.message_bus.start()
 
+            # Subscribe to agent status updates (Observer Pattern)
+            self.message_bus.subscribe(
+                "system.agent.status", "coordinator", self._on_agent_status_changed
+            )
+
             # Start all agents
             self.start_all_agents()
 
-            # Start health monitoring
+            # Start health monitoring (Watchdog)
             self._start_health_monitoring()
 
-            self.stats['system_start_time'] = time.time()
+            self.stats["system_start_time"] = time.time()
 
             logger.info("Multi-agent system initialized successfully")
 
         except Exception as e:
             logger.error(f"Error initializing system: {e}")
             raise
+
+    def _on_agent_status_changed(self, message):
+        """
+        Handle agent status change events (Reactive Health Monitoring).
+        """
+        payload = message.payload
+        agent_id = payload.get("agent_id")
+        new_state = payload.get("new_state")
+        old_state = payload.get("old_state")
+
+        logger.info(
+            f"Coordinator received status change for {agent_id}: {old_state} -> {new_state}"
+        )
+
+        if new_state == "error":
+            logger.warning(
+                f"Agent {agent_id} reported ERROR state. Initiating recovery..."
+            )
+            self.stats["total_agent_errors"] += 1
+            # Reactive recovery
+            threading.Thread(
+                target=self.restart_agent, args=(agent_id,), daemon=True
+            ).start()
+
+        elif new_state == "stopped" and self.monitoring_active:
+            # Check if this stop was intentional (initiated by coordinator) or unexpected
+            # For now, we assume if the system is running, agents shouldn't stop unless asked.
+            # In a real implementation, we'd check a 'desired_state' flag.
+            pass
 
     def shutdown_system(self):
         """Shutdown the complete agent system"""
@@ -135,10 +168,17 @@ class AgentCoordinator:
         agents_to_create.extend(self._create_live_agents())
 
         with self.lock:
-            for agent in agents_to_create:
-                self.agents[agent.agent_id] = agent
-                self.registry.register(agent)
-                logger.info(f"Registered agent: {agent.agent_id}")
+            for agent_type in agent_types:
+                try:
+                    agent = AgentFactory.create_agent(agent_type)
+                    self.agents[agent.agent_id] = agent
+                    self.registry.register(agent)
+                    logger.info(
+                        f"Registered agent: {agent.agent_id} (type: {agent_type})"
+                    )
+                except ValueError as e:
+                    logger.error(f"Failed to create agent of type {agent_type}: {e}")
+                    raise
 
     def _create_live_agents(self) -> List[BaseAgent]:
         """Create primary/standby instances for live performance agents"""
@@ -181,7 +221,7 @@ class AgentCoordinator:
             for agent_id, agent in self.agents.items():
                 try:
                     agent.start()
-                    self.stats['agents_started'] += 1
+                    self.stats["agents_started"] += 1
                     logger.info(f"Started agent: {agent_id}")
                 except Exception as e:
                     logger.error(f"Error starting agent {agent_id}: {e}")
@@ -194,7 +234,7 @@ class AgentCoordinator:
                     agent.stop()
                     # Unregister from global registry
                     self.registry.unregister(agent_id)
-                    self.stats['agents_stopped'] += 1
+                    self.stats["agents_stopped"] += 1
                     logger.info(f"Stopped agent: {agent_id}")
                 except Exception as e:
                     logger.error(f"Error stopping agent {agent_id}: {e}")
@@ -277,7 +317,7 @@ class AgentCoordinator:
         """Get overall system health status"""
         statuses = self.get_all_agent_statuses()
 
-        healthy_agents = sum(1 for s in statuses if s['state'] == 'running')
+        healthy_agents = sum(1 for s in statuses if s["state"] == "running")
         total_agents = len(statuses)
 
         # Calculate overall health score
@@ -287,22 +327,24 @@ class AgentCoordinator:
         bus_metrics = self.message_bus.get_metrics()
 
         return {
-            'health_score': health_score,
-            'agents_total': total_agents,
-            'agents_healthy': healthy_agents,
-            'agents_error': sum(1 for s in statuses if s['state'] == 'error'),
-            'system_uptime_seconds': time.time() - self.stats['system_start_time'] if self.stats['system_start_time'] else 0,
-            'message_bus_metrics': bus_metrics,
-            'system_stats': self.stats
+            "health_score": health_score,
+            "agents_total": total_agents,
+            "agents_healthy": healthy_agents,
+            "agents_error": sum(1 for s in statuses if s["state"] == "error"),
+            "system_uptime_seconds": (
+                time.time() - self.stats["system_start_time"]
+                if self.stats["system_start_time"]
+                else 0
+            ),
+            "message_bus_metrics": bus_metrics,
+            "system_stats": self.stats,
         }
 
     def _start_health_monitoring(self):
         """Start health monitoring thread"""
         self.monitoring_active = True
         self.health_monitor_thread = threading.Thread(
-            target=self._health_monitoring_loop,
-            name="health_monitor",
-            daemon=True
+            target=self._health_monitoring_loop, name="health_monitor", daemon=True
         )
         self.health_monitor_thread.start()
         logger.info("Health monitoring started")
@@ -322,20 +364,20 @@ class AgentCoordinator:
                 statuses = self.get_all_agent_statuses()
 
                 for status in statuses:
-                    agent_id = status['agent_id']
-                    state = status['state']
+                    agent_id = status["agent_id"]
+                    state = status["state"]
 
                     # Check for error state
-                    if state == 'error':
+                    if state == "error":
                         logger.warning(f"Agent {agent_id} is in error state")
-                        self.stats['total_agent_errors'] += 1
+                        self.stats["total_agent_errors"] += 1
 
                         # Attempt restart
                         logger.info(f"Attempting to restart agent {agent_id}")
                         self.restart_agent(agent_id)
 
                     # Check for stopped state (unexpected)
-                    elif state == 'stopped':
+                    elif state == "stopped":
                         logger.warning(f"Agent {agent_id} unexpectedly stopped")
 
                         # Attempt restart
@@ -347,7 +389,9 @@ class AgentCoordinator:
 
                 # Update message processing stats
                 bus_metrics = self.message_bus.get_metrics()
-                self.stats['total_messages_processed'] = bus_metrics.get('messages_delivered', 0)
+                self.stats["total_messages_processed"] = bus_metrics.get(
+                    "messages_delivered", 0
+                )
 
                 time.sleep(self.monitoring_interval)
 

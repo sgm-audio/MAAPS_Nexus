@@ -1,0 +1,12 @@
+setup.py
+src/cv_director/__init__.py
+src/cv_director/camera_manager.py
+src/cv_director/cli.py
+src/cv_director/profiles.py
+src/cv_director/state_machine.py
+src/cv_director.egg-info/PKG-INFO
+src/cv_director.egg-info/SOURCES.txt
+src/cv_director.egg-info/dependency_links.txt
+src/cv_director.egg-info/entry_points.txt
+src/cv_director.egg-info/requires.txt
+src/cv_director.egg-info/top_level.txt

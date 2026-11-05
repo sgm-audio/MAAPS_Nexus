@@ -6,13 +6,11 @@ Provides thread-safe publish-subscribe messaging with priority queuing.
 import threading
 import queue
 import time
-from typing import Dict, List, Callable, Optional, Set
+from typing import Dict, List, Callable, Optional
 from collections import defaultdict
-from datetime import datetime, timedelta
 import logging
 
 from .message_types import Message, Priority, MessageType
-
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +52,7 @@ class MessageBus:
             "messages_delivered": 0,
             "messages_failed": 0,
             "messages_dropped": 0,
-            "total_latency_ms": 0.0
+            "total_latency_ms": 0.0,
         }
         self._metrics_lock = threading.Lock()
 
@@ -71,9 +69,7 @@ class MessageBus:
 
         self._running = True
         self._dispatcher_thread = threading.Thread(
-            target=self._dispatch_messages,
-            name="MessageBusDispatcher",
-            daemon=True
+            target=self._dispatch_messages, name="MessageBusDispatcher", daemon=True
         )
         self._dispatcher_thread.start()
         logger.info("Message bus started")
@@ -117,7 +113,8 @@ class MessageBus:
         with self._subscription_lock:
             if topic in self._subscriptions:
                 self._subscriptions[topic] = [
-                    (aid, cb) for aid, cb in self._subscriptions[topic]
+                    (aid, cb)
+                    for aid, cb in self._subscriptions[topic]
                     if aid != agent_id
                 ]
                 logger.debug(f"Agent {agent_id} unsubscribed from {topic}")
@@ -142,7 +139,9 @@ class MessageBus:
             with self._metrics_lock:
                 self._metrics["messages_published"] += 1
 
-            logger.debug(f"Published message {message.message_id} to topic {message.topic}")
+            logger.debug(
+                f"Published message {message.message_id} to topic {message.topic}"
+            )
             return True
 
         except queue.Full:
@@ -163,7 +162,9 @@ class MessageBus:
                 except queue.Full:
                     with self._metrics_lock:
                         self._metrics["messages_dropped"] += 1
-                    logger.error(f"Failed to queue message {message.message_id} - queue full")
+                    logger.error(
+                        f"Failed to queue message {message.message_id} - queue full"
+                    )
                     return False
 
     def request(self, message: Message, timeout: float = 5.0) -> Optional[Message]:
@@ -228,7 +229,7 @@ class MessageBus:
             payload=response_payload,
             correlation_id=original_message.correlation_id,
             message_type=MessageType.RESPONSE,
-            priority=original_message.priority
+            priority=original_message.priority,
         )
 
         # Check if anyone is waiting for this response
@@ -260,6 +261,101 @@ class MessageBus:
         metrics["dead_letter_count"] = self._dead_letter_queue.qsize()
 
         return metrics
+
+    def get_dead_letters(
+        self, n: Optional[int] = None, drain: bool = False
+    ) -> List[Dict]:
+        """Retrieve entries from the dead-letter queue.
+
+        Args:
+            n: Maximum number of entries to return. None returns all available.
+            drain: If True, remove returned entries from the DLQ; otherwise
+                   peek (non-destructive).
+
+        Returns:
+            List of dicts: {message_id, topic, sender, error, original_message}
+        """
+        snapshot: List = []
+        # Drain into a temporary list (queue.Queue does not support iteration)
+        while True:
+            try:
+                snapshot.append(self._dead_letter_queue.get_nowait())
+            except queue.Empty:
+                break
+
+        results = []
+        for entry in snapshot:
+            # Entry shape from line ~324: (message, agent_id, error_str)
+            try:
+                msg, agent_id, err = entry
+            except (ValueError, TypeError):
+                msg, agent_id, err = (entry, None, "unknown")
+            results.append(
+                {
+                    "message_id": getattr(msg, "message_id", None),
+                    "topic": getattr(msg, "topic", None),
+                    "sender": getattr(msg, "sender", None),
+                    "agent_id": agent_id,
+                    "error": err,
+                    "original_message": msg,
+                }
+            )
+
+        # Limit to n
+        if n is not None:
+            extras = results[n:]
+            results = results[:n]
+        else:
+            extras = []
+
+        # Put back what we did not consume
+        if not drain:
+            for entry in snapshot:
+                self._dead_letter_queue.put_nowait(entry)
+        else:
+            # Even when draining, anything beyond n must be re-enqueued
+            for entry in snapshot[n:] if n is not None else []:
+                self._dead_letter_queue.put_nowait(entry)
+            _ = extras  # silence linter
+
+        return results
+
+    def retry_dead_letters(self, max_retries: int = 3) -> Dict[str, int]:
+        """Re-publish messages from the dead-letter queue.
+
+        Args:
+            max_retries: maximum number of DLQ entries to attempt in this call.
+
+        Returns:
+            Dict with 'attempted', 'succeeded', 'failed', 'remaining' counts.
+        """
+        attempted = 0
+        succeeded = 0
+        failed = 0
+
+        for _ in range(max_retries):
+            try:
+                entry = self._dead_letter_queue.get_nowait()
+            except queue.Empty:
+                break
+            attempted += 1
+            try:
+                msg, _agent_id, _err = entry
+            except (ValueError, TypeError):
+                msg = entry
+            if self.publish(msg):
+                succeeded += 1
+            else:
+                failed += 1
+                # Put it back so we don't lose the message
+                self._dead_letter_queue.put_nowait(entry)
+
+        return {
+            "attempted": attempted,
+            "succeeded": succeeded,
+            "failed": failed,
+            "remaining": self._dead_letter_queue.qsize(),
+        }
 
     def _get_queue_for_priority(self, priority: Priority) -> queue.Queue:
         """Get the appropriate queue for a message priority"""
@@ -379,14 +475,14 @@ class MessageBus:
             return True
 
         # Wildcard matching
-        topic_parts = topic.split('.')
-        pattern_parts = pattern.split('.')
+        topic_parts = topic.split(".")
+        pattern_parts = pattern.split(".")
 
         if len(topic_parts) != len(pattern_parts):
             return False
 
         for topic_part, pattern_part in zip(topic_parts, pattern_parts):
-            if pattern_part == '*':
+            if pattern_part == "*":
                 continue
             if topic_part != pattern_part:
                 return False

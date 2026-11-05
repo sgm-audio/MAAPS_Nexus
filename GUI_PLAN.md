@@ -928,7 +928,7 @@ Ctrl+1-9      Create/Edit Scene
 ### File Structure
 
 ```
-F:/agents/
+/path/to/agents/
 ├── gui/
 │   ├── __init__.py
 │   ├── main.py                    # Application entry point

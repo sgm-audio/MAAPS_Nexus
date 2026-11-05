@@ -1,0 +1,16 @@
+FROM us-docker.pkg.dev/vertex-ai/training/pytorch-gpu.2-0:latest
+
+WORKDIR /app
+
+# Install system dependencies for audio (libsndfile)
+RUN apt-get update && apt-get install -y libsndfile1
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install google-cloud-storage google-cloud-aiplatform[ray]
+
+# Copy source code
+COPY src/ src/
+
+ENTRYPOINT ["python", "src/agents/train_critic_remote.py"]
