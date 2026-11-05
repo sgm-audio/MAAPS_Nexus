@@ -1,0 +1,1917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APEX DAW - Next-Generation Digital Audio Workstation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* Premium Dark Theme - WCAG AAA Compliant */
+            --bg-deep: #0A0A0A;
+            --bg-primary: #121212;
+            --bg-secondary: #1A1A1A;
+            --bg-tertiary: #242424;
+            --bg-elevated: #2E2E2E;
+            --bg-hover: #383838;
+            --bg-active: #424242;
+            
+            /* Text Hierarchy */
+            --text-primary: #FFFFFF;
+            --text-secondary: #E8E8E8;
+            --text-tertiary: #B8B8B8;
+            --text-disabled: #6E6E6E;
+            --text-inverse: #0A0A0A;
+            
+            /* Accent Colors - Premium Blue/Purple Gradient System */
+            --accent-primary: #4A9EFF;
+            --accent-primary-hover: #5AADFF;
+            --accent-primary-active: #3A8EEF;
+            --accent-secondary: #8B5CF6;
+            --accent-tertiary: #EC4899;
+            --accent-success: #10B981;
+            --accent-warning: #F59E0B;
+            --accent-error: #EF4444;
+            --accent-info: #3B82F6;
+            
+            /* Gradients */
+            --gradient-primary: linear-gradient(135deg, #4A9EFF 0%, #8B5CF6 100%);
+            --gradient-accent: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%);
+            --gradient-success: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            
+            /* Metering Colors */
+            --meter-peak: #10B981;
+            --meter-nominal: #3B82F6;
+            --meter-warning: #F59E0B;
+            --meter-danger: #EF4444;
+            --meter-clip: #DC2626;
+            
+            /* Borders & Dividers */
+            --border-subtle: #2A2A2A;
+            --border-default: #3A3A3A;
+            --border-strong: #4A4A4A;
+            --border-focus: #4A9EFF;
+            
+            /* Shadows */
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+            --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+            --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.6);
+            
+            /* Track Colors */
+            --track-audio: #3B82F6;
+            --track-midi: #8B5CF6;
+            --track-aux: #10B981;
+            --track-bus: #F59E0B;
+            --track-master: #EC4899;
+            
+            /* Waveform Colors */
+            --waveform-base: #4A9EFF;
+            --waveform-selected: #8B5CF6;
+            --waveform-muted: #6E6E6E;
+            
+            /* Font System */
+            --font-primary: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, system-ui, sans-serif;
+            --font-mono: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+        }
+
+        body {
+            font-family: var(--font-primary);
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* === MAIN CONTAINER === */
+        .daw-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* === TOP MENU BAR === */
+        .menu-bar {
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-default);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            height: 40px;
+            gap: 24px;
+        }
+
+        .menu-logo {
+            font-size: 16px;
+            font-weight: 700;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 1px;
+        }
+
+        .menu-items {
+            display: flex;
+            gap: 20px;
+            flex: 1;
+        }
+
+        .menu-item {
+            font-size: 13px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .menu-item:hover {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .menu-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .ai-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            font-size: 11px;
+            color: var(--text-tertiary);
+        }
+
+        .ai-status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent-success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* === TOOLBAR === */
+        .toolbar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-default);
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            gap: 24px;
+            height: 72px;
+        }
+
+        .toolbar-section {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            padding-right: 24px;
+            border-right: 1px solid var(--border-subtle);
+        }
+
+        .toolbar-section:last-child {
+            border-right: none;
+        }
+
+        .toolbar-label {
+            font-size: 11px;
+            color: var(--text-disabled);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-right: 8px;
+        }
+
+        /* Pro Tools Style Edit Modes */
+        .edit-mode-group {
+            display: flex;
+            gap: 4px;
+            background: var(--bg-tertiary);
+            padding: 4px;
+            border-radius: 8px;
+        }
+
+        .edit-mode-btn {
+            padding: 8px 16px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .edit-mode-btn:hover {
+            color: var(--text-primary);
+            background: var(--bg-hover);
+        }
+
+        .edit-mode-btn.active {
+            background: var(--accent-primary);
+            color: var(--text-inverse);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .edit-mode-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-bottom: 4px solid var(--accent-primary);
+        }
+
+        /* Transport Controls */
+        .transport-controls {
+            display: flex;
+            gap: 6px;
+        }
+
+        .transport-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            border: 1px solid var(--border-default);
+            background: var(--bg-tertiary);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .transport-btn:hover {
+            border-color: var(--border-strong);
+            background: var(--bg-hover);
+            transform: translateY(-1px);
+        }
+
+        .transport-btn.record {
+            background: linear-gradient(135deg, #7F1D1D 0%, #991B1B 100%);
+            border-color: #B91C1C;
+        }
+
+        .transport-btn.record:hover {
+            background: linear-gradient(135deg, #991B1B 0%, #B91C1C 100%);
+        }
+
+        .transport-btn.record.active {
+            background: linear-gradient(135deg, #DC2626 0%, #EF4444 100%);
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+            animation: record-pulse 1s infinite;
+        }
+
+        @keyframes record-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .transport-btn.play.active {
+            background: var(--accent-success);
+            border-color: var(--accent-success);
+        }
+
+        /* Time Display */
+        .time-display {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: var(--bg-deep);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-family: var(--font-mono);
+            border: 1px solid var(--border-default);
+        }
+
+        .time-main {
+            font-size: 18px;
+            color: var(--text-primary);
+            letter-spacing: 1px;
+        }
+
+        .time-secondary {
+            font-size: 11px;
+            color: var(--text-disabled);
+            letter-spacing: 0.5px;
+        }
+
+        /* Tool Selector */
+        .tool-selector {
+            display: flex;
+            gap: 4px;
+        }
+
+        .tool-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            border: 1px solid var(--border-default);
+            background: var(--bg-tertiary);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .tool-btn:hover {
+            border-color: var(--accent-primary);
+            background: var(--bg-hover);
+        }
+
+        .tool-btn.active {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+            color: var(--text-inverse);
+            box-shadow: 0 0 12px rgba(74, 158, 255, 0.3);
+        }
+
+        .tool-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Snap/Grid Controls */
+        .snap-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-tertiary);
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-default);
+        }
+
+        .snap-toggle {
+            font-size: 12px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .snap-toggle.active {
+            color: var(--accent-primary);
+            font-weight: 600;
+        }
+
+        .grid-value {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-primary);
+            background: var(--bg-deep);
+            padding: 4px 8px;
+            border-radius: 4px;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        /* === MAIN CONTENT AREA === */
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* === LEFT SIDEBAR (Browser/Inspector) === */
+        .left-sidebar {
+            width: 300px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-default);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-tabs {
+            display: flex;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-default);
+        }
+
+        .sidebar-tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .sidebar-tab:hover {
+            color: var(--text-secondary);
+            background: var(--bg-hover);
+        }
+
+        .sidebar-tab.active {
+            color: var(--text-primary);
+            border-bottom-color: var(--accent-primary);
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .browser-item {
+            padding: 10px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            cursor: grab;
+            transition: all 0.2s;
+        }
+
+        .browser-item:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent-primary);
+            transform: translateX(4px);
+        }
+
+        .browser-item-name {
+            font-size: 13px;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .browser-item-info {
+            font-size: 11px;
+            color: var(--text-disabled);
+        }
+
+        /* === CENTER AREA (Tracks & Timeline) === */
+        .center-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Ruler/Timeline */
+        .ruler {
+            height: 40px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-default);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            overflow-x: auto;
+            position: relative;
+        }
+
+        .ruler-markers {
+            display: flex;
+            position: relative;
+            width: 100%;
+        }
+
+        .ruler-marker {
+            position: absolute;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .ruler-marker-line {
+            width: 1px;
+            height: 20px;
+            background: var(--border-strong);
+        }
+
+        .ruler-marker-label {
+            font-size: 10px;
+            color: var(--text-disabled);
+            font-family: var(--font-mono);
+            margin-top: 2px;
+        }
+
+        .playhead {
+            position: absolute;
+            top: 0;
+            left: 20%;
+            width: 2px;
+            height: 100%;
+            background: var(--accent-primary);
+            box-shadow: 0 0 10px rgba(74, 158, 255, 0.5);
+            z-index: 100;
+        }
+
+        .playhead::before {
+            content: '';
+            position: absolute;
+            top: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 8px solid var(--accent-primary);
+        }
+
+        /* Track List & Arrangement View */
+        .track-workspace {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Track Headers */
+        .track-headers {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-default);
+            overflow-y: scroll;
+        }
+
+        .track-header {
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: background 0.2s;
+            min-height: 80px;
+        }
+
+        .track-header:hover {
+            background: var(--bg-hover);
+        }
+
+        .track-header.selected {
+            background: var(--bg-elevated);
+            border-left: 3px solid var(--accent-primary);
+        }
+
+        .track-header-top {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .track-type-indicator {
+            width: 4px;
+            height: 40px;
+            border-radius: 2px;
+        }
+
+        .track-type-indicator.audio { background: var(--track-audio); }
+        .track-type-indicator.midi { background: var(--track-midi); }
+        .track-type-indicator.aux { background: var(--track-aux); }
+        .track-type-indicator.master { background: var(--track-master); }
+
+        .track-info {
+            flex: 1;
+        }
+
+        .track-name {
+            font-size: 13px;
+            color: var(--text-primary);
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .track-routing {
+            font-size: 10px;
+            color: var(--text-disabled);
+            font-family: var(--font-mono);
+        }
+
+        .track-controls {
+            display: flex;
+            gap: 4px;
+        }
+
+        .track-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
+            border: 1px solid var(--border-default);
+            background: var(--bg-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .track-btn:hover {
+            border-color: var(--border-strong);
+            transform: scale(1.05);
+        }
+
+        .track-btn.record {
+            background: #1A0000;
+            color: #EF4444;
+        }
+
+        .track-btn.record.active {
+            background: var(--accent-error);
+            color: var(--text-inverse);
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+        }
+
+        .track-btn.mute {
+            background: #1A1A1A;
+            color: var(--text-disabled);
+        }
+
+        .track-btn.mute.active {
+            background: var(--bg-elevated);
+            color: var(--accent-warning);
+        }
+
+        .track-btn.solo {
+            background: #1A1400;
+            color: var(--accent-warning);
+        }
+
+        .track-btn.solo.active {
+            background: var(--accent-warning);
+            color: var(--text-inverse);
+        }
+
+        .track-btn.monitor {
+            background: var(--bg-secondary);
+            color: var(--text-disabled);
+        }
+
+        .track-btn.monitor.active {
+            background: var(--accent-info);
+            color: var(--text-inverse);
+        }
+
+        .track-header-bottom {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .track-meter-mini {
+            flex: 1;
+            height: 6px;
+            background: var(--bg-deep);
+            border-radius: 3px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .track-meter-fill {
+            height: 100%;
+            background: linear-gradient(to right, var(--meter-peak) 0%, var(--meter-nominal) 60%, var(--meter-warning) 85%, var(--meter-danger) 100%);
+            transition: width 0.05s;
+            border-radius: 3px;
+        }
+
+        .track-volume {
+            font-size: 10px;
+            color: var(--text-disabled);
+            font-family: var(--font-mono);
+            min-width: 40px;
+            text-align: right;
+        }
+
+        /* Arrangement Area */
+        .arrangement-area {
+            flex: 1;
+            background: var(--bg-primary);
+            overflow: auto;
+            position: relative;
+        }
+
+        .arrangement-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                repeating-linear-gradient(90deg, var(--border-subtle) 0px, transparent 1px, transparent 60px),
+                repeating-linear-gradient(0deg, var(--border-subtle) 0px, transparent 1px, transparent 80px);
+        }
+
+        .arrangement-tracks {
+            position: relative;
+            z-index: 1;
+        }
+
+        .arrangement-track {
+            height: 80px;
+            border-bottom: 1px solid var(--border-subtle);
+            position: relative;
+            padding: 8px;
+        }
+
+        /* Audio/MIDI Regions */
+        .region {
+            position: absolute;
+            height: 64px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-strong);
+            border-radius: 4px;
+            overflow: hidden;
+            cursor: move;
+            transition: all 0.2s;
+        }
+
+        .region:hover {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 12px rgba(74, 158, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .region.selected {
+            border-color: var(--accent-primary);
+            border-width: 2px;
+            box-shadow: 0 0 16px rgba(74, 158, 255, 0.3);
+        }
+
+        .region-waveform {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .waveform-canvas {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, 
+                transparent 0%, 
+                var(--waveform-base) 45%,
+                var(--waveform-base) 55%,
+                transparent 100%);
+            opacity: 0.6;
+        }
+
+        .region-label {
+            position: absolute;
+            top: 4px;
+            left: 8px;
+            font-size: 11px;
+            color: var(--text-primary);
+            font-weight: 600;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+        }
+
+        /* Sample Regions */
+        .region.audio-1 {
+            left: 60px;
+            width: 300px;
+            border-color: var(--track-audio);
+        }
+
+        .region.audio-2 {
+            left: 400px;
+            width: 240px;
+            border-color: var(--track-audio);
+        }
+
+        .region.midi-1 {
+            left: 100px;
+            width: 280px;
+            border-color: var(--track-midi);
+        }
+
+        /* === RIGHT SIDEBAR (Mixer/Inspector) === */
+        .right-sidebar {
+            width: 400px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-default);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .mixer-header {
+            background: var(--bg-tertiary);
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-default);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .mixer-header h3 {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .mixer-channels {
+            flex: 1;
+            display: flex;
+            padding: 16px;
+            gap: 12px;
+            overflow-x: auto;
+        }
+
+        /* Channel Strip */
+        .channel-strip {
+            min-width: 90px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-default);
+            border-radius: 8px;
+            padding: 12px 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: all 0.2s;
+        }
+
+        .channel-strip:hover {
+            border-color: var(--accent-primary);
+            box-shadow: var(--shadow-md);
+        }
+
+        .channel-strip.selected {
+            border-color: var(--accent-primary);
+            border-width: 2px;
+            background: var(--bg-elevated);
+        }
+
+        .channel-name {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-align: center;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        /* Inserts Section */
+        .channel-inserts {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+
+        .insert-slot {
+            height: 24px;
+            background: var(--bg-deep);
+            border: 1px solid var(--border-subtle);
+            border-radius: 4px;
+            font-size: 9px;
+            color: var(--text-disabled);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .insert-slot:hover {
+            border-color: var(--accent-primary);
+            color: var(--text-secondary);
+        }
+
+        .insert-slot.active {
+            background: var(--accent-primary);
+            color: var(--text-inverse);
+            border-color: var(--accent-primary);
+        }
+
+        /* Pan Control */
+        .pan-control {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+
+        .pan-label {
+            font-size: 9px;
+            color: var(--text-disabled);
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .pan-slider {
+            width: 100%;
+            height: 24px;
+            background: var(--bg-deep);
+            border-radius: 12px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .pan-thumb {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 12px;
+            height: 12px;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            border: 2px solid var(--text-primary);
+            transition: left 0.1s;
+        }
+
+        .pan-value {
+            font-size: 9px;
+            color: var(--text-tertiary);
+            text-align: center;
+            font-family: var(--font-mono);
+            margin-top: 2px;
+        }
+
+        /* Volume Fader */
+        .fader-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .fader-track {
+            width: 32px;
+            height: 160px;
+            background: var(--bg-deep);
+            border-radius: 16px;
+            position: relative;
+            cursor: pointer;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .fader-fill {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            background: linear-gradient(to top, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+            border-radius: 16px;
+            transition: height 0.1s;
+        }
+
+        .fader-thumb {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 20px;
+            background: var(--text-primary);
+            border: 2px solid var(--accent-primary);
+            border-radius: 4px;
+            cursor: grab;
+            transition: bottom 0.1s;
+            box-shadow: var(--shadow-md);
+        }
+
+        .fader-thumb:active {
+            cursor: grabbing;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .fader-value {
+            font-size: 11px;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            text-align: center;
+        }
+
+        /* Level Meter */
+        .level-meter {
+            width: 12px;
+            height: 160px;
+            background: var(--bg-deep);
+            border-radius: 6px;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .meter-segment {
+            position: absolute;
+            width: 100%;
+            left: 0;
+            transition: height 0.05s;
+        }
+
+        .meter-segment.peak {
+            bottom: 75%;
+            height: 25%;
+            background: linear-gradient(to top, var(--meter-nominal), var(--meter-peak));
+        }
+
+        .meter-segment.nominal {
+            bottom: 30%;
+            height: 45%;
+            background: linear-gradient(to top, var(--meter-warning), var(--meter-nominal));
+        }
+
+        .meter-segment.warning {
+            bottom: 10%;
+            height: 20%;
+            background: linear-gradient(to top, var(--meter-danger), var(--meter-warning));
+        }
+
+        .meter-segment.danger {
+            bottom: 0%;
+            height: 10%;
+            background: var(--meter-clip);
+        }
+
+        /* Channel Controls */
+        .channel-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .channel-control-btn {
+            width: 100%;
+            height: 28px;
+            border-radius: 4px;
+            border: 1px solid var(--border-default);
+            background: var(--bg-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 10px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .channel-control-btn:hover {
+            border-color: var(--border-strong);
+            transform: scale(1.02);
+        }
+
+        .channel-control-btn.solo {
+            background: #1A1400;
+            color: var(--accent-warning);
+        }
+
+        .channel-control-btn.solo.active {
+            background: var(--accent-warning);
+            color: var(--text-inverse);
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+        }
+
+        .channel-control-btn.mute {
+            background: #1A1A1A;
+            color: var(--text-disabled);
+        }
+
+        .channel-control-btn.mute.active {
+            background: var(--bg-elevated);
+            color: var(--text-tertiary);
+        }
+
+        /* === AI ASSISTANT PANEL === */
+        .ai-panel {
+            position: fixed;
+            right: 0;
+            top: 112px;
+            bottom: 0;
+            width: 0;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-default);
+            overflow: hidden;
+            transition: width 0.3s;
+            z-index: 1000;
+        }
+
+        .ai-panel.open {
+            width: 360px;
+        }
+
+        .ai-panel-header {
+            padding: 16px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-default);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .ai-panel-title {
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .ai-panel-content {
+            padding: 16px;
+            overflow-y: auto;
+            height: calc(100% - 120px);
+        }
+
+        .ai-suggestion {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-default);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .ai-suggestion:hover {
+            border-color: var(--accent-primary);
+            background: var(--bg-hover);
+            transform: translateX(4px);
+        }
+
+        .ai-suggestion-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .ai-suggestion-desc {
+            font-size: 11px;
+            color: var(--text-tertiary);
+        }
+
+        /* === BOTTOM INFO BAR === */
+        .info-bar {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-default);
+            padding: 8px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 36px;
+        }
+
+        .info-item {
+            font-size: 11px;
+            color: var(--text-disabled);
+            font-family: var(--font-mono);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .info-value {
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        /* === SCROLLBAR STYLING === */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-elevated);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--bg-hover);
+        }
+
+        /* === CONTEXT MENU === */
+        .context-menu {
+            position: fixed;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-strong);
+            border-radius: 8px;
+            padding: 4px;
+            box-shadow: var(--shadow-xl);
+            z-index: 10000;
+            display: none;
+        }
+
+        .context-menu-item {
+            padding: 8px 16px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .context-menu-item:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .context-menu-divider {
+            height: 1px;
+            background: var(--border-default);
+            margin: 4px 8px;
+        }
+
+        /* === TOOLTIPS === */
+        .tooltip {
+            position: fixed;
+            background: var(--bg-deep);
+            border: 1px solid var(--border-strong);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            color: var(--text-primary);
+            pointer-events: none;
+            z-index: 10001;
+            box-shadow: var(--shadow-lg);
+            display: none;
+        }
+
+        /* === ANIMATIONS === */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        /* === RESPONSIVE ADJUSTMENTS === */
+        @media (max-width: 1600px) {
+            .left-sidebar {
+                width: 250px;
+            }
+            .right-sidebar {
+                width: 350px;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .toolbar-section {
+                padding-right: 16px;
+            }
+            .toolbar {
+                gap: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="daw-container">
+        <!-- Menu Bar -->
+        <div class="menu-bar">
+            <div class="menu-logo">APEX</div>
+            <div class="menu-items">
+                <div class="menu-item">File</div>
+                <div class="menu-item">Edit</div>
+                <div class="menu-item">View</div>
+                <div class="menu-item">Track</div>
+                <div class="menu-item">Region</div>
+                <div class="menu-item">Audio</div>
+                <div class="menu-item">MIDI</div>
+                <div class="menu-item">Mix</div>
+                <div class="menu-item">Window</div>
+            </div>
+            <div class="menu-actions">
+                <div class="ai-status">
+                    <div class="ai-status-dot"></div>
+                    AI ACTIVE
+                </div>
+                <div style="font-size: 11px; color: var(--text-disabled);">Project: Untitled</div>
+            </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <!-- Edit Modes (Pro Tools Style) -->
+            <div class="toolbar-section">
+                <span class="toolbar-label">Edit</span>
+                <div class="edit-mode-group">
+                    <button class="edit-mode-btn" title="Shuffle Mode">SHFL</button>
+                    <button class="edit-mode-btn" title="Slip Mode">SLIP</button>
+                    <button class="edit-mode-btn" title="Spot Mode">SPOT</button>
+                    <button class="edit-mode-btn active" title="Grid Mode">GRID</button>
+                </div>
+            </div>
+
+            <!-- Tool Selector -->
+            <div class="toolbar-section">
+                <span class="toolbar-label">Tools</span>
+                <div class="tool-selector">
+                    <button class="tool-btn active" title="Selection Tool (1)">
+                        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M3 3l18 9-8 3-3 8z"/></svg>
+                    </button>
+                    <button class="tool-btn" title="Trim Tool (2)">
+                        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M9 3v18M15 3v18"/></svg>
+                    </button>
+                    <button class="tool-btn" title="Slip Tool (3)">
+                        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M8 6h8v12H8zM12 2v4M12 18v4"/></svg>
+                    </button>
+                    <button class="tool-btn" title="Pencil Tool (4)">
+                        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/></svg>
+                    </button>
+                    <button class="tool-btn" title="Eraser Tool (5)">
+                        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M16.24 3.56l4.2 4.2-11 11H5.24v-4.2l11-11z"/></svg>
+                    </button>
+                    <button class="tool-btn" title="Automation Tool (6)">
+                        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M3 18h2.5l1-3 2 6 2-12 2 9 1.5-4.5H21"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Transport Controls -->
+            <div class="toolbar-section">
+                <span class="toolbar-label">Transport</span>
+                <div class="transport-controls">
+                    <button class="transport-btn" title="Return to Zero">⏮</button>
+                    <button class="transport-btn" title="Rewind">⏪</button>
+                    <button class="transport-btn play" title="Play (Space)">▶</button>
+                    <button class="transport-btn" title="Stop">⏹</button>
+                    <button class="transport-btn record" title="Record (R)">⏺</button>
+                    <button class="transport-btn" title="Loop">🔁</button>
+                </div>
+            </div>
+
+            <!-- Time Display -->
+            <div class="toolbar-section">
+                <div class="time-display">
+                    <div class="time-main">00:00:00:00</div>
+                    <div class="time-secondary">120.00 BPM | 4/4</div>
+                </div>
+            </div>
+
+            <!-- Snap/Grid Controls -->
+            <div class="toolbar-section">
+                <span class="toolbar-label">Snap</span>
+                <div class="snap-control">
+                    <span class="snap-toggle active">SNAP</span>
+                    <div class="grid-value">1/16</div>
+                </div>
+            </div>
+
+            <!-- View Options -->
+            <div class="toolbar-section" style="border-right: none;">
+                <button class="tool-btn" title="Zoom In">
+                    <svg fill="currentColor" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                </button>
+                <button class="tool-btn" title="Zoom Out">
+                    <svg fill="currentColor" viewBox="0 0 24 24"><path d="M19 13H5v-2h14v2z"/></svg>
+                </button>
+                <button class="tool-btn" title="Zoom to Fit">
+                    <svg fill="currentColor" viewBox="0 0 24 24"><path d="M5 5h14v14H5z"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <!-- Left Sidebar: Browser/Library -->
+            <div class="left-sidebar">
+                <div class="sidebar-tabs">
+                    <div class="sidebar-tab active">BROWSER</div>
+                    <div class="sidebar-tab">LIBRARY</div>
+                    <div class="sidebar-tab">FX</div>
+                </div>
+                <div class="sidebar-content">
+                    <div class="browser-item">
+                        <div class="browser-item-name">🎵 Acoustic Guitar.wav</div>
+                        <div class="browser-item-info">48kHz • 24bit • 00:32</div>
+                    </div>
+                    <div class="browser-item">
+                        <div class="browser-item-name">🎹 Piano Lead.mid</div>
+                        <div class="browser-item-info">MIDI • C Major • 120 BPM</div>
+                    </div>
+                    <div class="browser-item">
+                        <div class="browser-item-name">🥁 Drum Loop.wav</div>
+                        <div class="browser-item-info">48kHz • 24bit • 00:08</div>
+                    </div>
+                    <div class="browser-item">
+                        <div class="browser-item-name">🎸 Bass Synth.wav</div>
+                        <div class="browser-item-info">48kHz • 24bit • 00:16</div>
+                    </div>
+                    <div class="browser-item">
+                        <div class="browser-item-name">🎚️ Vocal FX.wav</div>
+                        <div class="browser-item-info">48kHz • 24bit • 00:24</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Center Area: Tracks & Timeline -->
+            <div class="center-area">
+                <!-- Ruler/Timeline -->
+                <div class="ruler">
+                    <div class="ruler-markers" style="width: 2000px;">
+                        <div class="ruler-marker" style="left: 0px;">
+                            <div class="ruler-marker-line"></div>
+                            <div class="ruler-marker-label">1</div>
+                        </div>
+                        <div class="ruler-marker" style="left: 200px;">
+                            <div class="ruler-marker-line"></div>
+                            <div class="ruler-marker-label">2</div>
+                        </div>
+                        <div class="ruler-marker" style="left: 400px;">
+                            <div class="ruler-marker-line"></div>
+                            <div class="ruler-marker-label">3</div>
+                        </div>
+                        <div class="ruler-marker" style="left: 600px;">
+                            <div class="ruler-marker-line"></div>
+                            <div class="ruler-marker-label">4</div>
+                        </div>
+                        <div class="ruler-marker" style="left: 800px;">
+                            <div class="ruler-marker-line"></div>
+                            <div class="ruler-marker-label">5</div>
+                        </div>
+                    </div>
+                    <div class="playhead"></div>
+                </div>
+
+                <!-- Track Workspace -->
+                <div class="track-workspace">
+                    <!-- Track Headers -->
+                    <div class="track-headers">
+                        <!-- Track 1: Audio -->
+                        <div class="track-header selected">
+                            <div class="track-header-top">
+                                <div class="track-type-indicator audio"></div>
+                                <div class="track-info">
+                                    <div class="track-name">Lead Vocal</div>
+                                    <div class="track-routing">INPUT: 1 • OUT: Master</div>
+                                </div>
+                                <div class="track-controls">
+                                    <button class="track-btn record active" title="Record Enable">R</button>
+                                    <button class="track-btn mute" title="Mute">M</button>
+                                    <button class="track-btn solo" title="Solo">S</button>
+                                    <button class="track-btn monitor active" title="Input Monitor">I</button>
+                                </div>
+                            </div>
+                            <div class="track-header-bottom">
+                                <div class="track-meter-mini">
+                                    <div class="track-meter-fill" style="width: 65%;"></div>
+                                </div>
+                                <div class="track-volume">-6.2 dB</div>
+                            </div>
+                        </div>
+
+                        <!-- Track 2: MIDI -->
+                        <div class="track-header">
+                            <div class="track-header-top">
+                                <div class="track-type-indicator midi"></div>
+                                <div class="track-info">
+                                    <div class="track-name">Piano</div>
+                                    <div class="track-routing">MIDI: Kontakt • OUT: Master</div>
+                                </div>
+                                <div class="track-controls">
+                                    <button class="track-btn record" title="Record Enable">R</button>
+                                    <button class="track-btn mute" title="Mute">M</button>
+                                    <button class="track-btn solo" title="Solo">S</button>
+                                    <button class="track-btn monitor" title="Input Monitor">I</button>
+                                </div>
+                            </div>
+                            <div class="track-header-bottom">
+                                <div class="track-meter-mini">
+                                    <div class="track-meter-fill" style="width: 45%;"></div>
+                                </div>
+                                <div class="track-volume">-12.0 dB</div>
+                            </div>
+                        </div>
+
+                        <!-- Track 3: Audio -->
+                        <div class="track-header">
+                            <div class="track-header-top">
+                                <div class="track-type-indicator audio"></div>
+                                <div class="track-info">
+                                    <div class="track-name">Bass Guitar</div>
+                                    <div class="track-routing">INPUT: 3 • OUT: Bass Bus</div>
+                                </div>
+                                <div class="track-controls">
+                                    <button class="track-btn record" title="Record Enable">R</button>
+                                    <button class="track-btn mute" title="Mute">M</button>
+                                    <button class="track-btn solo" title="Solo">S</button>
+                                    <button class="track-btn monitor" title="Input Monitor">I</button>
+                                </div>
+                            </div>
+                            <div class="track-header-bottom">
+                                <div class="track-meter-mini">
+                                    <div class="track-meter-fill" style="width: 55%;"></div>
+                                </div>
+                                <div class="track-volume">-9.5 dB</div>
+                            </div>
+                        </div>
+
+                        <!-- Track 4: Aux -->
+                        <div class="track-header">
+                            <div class="track-header-top">
+                                <div class="track-type-indicator aux"></div>
+                                <div class="track-info">
+                                    <div class="track-name">Reverb Send</div>
+                                    <div class="track-routing">AUX • OUT: Master</div>
+                                </div>
+                                <div class="track-controls">
+                                    <button class="track-btn record" title="Record Enable" style="opacity: 0.3; cursor: not-allowed;">R</button>
+                                    <button class="track-btn mute" title="Mute">M</button>
+                                    <button class="track-btn solo" title="Solo">S</button>
+                                    <button class="track-btn monitor" title="Input Monitor" style="opacity: 0.3; cursor: not-allowed;">I</button>
+                                </div>
+                            </div>
+                            <div class="track-header-bottom">
+                                <div class="track-meter-mini">
+                                    <div class="track-meter-fill" style="width: 35%;"></div>
+                                </div>
+                                <div class="track-volume">-18.0 dB</div>
+                            </div>
+                        </div>
+
+                        <!-- Track 5: Master -->
+                        <div class="track-header">
+                            <div class="track-header-top">
+                                <div class="track-type-indicator master"></div>
+                                <div class="track-info">
+                                    <div class="track-name">Master Output</div>
+                                    <div class="track-routing">STEREO OUT: 1-2</div>
+                                </div>
+                                <div class="track-controls">
+                                    <button class="track-btn record" title="Record Enable" style="opacity: 0.3; cursor: not-allowed;">R</button>
+                                    <button class="track-btn mute" title="Mute">M</button>
+                                    <button class="track-btn solo" title="Solo" style="opacity: 0.3; cursor: not-allowed;">S</button>
+                                    <button class="track-btn monitor" title="Input Monitor" style="opacity: 0.3; cursor: not-allowed;">I</button>
+                                </div>
+                            </div>
+                            <div class="track-header-bottom">
+                                <div class="track-meter-mini">
+                                    <div class="track-meter-fill" style="width: 75%;"></div>
+                                </div>
+                                <div class="track-volume">-3.0 dB</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Arrangement Area -->
+                    <div class="arrangement-area">
+                        <div class="arrangement-grid"></div>
+                        <div class="arrangement-tracks">
+                            <!-- Track 1 Regions -->
+                            <div class="arrangement-track">
+                                <div class="region audio-1 selected">
+                                    <div class="region-waveform">
+                                        <div class="waveform-canvas"></div>
+                                    </div>
+                                    <div class="region-label">Lead Vocal Take 1</div>
+                                </div>
+                                <div class="region audio-2">
+                                    <div class="region-waveform">
+                                        <div class="waveform-canvas"></div>
+                                    </div>
+                                    <div class="region-label">Lead Vocal Take 2</div>
+                                </div>
+                            </div>
+
+                            <!-- Track 2 Regions -->
+                            <div class="arrangement-track">
+                                <div class="region midi-1">
+                                    <div class="region-waveform" style="background: linear-gradient(to bottom, transparent 20%, var(--track-midi) 40%, var(--track-midi) 60%, transparent 80%);">
+                                    </div>
+                                    <div class="region-label">Piano Progression</div>
+                                </div>
+                            </div>
+
+                            <!-- Track 3 Regions -->
+                            <div class="arrangement-track"></div>
+
+                            <!-- Track 4 Regions -->
+                            <div class="arrangement-track"></div>
+
+                            <!-- Track 5 Regions -->
+                            <div class="arrangement-track"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Sidebar: Mixer -->
+            <div class="right-sidebar">
+                <div class="mixer-header">
+                    <h3>Mixer</h3>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="tool-btn" title="Mixer Settings">⚙</button>
+                        <button class="tool-btn" title="Expand Mixer">↔</button>
+                    </div>
+                </div>
+
+                <div class="mixer-channels">
+                    <!-- Channel 1 -->
+                    <div class="channel-strip selected">
+                        <div class="channel-name">LEAD VOX</div>
+                        
+                        <div class="channel-inserts">
+                            <div class="insert-slot active">EQ</div>
+                            <div class="insert-slot active">COMP</div>
+                            <div class="insert-slot">INSERT 3</div>
+                            <div class="insert-slot">INSERT 4</div>
+                        </div>
+
+                        <div class="pan-control">
+                            <div class="pan-label">PAN</div>
+                            <div class="pan-slider">
+                                <div class="pan-thumb"></div>
+                            </div>
+                            <div class="pan-value">C</div>
+                        </div>
+
+                        <div class="fader-section">
+                            <div style="display: flex; gap: 8px; align-items: flex-end;">
+                                <div class="level-meter">
+                                    <div class="meter-segment peak"></div>
+                                    <div class="meter-segment nominal"></div>
+                                    <div class="meter-segment warning"></div>
+                                    <div class="meter-segment danger"></div>
+                                </div>
+                                <div class="fader-track">
+                                    <div class="fader-fill" style="height: 65%;"></div>
+                                    <div class="fader-thumb" style="bottom: 65%;"></div>
+                                </div>
+                            </div>
+                            <div class="fader-value">-6.2 dB</div>
+                        </div>
+
+                        <div class="channel-controls">
+                            <button class="channel-control-btn solo">S</button>
+                            <button class="channel-control-btn mute">M</button>
+                        </div>
+                    </div>
+
+                    <!-- Channel 2 -->
+                    <div class="channel-strip">
+                        <div class="channel-name">PIANO</div>
+                        
+                        <div class="channel-inserts">
+                            <div class="insert-slot active">REVERB</div>
+                            <div class="insert-slot">INSERT 2</div>
+                            <div class="insert-slot">INSERT 3</div>
+                            <div class="insert-slot">INSERT 4</div>
+                        </div>
+
+                        <div class="pan-control">
+                            <div class="pan-label">PAN</div>
+                            <div class="pan-slider">
+                                <div class="pan-thumb" style="left: 40%;"></div>
+                            </div>
+                            <div class="pan-value">L 20</div>
+                        </div>
+
+                        <div class="fader-section">
+                            <div style="display: flex; gap: 8px; align-items: flex-end;">
+                                <div class="level-meter">
+                                    <div class="meter-segment peak"></div>
+                                    <div class="meter-segment nominal" style="height: 35%;"></div>
+                                    <div class="meter-segment warning"></div>
+                                </div>
+                                <div class="fader-track">
+                                    <div class="fader-fill" style="height: 45%;"></div>
+                                    <div class="fader-thumb" style="bottom: 45%;"></div>
+                                </div>
+                            </div>
+                            <div class="fader-value">-12.0 dB</div>
+                        </div>
+
+                        <div class="channel-controls">
+                            <button class="channel-control-btn solo">S</button>
+                            <button class="channel-control-btn mute">M</button>
+                        </div>
+                    </div>
+
+                    <!-- Channel 3 -->
+                    <div class="channel-strip">
+                        <div class="channel-name">BASS</div>
+                        
+                        <div class="channel-inserts">
+                            <div class="insert-slot active">AMP</div>
+                            <div class="insert-slot active">COMP</div>
+                            <div class="insert-slot">INSERT 3</div>
+                            <div class="insert-slot">INSERT 4</div>
+                        </div>
+
+                        <div class="pan-control">
+                            <div class="pan-label">PAN</div>
+                            <div class="pan-slider">
+                                <div class="pan-thumb"></div>
+                            </div>
+                            <div class="pan-value">C</div>
+                        </div>
+
+                        <div class="fader-section">
+                            <div style="display: flex; gap: 8px; align-items: flex-end;">
+                                <div class="level-meter">
+                                    <div class="meter-segment peak"></div>
+                                    <div class="meter-segment nominal" style="height: 42%;"></div>
+                                    <div class="meter-segment warning"></div>
+                                </div>
+                                <div class="fader-track">
+                                    <div class="fader-fill" style="height: 55%;"></div>
+                                    <div class="fader-thumb" style="bottom: 55%;"></div>
+                                </div>
+                            </div>
+                            <div class="fader-value">-9.5 dB</div>
+                        </div>
+
+                        <div class="channel-controls">
+                            <button class="channel-control-btn solo">S</button>
+                            <button class="channel-control-btn mute">M</button>
+                        </div>
+                    </div>
+
+                    <!-- Master Channel -->
+                    <div class="channel-strip" style="border-color: var(--track-master); min-width: 100px;">
+                        <div class="channel-name" style="color: var(--track-master);">MASTER</div>
+                        
+                        <div class="channel-inserts">
+                            <div class="insert-slot active">LIMITER</div>
+                            <div class="insert-slot active">METER</div>
+                            <div class="insert-slot">INSERT 3</div>
+                            <div class="insert-slot">INSERT 4</div>
+                        </div>
+
+                        <div class="pan-control">
+                            <div class="pan-label">BALANCE</div>
+                            <div class="pan-slider">
+                                <div class="pan-thumb"></div>
+                            </div>
+                            <div class="pan-value">C</div>
+                        </div>
+
+                        <div class="fader-section">
+                            <div style="display: flex; gap: 8px; align-items: flex-end;">
+                                <div class="level-meter" style="width: 16px;">
+                                    <div class="meter-segment peak"></div>
+                                    <div class="meter-segment nominal" style="height: 50%;"></div>
+                                    <div class="meter-segment warning" style="height: 15%;"></div>
+                                </div>
+                                <div class="fader-track">
+                                    <div class="fader-fill" style="height: 75%; background: linear-gradient(to top, var(--track-master) 0%, var(--accent-secondary) 100%);"></div>
+                                    <div class="fader-thumb" style="bottom: 75%; border-color: var(--track-master);"></div>
+                                </div>
+                            </div>
+                            <div class="fader-value">-3.0 dB</div>
+                        </div>
+
+                        <div class="channel-controls">
+                            <button class="channel-control-btn mute">M</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Assistant Panel -->
+        <div class="ai-panel">
+            <div class="ai-panel-header">
+                <div class="ai-panel-title">
+                    <span>🤖</span>
+                    AI Assistant
+                </div>
+                <button class="tool-btn">✕</button>
+            </div>
+            <div class="ai-panel-content">
+                <div class="ai-suggestion">
+                    <div class="ai-suggestion-title">🎵 Optimize Vocal Chain</div>
+                    <div class="ai-suggestion-desc">Detected potential phase issues. Suggested EQ and compression settings ready.</div>
+                </div>
+                <div class="ai-suggestion">
+                    <div class="ai-suggestion-title">⚡ Tempo Analysis Complete</div>
+                    <div class="ai-suggestion-desc">AI detected natural tempo fluctuations. Apply time correction?</div>
+                </div>
+                <div class="ai-suggestion">
+                    <div class="ai-suggestion-title">🎚️ Mix Balance Suggestion</div>
+                    <div class="ai-suggestion-desc">Bass frequencies competing with kick. View frequency analysis?</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Bar -->
+        <div class="info-bar">
+            <div class="info-item">
+                CPU: <span class="info-value">24%</span>
+            </div>
+            <div class="info-item">
+                DISK: <span class="info-value">12 MB/s</span>
+            </div>
+            <div class="info-item">
+                SAMPLE RATE: <span class="info-value">48 kHz</span>
+            </div>
+            <div class="info-item">
+                BUFFER: <span class="info-value">256 samples</span>
+            </div>
+            <div class="info-item">
+                LATENCY: <span class="info-value">5.3 ms</span>
+            </div>
+            <div class="info-item">
+                FREE SPACE: <span class="info-value">234.5 GB</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Enhanced interactivity simulation
+        document.addEventListener('DOMContentLoaded', function() {
+            // Simulate meter animation
+            function animateMeters() {
+                const meters = document.querySelectorAll('.meter-segment');
+                meters.forEach(meter => {
+                    const randomHeight = Math.random() * 100;
+                    meter.style.height = randomHeight + '%';
+                });
+
+                const miniMeters = document.querySelectorAll('.track-meter-fill');
+                miniMeters.forEach(meter => {
+                    const randomWidth = 30 + Math.random() * 60;
+                    meter.style.width = randomWidth + '%';
+                });
+            }
+
+            setInterval(animateMeters, 100);
+
+            // Tool button interactions
+            document.querySelectorAll('.tool-btn, .edit-mode-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const parent = this.parentElement;
+                    parent.querySelectorAll('.active').forEach(active => {
+                        active.classList.remove('active');
+                    });
+                    this.classList.add('active');
+                });
+            });
+
+            // Track selection
+            document.querySelectorAll('.track-header').forEach(header => {
+                header.addEventListener('click', function() {
+                    document.querySelectorAll('.track-header.selected').forEach(selected => {
+                        selected.classList.remove('selected');
+                    });
+                    this.classList.add('selected');
+                });
+            });
+
+            // Channel strip selection
+            document.querySelectorAll('.channel-strip').forEach(strip => {
+                strip.addEventListener('click', function() {
+                    document.querySelectorAll('.channel-strip.selected').forEach(selected => {
+                        selected.classList.remove('selected');
+                    });
+                    this.classList.add('selected');
+                });
+            });
+
+            // Toggle buttons (Record, Mute, Solo)
+            document.querySelectorAll('.track-btn, .channel-control-btn, .transport-btn').forEach(btn => {
+                if (btn.classList.contains('record') || btn.classList.contains('mute') || 
+                    btn.classList.contains('solo') || btn.classList.contains('play')) {
+                    btn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        this.classList.toggle('active');
+                    });
+                }
+            });
+
+            // Console log for demonstration
+            console.log('APEX DAW Interface Initialized');
+            console.log('Premium features active:');
+            console.log('- Pro Tools editing modes');
+            console.log('- AI-powered workflow assistance');
+            console.log('- Real-time metering and analysis');
+            console.log('- Advanced mixer with insert slots');
+            console.log('- Contextual tool switching');
+        });
+    </script>
+</body>
+</html>

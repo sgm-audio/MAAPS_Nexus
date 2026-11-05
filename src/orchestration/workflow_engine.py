@@ -14,7 +14,8 @@ from enum import Enum
 import logging
 import uuid
 
-from ..core import BaseAgent, Message, Topics, Priority
+from ..core import BaseAgent, Message, Priority
+from ..telemetry import get_telemetry_store
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +109,7 @@ class WorkflowEngine(BaseAgent):
             'avg_workflow_duration': 0.0
         }
         self.stats_lock = threading.Lock()
+        self.telemetry = get_telemetry_store()
 
     def setup(self):
         """Initialize the workflow engine"""
@@ -161,9 +163,10 @@ class WorkflowEngine(BaseAgent):
         workflow_name = payload.get('name', 'Untitled Workflow')
         description = payload.get('description', '')
         steps_data = payload.get('steps', [])
+        context = payload.get('context', {})
 
         # Create workflow
-        workflow = self._create_workflow(workflow_name, description, steps_data)
+        workflow = self._create_workflow(workflow_name, description, steps_data, context)
 
         # Store workflow
         with self.workflows_lock:
@@ -285,7 +288,13 @@ class WorkflowEngine(BaseAgent):
                         step.end_time = time.time()
                         break
 
-    def _create_workflow(self, name: str, description: str, steps_data: List[Dict]) -> Workflow:
+    def _create_workflow(
+        self,
+        name: str,
+        description: str,
+        steps_data: List[Dict],
+        context: Optional[Dict[str, Any]] = None
+    ) -> Workflow:
         """Create a new workflow from definition"""
         workflow_id = str(uuid.uuid4())
 
@@ -307,7 +316,8 @@ class WorkflowEngine(BaseAgent):
             workflow_id=workflow_id,
             name=name,
             description=description,
-            steps=steps
+            steps=steps,
+            context=context or {}
         )
 
         return workflow
@@ -356,6 +366,7 @@ class WorkflowEngine(BaseAgent):
         # Update status
         workflow.status = WorkflowStatus.RUNNING
         workflow.started_at = time.time()
+        self.telemetry.workflow_started(workflow)
 
         with self.stats_lock:
             self.stats['workflows_executed'] += 1
@@ -421,6 +432,7 @@ class WorkflowEngine(BaseAgent):
                     self.stats['workflows_failed'] += 1
 
             workflow.completed_at = time.time()
+            self.telemetry.workflow_completed(workflow)
 
             # Update stats
             with self.stats_lock:
@@ -529,6 +541,7 @@ class WorkflowEngine(BaseAgent):
             logger.error(f"Error executing step {step.step_id}: {e}")
 
         step.end_time = time.time()
+        self.telemetry.record_step_execution(workflow.workflow_id, step)
 
         # Publish step completed event
         self.publish(

@@ -99,6 +99,10 @@ class MessageBus:
             callback: Function to call when message received
         """
         with self._subscription_lock:
+            self._subscriptions[topic] = [
+                (aid, cb) for aid, cb in self._subscriptions[topic]
+                if aid != agent_id
+            ]
             self._subscriptions[topic].append((agent_id, callback))
             logger.debug(f"Agent {agent_id} subscribed to {topic}")
 

@@ -76,11 +76,14 @@ class RealtimeAudioIOAgent(BaseAgent):
     - Hot-swappable audio interfaces
     """
 
-    def __init__(self):
+    def __init__(self, agent_id: str = "realtime_audio_io_agent", active: bool = True):
         super().__init__(
-            agent_id="realtime_audio_io_agent",
+            agent_id=agent_id,
             agent_name="Real-Time Audio I/O Agent"
         )
+
+        # Role control for redundancy (primary/standby)
+        self.active = active
 
         # Audio interface configuration
         self.audio_config = AudioInterfaceConfig()
@@ -156,6 +159,8 @@ class RealtimeAudioIOAgent(BaseAgent):
 
     def handle_message(self, message: Message):
         """Process incoming messages"""
+        if not self.active:
+            return
         try:
             if message.topic == "audio.live.input.request":
                 self._handle_input_request(message)
@@ -176,6 +181,10 @@ class RealtimeAudioIOAgent(BaseAgent):
 
         except Exception as e:
             self.log("ERROR", f"Error handling message: {e}", {"topic": message.topic})
+
+    def set_active(self, active: bool):
+        """Toggle processing for redundancy handoff"""
+        self.active = active
 
     def _handle_interface_configure(self, message: Message):
         """Handle audio interface configuration"""

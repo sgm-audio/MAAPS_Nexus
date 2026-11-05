@@ -78,11 +78,14 @@ class LiveLoopingAgent(BaseAgent):
     - Tempo-locked loops
     """
 
-    def __init__(self, sample_rate: int = 44100):
+    def __init__(self, sample_rate: int = 44100, agent_id: str = "live_looping_agent", active: bool = True):
         super().__init__(
-            agent_id="live_looping_agent",
+            agent_id=agent_id,
             agent_name="Live Looping Agent"
         )
+
+        # Role control for redundancy (primary/standby)
+        self.active = active
 
         # Audio configuration
         self.sample_rate = sample_rate
@@ -132,6 +135,8 @@ class LiveLoopingAgent(BaseAgent):
         """Initialize the looping agent"""
         # Subscribe to relevant topics
         self.subscribe("loop.track.create")
+        self.subscribe("loop.track.list")
+        self.subscribe("loop.track.get")
         self.subscribe("loop.track.delete")
         self.subscribe("loop.record.start")
         self.subscribe("loop.record.stop")
@@ -151,6 +156,9 @@ class LiveLoopingAgent(BaseAgent):
 
     def teardown(self):
         """Cleanup resources"""
+        for topic in self._subscribed_topics[:]:
+            self.unsubscribe(topic)
+
         # Stop playback thread
         self._stop_playback_thread()
 
@@ -158,9 +166,15 @@ class LiveLoopingAgent(BaseAgent):
 
     def handle_message(self, message: Message):
         """Process incoming messages"""
+        if not self.active:
+            return
         try:
             if message.topic == "loop.track.create":
                 self._handle_track_create(message)
+            elif message.topic == "loop.track.list":
+                self._handle_track_list(message)
+            elif message.topic == "loop.track.get":
+                self._handle_track_get(message)
             elif message.topic == "loop.track.delete":
                 self._handle_track_delete(message)
             elif message.topic == "loop.record.start":
@@ -189,6 +203,10 @@ class LiveLoopingAgent(BaseAgent):
         except Exception as e:
             self.log("ERROR", f"Error handling message: {e}", {"topic": message.topic})
 
+    def set_active(self, active: bool):
+        """Toggle processing for redundancy handoff"""
+        self.active = active
+
     def _handle_track_create(self, message: Message):
         """Handle loop track creation"""
         payload = message.payload
@@ -215,6 +233,44 @@ class LiveLoopingAgent(BaseAgent):
             'track_id': track.track_id,
             'track_name': track.track_name
         }, priority=Priority.MEDIUM)
+
+    def _serialize_track(self, track: LoopTrack) -> Dict[str, Any]:
+        return {
+            'track_id': track.track_id,
+            'track_name': track.track_name,
+            'status': track.state.value,
+            'state': track.state.value,
+            'length_beats': track.length_beats,
+            'length_samples': len(track.audio_data),
+            'sync_to_tempo': track.sync_to_tempo,
+            'volume': track.volume,
+            'pan': track.pan,
+            'undo_available': len(track.undo_history),
+            'redo_available': len(track.redo_stack)
+        }
+
+    def _handle_track_list(self, message: Message):
+        """Handle listing all loop tracks"""
+        with self.tracks_lock:
+            tracks = [self._serialize_track(t) for t in self.loop_tracks.values()]
+
+        self.respond(message, {
+            'success': True,
+            'tracks': tracks,
+            'total_tracks': len(tracks)
+        })
+
+    def _handle_track_get(self, message: Message):
+        """Handle getting loop track details"""
+        track_id = message.payload.get('track_id')
+        with self.tracks_lock:
+            track = self.loop_tracks.get(track_id)
+            if not track:
+                self.respond(message, {'success': False, 'error': 'Track not found'})
+                return
+            data = self._serialize_track(track)
+
+        self.respond(message, {'success': True, **data})
 
     def _handle_track_delete(self, message: Message):
         """Handle loop track deletion"""

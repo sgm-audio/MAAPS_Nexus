@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apex Pro - Premium Audio Interface Control</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* 2025 Premium Dark Theme */
+            --bg-primary: #000000;
+            --bg-secondary: #0a0a0a;
+            --bg-tertiary: #141414;
+            --bg-elevated: #1a1a1a;
+            --bg-panel: #0f0f0f;
+            
+            /* Glass/Frosted Elements */
+            --glass-bg: rgba(20, 20, 20, 0.8);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-highlight: rgba(255, 255, 255, 0.05);
+            
+            /* Premium Accents */
+            --accent-primary: #00e5ff;
+            --accent-secondary: #7b2ff7;
+            --accent-gold: #ffa726;
+            --accent-success: #00e676;
+            --accent-warning: #ffab00;
+            --accent-danger: #ff1744;
+            
+            /* Gradients */
+            --gradient-primary: linear-gradient(135deg, #00e5ff 0%, #7b2ff7 100%);
+            --gradient-signal: linear-gradient(180deg, #00e676 0%, #ffa726 70%, #ff1744 100%);
+            --gradient-meter: linear-gradient(90deg, #00e676 0%, #00e676 60%, #ffa726 75%, #ff1744 90%);
+            
+            /* Text */
+            --text-primary: #ffffff;
+            --text-secondary: #b0b0b0;
+            --text-tertiary: #707070;
+            --text-disabled: #404040;
+            
+            /* Meters */
+            --meter-green: #00e676;
+            --meter-yellow: #ffa726;
+            --meter-orange: #ff6d00;
+            --meter-red: #ff1744;
+            --meter-clip: #f50057;
+            
+            /* Borders & Shadows */
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-medium: rgba(255, 255, 255, 0.15);
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+            --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.6);
+            --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.8);
+            --shadow-glow: 0 0 20px rgba(0, 229, 255, 0.3);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Main Container */
+        .apex-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* Top Bar */
+        .top-bar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            gap: 32px;
+            height: 64px;
+            backdrop-filter: blur(20px);
+            position: relative;
+            z-index: 100;
+        }
+
+        .apex-logo {
+            font-size: 24px;
+            font-weight: 700;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.5px;
+        }
+
+        .device-status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 6px 16px;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--meter-green);
+            box-shadow: 0 0 12px var(--meter-green);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .status-text {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .sample-rate {
+            margin-left: auto;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .sample-rate span {
+            padding: 4px 12px;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            border: 1px solid var(--border-subtle);
+        }
+
+        /* Main Content Grid */
+        .main-content {
+            display: grid;
+            grid-template-columns: 420px 1fr 380px;
+            gap: 0;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Input Panel */
+        .input-panel {
+            background: var(--bg-panel);
+            border-right: 1px solid var(--border-subtle);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 16px 20px;
+            background: var(--bg-elevated);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: -0.3px;
+        }
+
+        .view-toggle {
+            display: flex;
+            gap: 4px;
+            background: var(--bg-tertiary);
+            padding: 2px;
+            border-radius: 6px;
+        }
+
+        .toggle-btn {
+            padding: 6px 12px;
+            border: none;
+            background: transparent;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .toggle-btn.active {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+            box-shadow: var(--shadow-glow);
+        }
+
+        /* Input/Output List */
+        .io-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+
+        .io-item {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 8px;
+            backdrop-filter: blur(10px);
+            transition: all 0.2s;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .io-item:hover {
+            border-color: var(--accent-primary);
+            background: rgba(0, 229, 255, 0.05);
+            transform: translateX(2px);
+        }
+
+        .io-item.active {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 20px rgba(0, 229, 255, 0.2);
+        }
+
+        .io-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 3px;
+            height: 100%;
+            background: var(--gradient-primary);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .io-item.active::before {
+            opacity: 1;
+        }
+
+        .io-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .io-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .io-type {
+            font-size: 10px;
+            padding: 3px 8px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .io-meter-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .io-meter {
+            flex: 1;
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .io-meter-fill {
+            height: 100%;
+            background: var(--gradient-meter);
+            border-radius: 3px;
+            transition: width 0.05s linear;
+            box-shadow: 0 0 8px currentColor;
+        }
+
+        .io-db {
+            font-size: 11px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            color: var(--text-secondary);
+            min-width: 50px;
+            text-align: right;
+        }
+
+        /* Mixer/Channel Strip Area */
+        .mixer-area {
+            background: var(--bg-secondary);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .mixer-header {
+            padding: 16px 20px;
+            background: var(--bg-elevated);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .channel-strips {
+            display: flex;
+            gap: 2px;
+            padding: 20px;
+            overflow-x: auto;
+            flex: 1;
+        }
+
+        /* Premium Channel Strip */
+        .channel-strip {
+            min-width: 100px;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 16px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s;
+        }
+
+        .channel-strip:hover {
+            background: rgba(20, 20, 20, 0.95);
+            border-color: var(--border-medium);
+            box-shadow: var(--shadow-md);
+        }
+
+        .channel-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        /* Premium VU Meter */
+        .vu-meter {
+            width: 100%;
+            height: 180px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .vu-scale {
+            position: absolute;
+            right: 4px;
+            top: 8px;
+            bottom: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            font-size: 9px;
+            color: var(--text-tertiary);
+            z-index: 2;
+        }
+
+        .vu-fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--gradient-signal);
+            transition: height 0.05s linear;
+        }
+
+        .vu-peak-indicator {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--accent-danger);
+            box-shadow: 0 0 8px var(--accent-danger);
+            transition: top 0.1s;
+        }
+
+        /* Premium Fader */
+        .fader-container {
+            position: relative;
+            height: 140px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .fader-track {
+            width: 6px;
+            height: 100%;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            position: relative;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .fader-fill {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            background: var(--gradient-primary);
+            border-radius: 3px;
+            transition: height 0.1s;
+        }
+
+        .fader-thumb {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 28px;
+            height: 14px;
+            background: linear-gradient(135deg, #ffffff, #e0e0e0);
+            border: 1px solid var(--border-medium);
+            border-radius: 3px;
+            cursor: grab;
+            box-shadow: var(--shadow-sm), 0 0 12px rgba(0, 229, 255, 0.4);
+            transition: box-shadow 0.2s;
+        }
+
+        .fader-thumb:hover {
+            box-shadow: var(--shadow-md), var(--shadow-glow);
+        }
+
+        .fader-thumb:active {
+            cursor: grabbing;
+            box-shadow: var(--shadow-lg), 0 0 20px rgba(0, 229, 255, 0.6);
+        }
+
+        .fader-value {
+            position: absolute;
+            bottom: -24px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 10px;
+            font-family: 'Monaco', monospace;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        /* Channel Controls */
+        .channel-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .channel-btn {
+            padding: 8px;
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .channel-btn:hover {
+            border-color: var(--border-medium);
+            transform: translateY(-1px);
+        }
+
+        .channel-btn.mute {
+            color: var(--text-tertiary);
+        }
+
+        .channel-btn.mute.active {
+            background: var(--accent-warning);
+            border-color: var(--accent-warning);
+            color: var(--bg-primary);
+            box-shadow: 0 0 16px rgba(255, 171, 0, 0.4);
+        }
+
+        .channel-btn.solo {
+            color: var(--text-tertiary);
+        }
+
+        .channel-btn.solo.active {
+            background: var(--accent-success);
+            border-color: var(--accent-success);
+            color: var(--bg-primary);
+            box-shadow: 0 0 16px rgba(0, 230, 118, 0.4);
+        }
+
+        .channel-btn.record {
+            color: var(--text-tertiary);
+        }
+
+        .channel-btn.record.active {
+            background: var(--accent-danger);
+            border-color: var(--accent-danger);
+            color: var(--text-primary);
+            box-shadow: 0 0 16px rgba(255, 23, 68, 0.4);
+            animation: recordPulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes recordPulse {
+            0%, 100% { box-shadow: 0 0 16px rgba(255, 23, 68, 0.4); }
+            50% { box-shadow: 0 0 24px rgba(255, 23, 68, 0.8); }
+        }
+
+        /* Output Panel */
+        .output-panel {
+            background: var(--bg-panel);
+            border-left: 1px solid var(--border-subtle);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Routing Matrix */
+        .routing-section {
+            padding: 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .routing-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .routing-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+        }
+
+        .routing-btn {
+            aspect-ratio: 1;
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: var(--text-disabled);
+            font-weight: 600;
+        }
+
+        .routing-btn:hover {
+            border-color: var(--accent-primary);
+            background: rgba(0, 229, 255, 0.1);
+        }
+
+        .routing-btn.active {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+            color: var(--bg-primary);
+            box-shadow: 0 0 12px rgba(0, 229, 255, 0.5);
+        }
+
+        /* Premium Button Styles */
+        .premium-btn {
+            padding: 10px 20px;
+            border: 1px solid var(--border-medium);
+            background: var(--glass-bg);
+            color: var(--text-primary);
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .premium-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transition: left 0.5s;
+        }
+
+        .premium-btn:hover::before {
+            left: 100%;
+        }
+
+        .premium-btn:hover {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 20px rgba(0, 229, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .premium-btn.primary {
+            background: var(--gradient-primary);
+            border: none;
+            color: var(--text-primary);
+            box-shadow: 0 4px 16px rgba(0, 229, 255, 0.3);
+        }
+
+        .premium-btn.primary:hover {
+            box-shadow: 0 6px 24px rgba(0, 229, 255, 0.5);
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-tertiary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-elevated);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Master Section */
+        .master-section {
+            padding: 20px;
+            background: var(--bg-elevated);
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .master-meter {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .master-meter-channel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .master-label {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .master-vu {
+            height: 120px;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .master-vu-fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--gradient-signal);
+            transition: height 0.05s linear;
+        }
+
+        .master-value {
+            text-align: center;
+            font-size: 12px;
+            font-family: 'Monaco', monospace;
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="apex-container">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div class="apex-logo">APEX PRO</div>
+            <div class="device-status">
+                <div class="status-indicator"></div>
+                <span class="status-text">Antelope Audio Orion 32+ Connected</span>
+            </div>
+            <div class="sample-rate">
+                <span>48 kHz</span>
+                <span>24-bit</span>
+                <span>Buffer: 128</span>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Input Panel -->
+            <div class="input-panel">
+                <div class="panel-header">
+                    <div class="panel-title">INPUTS</div>
+                    <div class="view-toggle">
+                        <button class="toggle-btn active">All</button>
+                        <button class="toggle-btn">Active</button>
+                        <button class="toggle-btn">Analog</button>
+                        <button class="toggle-btn">Digital</button>
+                    </div>
+                </div>
+                <div class="io-list" id="inputList">
+                    <!-- Input items will be generated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Mixer/Channel Strip Area -->
+            <div class="mixer-area">
+                <div class="mixer-header">
+                    <div class="panel-title">CHANNEL STRIPS</div>
+                    <button class="premium-btn">Add Channel</button>
+                </div>
+                <div class="channel-strips" id="channelStrips">
+                    <!-- Channel strips will be generated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Output Panel -->
+            <div class="output-panel">
+                <div class="panel-header">
+                    <div class="panel-title">OUTPUTS</div>
+                    <div class="view-toggle">
+                        <button class="toggle-btn active">All</button>
+                        <button class="toggle-btn">Active</button>
+                    </div>
+                </div>
+                <div class="io-list" id="outputList">
+                    <!-- Output items will be generated by JavaScript -->
+                </div>
+                
+                <!-- Routing Section -->
+                <div class="routing-section">
+                    <div class="routing-title">Quick Route Matrix</div>
+                    <div class="routing-grid" id="routingGrid">
+                        <!-- Routing buttons will be generated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Master Section -->
+                <div class="master-section">
+                    <div class="routing-title">Master Output</div>
+                    <div class="master-meter">
+                        <div class="master-meter-channel">
+                            <div class="master-label">L</div>
+                            <div class="master-vu">
+                                <div class="master-vu-fill" id="masterL"></div>
+                            </div>
+                            <div class="master-value" id="masterLValue">-∞ dB</div>
+                        </div>
+                        <div class="master-meter-channel">
+                            <div class="master-label">R</div>
+                            <div class="master-vu">
+                                <div class="master-vu-fill" id="masterR"></div>
+                            </div>
+                            <div class="master-value" id="masterRValue">-∞ dB</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Input Configuration
+        const inputs = [
+            { name: 'Mic 1', type: 'XLR', active: true },
+            { name: 'Mic 2', type: 'XLR', active: true },
+            { name: 'Line 1-2', type: 'TRS', active: false },
+            { name: 'Line 3-4', type: 'TRS', active: true },
+            { name: 'ADAT 1-2', type: 'Digital', active: false },
+            { name: 'ADAT 3-4', type: 'Digital', active: false },
+            { name: 'SPDIF L-R', type: 'Digital', active: true },
+            { name: 'USB 1-2', type: 'USB', active: true },
+        ];
+
+        const outputs = [
+            { name: 'Monitor L-R', type: 'TRS', active: true },
+            { name: 'Headphone 1', type: 'TRS', active: true },
+            { name: 'Headphone 2', type: 'TRS', active: false },
+            { name: 'Line Out 1-2', type: 'TRS', active: true },
+            { name: 'ADAT Out 1-2', type: 'Digital', active: false },
+            { name: 'SPDIF Out', type: 'Digital', active: true },
+        ];
+
+        // Generate Input List
+        const inputList = document.getElementById('inputList');
+        inputs.forEach((input, index) => {
+            const item = document.createElement('div');
+            item.className = 'io-item' + (input.active ? ' active' : '');
+            item.innerHTML = `
+                <div class="io-header">
+                    <div class="io-name">${input.name}</div>
+                    <div class="io-type">${input.type}</div>
+                </div>
+                <div class="io-meter-container">
+                    <div class="io-meter">
+                        <div class="io-meter-fill" id="inputMeter${index}"></div>
+                    </div>
+                    <div class="io-db" id="inputDb${index}">-∞ dB</div>
+                </div>
+            `;
+            inputList.appendChild(item);
+        });
+
+        // Generate Output List
+        const outputList = document.getElementById('outputList');
+        outputs.forEach((output, index) => {
+            const item = document.createElement('div');
+            item.className = 'io-item' + (output.active ? ' active' : '');
+            item.innerHTML = `
+                <div class="io-header">
+                    <div class="io-name">${output.name}</div>
+                    <div class="io-type">${output.type}</div>
+                </div>
+                <div class="io-meter-container">
+                    <div class="io-meter">
+                        <div class="io-meter-fill" id="outputMeter${index}"></div>
+                    </div>
+                    <div class="io-db" id="outputDb${index}">-∞ dB</div>
+                </div>
+            `;
+            outputList.appendChild(item);
+        });
+
+        // Generate Channel Strips
+        const channelStrips = document.getElementById('channelStrips');
+        const channels = ['Vocal', 'Guitar', 'Keys', 'Drums', 'Bass', 'FX 1', 'FX 2', 'Aux'];
+        
+        channels.forEach((channel, index) => {
+            const strip = document.createElement('div');
+            strip.className = 'channel-strip';
+            strip.innerHTML = `
+                <div class="channel-label">${channel}</div>
+                <div class="vu-meter">
+                    <div class="vu-scale">
+                        <span>0</span>
+                        <span>-6</span>
+                        <span>-12</span>
+                        <span>-18</span>
+                        <span>-24</span>
+                        <span>-∞</span>
+                    </div>
+                    <div class="vu-fill" id="vuFill${index}"></div>
+                    <div class="vu-peak-indicator" id="vuPeak${index}"></div>
+                </div>
+                <div class="fader-container">
+                    <div class="fader-track">
+                        <div class="fader-fill" id="faderFill${index}"></div>
+                        <div class="fader-thumb" id="faderThumb${index}" draggable="true"></div>
+                    </div>
+                    <div class="fader-value" id="faderValue${index}">0.0 dB</div>
+                </div>
+                <div class="channel-controls">
+                    <button class="channel-btn record" onclick="toggleBtn(this)">REC</button>
+                    <button class="channel-btn solo" onclick="toggleBtn(this)">SOLO</button>
+                    <button class="channel-btn mute" onclick="toggleBtn(this)">MUTE</button>
+                </div>
+            `;
+            channelStrips.appendChild(strip);
+        });
+
+        // Generate Routing Matrix
+        const routingGrid = document.getElementById('routingGrid');
+        for (let i = 1; i <= 16; i++) {
+            const btn = document.createElement('div');
+            btn.className = 'routing-btn';
+            btn.textContent = i;
+            btn.onclick = () => btn.classList.toggle('active');
+            routingGrid.appendChild(btn);
+        }
+
+        // Toggle Button Function
+        function toggleBtn(btn) {
+            btn.classList.toggle('active');
+        }
+
+        // Simulated Metering Animation
+        function animateMeters() {
+            // Input Meters
+            inputs.forEach((input, index) => {
+                if (input.active) {
+                    const level = Math.random() * 100;
+                    const db = -60 + (level * 0.6);
+                    const meterFill = document.getElementById(`inputMeter${index}`);
+                    const dbDisplay = document.getElementById(`inputDb${index}`);
+                    
+                    if (meterFill && dbDisplay) {
+                        meterFill.style.width = level + '%';
+                        dbDisplay.textContent = db.toFixed(1) + ' dB';
+                    }
+                }
+            });
+
+            // Output Meters
+            outputs.forEach((output, index) => {
+                if (output.active) {
+                    const level = Math.random() * 100;
+                    const db = -60 + (level * 0.6);
+                    const meterFill = document.getElementById(`outputMeter${index}`);
+                    const dbDisplay = document.getElementById(`outputDb${index}`);
+                    
+                    if (meterFill && dbDisplay) {
+                        meterFill.style.width = level + '%';
+                        dbDisplay.textContent = db.toFixed(1) + ' dB';
+                    }
+                }
+            });
+
+            // Channel VU Meters
+            channels.forEach((channel, index) => {
+                const level = Math.random() * 100;
+                const db = -60 + (level * 0.6);
+                const vuFill = document.getElementById(`vuFill${index}`);
+                const vuPeak = document.getElementById(`vuPeak${index}`);
+                
+                if (vuFill && vuPeak) {
+                    vuFill.style.height = level + '%';
+                    vuPeak.style.top = (100 - level) + '%';
+                }
+            });
+
+            // Master Meters
+            const masterLLevel = Math.random() * 85 + 10;
+            const masterRLevel = Math.random() * 85 + 10;
+            const masterLDb = -60 + (masterLLevel * 0.6);
+            const masterRDb = -60 + (masterRLevel * 0.6);
+            
+            const masterLFill = document.getElementById('masterL');
+            const masterRFill = document.getElementById('masterR');
+            const masterLValue = document.getElementById('masterLValue');
+            const masterRValue = document.getElementById('masterRValue');
+            
+            if (masterLFill && masterRFill && masterLValue && masterRValue) {
+                masterLFill.style.height = masterLLevel + '%';
+                masterRFill.style.height = masterRLevel + '%';
+                masterLValue.textContent = masterLDb.toFixed(1) + ' dB';
+                masterRValue.textContent = masterRDb.toFixed(1) + ' dB';
+            }
+
+            requestAnimationFrame(animateMeters);
+        }
+
+        // Initialize fader positions
+        channels.forEach((channel, index) => {
+            const faderThumb = document.getElementById(`faderThumb${index}`);
+            const faderFill = document.getElementById(`faderFill${index}`);
+            const faderValue = document.getElementById(`faderValue${index}`);
+            
+            // Set initial position (70% = 0 dB unity gain position)
+            const initialPos = 70;
+            if (faderThumb && faderFill && faderValue) {
+                faderThumb.style.bottom = initialPos + '%';
+                faderFill.style.height = initialPos + '%';
+                faderValue.textContent = '0.0 dB';
+            }
+        });
+
+        // Start metering animation
+        animateMeters();
+
+        // Add click-to-select functionality for I/O items
+        document.querySelectorAll('.io-item').forEach(item => {
+            item.addEventListener('click', function() {
+                this.classList.toggle('active');
+            });
+        });
+    </script>
+</body>
+</html>

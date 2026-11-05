@@ -3,7 +3,7 @@ Pydantic schemas for Performance Automation API
 """
 
 from pydantic import BaseModel, Field
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from api.schemas.common import CurveType, CueActionType
 
 
@@ -97,7 +97,7 @@ class MacroValueResponse(BaseModel):
 class CueAction(BaseModel):
     """Performance cue action"""
     action_type: CueActionType = Field(..., description="Action type")
-    parameters: Dict[str, any] = Field(..., description="Action parameters")
+    parameters: Dict[str, Any] = Field(..., description="Action parameters")
 
 
 class CreateCueRequest(BaseModel):

@@ -114,11 +114,14 @@ class LiveEffectsChainAgent(BaseAgent):
     - A/B comparison
     """
 
-    def __init__(self, sample_rate: int = 44100):
+    def __init__(self, sample_rate: int = 44100, agent_id: str = "live_effects_chain_agent", active: bool = True):
         super().__init__(
-            agent_id="live_effects_chain_agent",
+            agent_id=agent_id,
             agent_name="Live Effects Chain Agent"
         )
+
+        # Role control for redundancy (primary/standby)
+        self.active = active
 
         # Audio configuration
         self.sample_rate = sample_rate
@@ -166,6 +169,8 @@ class LiveEffectsChainAgent(BaseAgent):
         """Initialize the effects chain agent"""
         # Subscribe to relevant topics
         self.subscribe("effects.chain.create")
+        self.subscribe("effects.chain.list")
+        self.subscribe("effects.chain.get")
         self.subscribe("effects.chain.update")
         self.subscribe("effects.chain.delete")
         self.subscribe("effects.preset.recall")
@@ -188,6 +193,9 @@ class LiveEffectsChainAgent(BaseAgent):
 
     def teardown(self):
         """Cleanup resources"""
+        for topic in self._subscribed_topics[:]:
+            self.unsubscribe(topic)
+
         # Stop automation thread
         self._stop_automation_thread()
 
@@ -199,9 +207,15 @@ class LiveEffectsChainAgent(BaseAgent):
 
     def handle_message(self, message: Message):
         """Process incoming messages"""
+        if not self.active:
+            return
         try:
             if message.topic == "effects.chain.create":
                 self._handle_chain_create(message)
+            elif message.topic == "effects.chain.list":
+                self._handle_chain_list(message)
+            elif message.topic == "effects.chain.get":
+                self._handle_chain_get(message)
             elif message.topic == "effects.chain.update":
                 self._handle_chain_update(message)
             elif message.topic == "effects.chain.delete":
@@ -230,6 +244,10 @@ class LiveEffectsChainAgent(BaseAgent):
         except Exception as e:
             self.log("ERROR", f"Error handling message: {e}", {"topic": message.topic})
 
+    def set_active(self, active: bool):
+        """Toggle processing for redundancy handoff"""
+        self.active = active
+
     def _handle_chain_create(self, message: Message):
         """Handle effect chain creation"""
         payload = message.payload
@@ -246,12 +264,15 @@ class LiveEffectsChainAgent(BaseAgent):
 
         # Add effects to chain
         for effect_data in payload.get('effects', []):
+            eff_type = effect_data['type']
+            if isinstance(eff_type, str):
+                eff_type = EffectType(eff_type)
             effect = Effect(
                 effect_id=effect_data.get('effect_id', f"effect_{time.time()}_{len(chain.effects)}"),
-                effect_type=EffectType(effect_data['type']),
+                effect_type=eff_type,
                 parameters=effect_data.get('parameters', {}),
-                bypassed=effect_data.get('bypassed', False),
-                wet_dry_mix=effect_data.get('wet_dry_mix', 1.0),
+                bypassed=effect_data.get('bypassed', effect_data.get('bypass', False)),
+                wet_dry_mix=effect_data.get('wet_dry_mix', effect_data.get('wet_dry', 1.0)),
                 position=effect_data.get('position', len(chain.effects))
             )
             chain.effects.append(effect)
@@ -265,13 +286,69 @@ class LiveEffectsChainAgent(BaseAgent):
         self.respond(message, {
             'success': True,
             'chain_id': chain.chain_id,
-            'num_effects': len(chain.effects)
+            'chain_name': chain.chain_name,
+            'num_effects': len(chain.effects),
+            'effects': [
+                {
+                    'effect_id': e.effect_id,
+                    'type': e.effect_type.value,
+                    'bypass': e.bypassed,
+                    'bypassed': e.bypassed,
+                    'wet_dry': e.wet_dry_mix,
+                    'parameters': e.parameters
+                }
+                for e in chain.effects
+            ]
         })
 
         self.publish("effects.chain.created", {
             'chain_id': chain.chain_id,
             'chain_name': chain.chain_name
         }, priority=Priority.MEDIUM)
+
+    def _serialize_chain(self, chain: EffectChain) -> Dict[str, Any]:
+        return {
+            'chain_id': chain.chain_id,
+            'chain_name': chain.chain_name,
+            'bypass': not chain.enabled,
+            'enabled': chain.enabled,
+            'routing': chain.routing,
+            'num_effects': len(chain.effects),
+            'effects': [
+                {
+                    'effect_id': e.effect_id,
+                    'type': e.effect_type.value,
+                    'bypass': e.bypassed,
+                    'bypassed': e.bypassed,
+                    'wet_dry': e.wet_dry_mix,
+                    'parameters': e.parameters
+                }
+                for e in chain.effects
+            ]
+        }
+
+    def _handle_chain_list(self, message: Message):
+        """Handle listing all effect chains"""
+        with self.chains_lock:
+            chains = [self._serialize_chain(c) for c in self.effect_chains.values()]
+
+        self.respond(message, {
+            'success': True,
+            'chains': chains,
+            'total_chains': len(chains)
+        })
+
+    def _handle_chain_get(self, message: Message):
+        """Handle getting a single effect chain"""
+        chain_id = message.payload.get('chain_id')
+        with self.chains_lock:
+            chain = self.effect_chains.get(chain_id)
+            if not chain:
+                self.respond(message, {'success': False, 'error': 'Chain not found'})
+                return
+            data = self._serialize_chain(chain)
+
+        self.respond(message, {'success': True, **data})
 
     def _handle_chain_update(self, message: Message):
         """Handle effect chain update"""
@@ -383,10 +460,35 @@ class LiveEffectsChainAgent(BaseAgent):
     def _handle_parameter_change(self, message: Message):
         """Handle effect parameter change"""
         payload = message.payload
-        effect_id = payload['effect_id']
+        effect_id = payload.get('effect_id')
+        ramp_time = payload.get('ramp_time', 0.0)
+
+        # Support batch parameters dict (from REST API)
+        if effect_id and 'parameters' in payload and isinstance(payload['parameters'], dict):
+            effect = self._find_effect(effect_id)
+            if effect is None:
+                self.respond(message, {'success': False, 'error': 'Effect not found'})
+                return
+            for param, val in payload['parameters'].items():
+                effect.parameters[param] = val
+            self.respond(message, {
+                'success': True,
+                'effect_id': effect_id,
+                'parameters': effect.parameters
+            })
+            return
+
+        # Support parameter_path (from automation agent)
+        if not effect_id and 'parameter_path' in payload:
+            self.respond(message, {
+                'success': True,
+                'parameter_path': payload['parameter_path'],
+                'value': payload.get('value')
+            })
+            return
+
         parameter = payload['parameter']
         value = payload['value']
-        ramp_time = payload.get('ramp_time', 0.0)
 
         # Find the effect
         effect = self._find_effect(effect_id)
@@ -427,7 +529,7 @@ class LiveEffectsChainAgent(BaseAgent):
         """Handle effect bypass toggle"""
         payload = message.payload
         effect_id = payload['effect_id']
-        bypassed = payload.get('bypassed')  # None = toggle
+        bypassed = payload.get('bypassed', payload.get('bypass'))  # None = toggle
 
         effect = self._find_effect(effect_id)
 

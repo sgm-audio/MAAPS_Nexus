@@ -10,16 +10,33 @@ from datetime import datetime, timedelta
 from typing import Optional
 import jwt
 import logging
+import hmac
+import os
+
+try:
+    from passlib.context import CryptContext
+except ImportError:  # pragma: no cover - fallback if passlib not installed
+    CryptContext = None
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 security = HTTPBearer()
 
-# Configuration (should be in environment variables in production)
-SECRET_KEY = "your-secret-key-change-in-production"
+# Configuration from environment variables
+SECRET_KEY = os.getenv("JWT_SECRET", "").strip()
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+
+# Authentication configuration
+AUTH_USERNAME = os.getenv("AUTH_USERNAME", "").strip()
+AUTH_PASSWORD_HASH = os.getenv("AUTH_PASSWORD_HASH", "").strip()
+AUTH_PASSWORD = os.getenv("AUTH_PASSWORD", "").strip()
+
+if CryptContext:
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+else:  # pragma: no cover
+    pwd_context = None
 
 
 class LoginRequest(BaseModel):
@@ -37,6 +54,12 @@ class TokenResponse(BaseModel):
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """Create JWT access token"""
+    if not SECRET_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="JWT secret not configured"
+        )
+
     to_encode = data.copy()
 
     if expires_delta:
@@ -50,9 +73,48 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return encoded_jwt
 
 
+def _verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify password using bcrypt when available; fallback to constant-time compare."""
+    if pwd_context and hashed_password.startswith("$2"):
+        try:
+            return pwd_context.verify(plain_password, hashed_password)
+        except Exception:
+            return False
+
+    # Fallback constant-time compare (only if hashing unavailable)
+    return hmac.compare_digest(plain_password, hashed_password)
+
+
+def _get_expected_credentials() -> tuple[str, str]:
+    """
+    Resolve expected credentials.
+    Returns username and hashed password (hash preferred; plain accepted for dev only).
+    """
+    # Prefer hash if provided
+    if AUTH_USERNAME and AUTH_PASSWORD_HASH:
+        return AUTH_USERNAME, AUTH_PASSWORD_HASH
+
+    # Support plain password only when explicitly set (still hashed before comparison)
+    if AUTH_USERNAME and AUTH_PASSWORD:
+        if pwd_context:
+            hashed = pwd_context.hash(AUTH_PASSWORD)
+        else:
+            hashed = AUTH_PASSWORD
+        return AUTH_USERNAME, hashed
+
+    return "", ""
+
+
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Verify JWT token"""
     token = credentials.credentials
+
+    if not SECRET_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="JWT secret not configured",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -90,9 +152,16 @@ async def login(request: LoginRequest):
     Note: This is a basic implementation.
     In production, validate against a real user database with hashed passwords.
     """
-    # TODO: Validate against real user database
-    # For demo purposes, accept any username/password
-    if not request.username or not request.password:
+    expected_username, expected_hash = _get_expected_credentials()
+
+    if not expected_username or not expected_hash:
+        logger.error("Authentication is not configured; rejecting login request")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication is not configured"
+        )
+
+    if request.username != expected_username or not _verify_password(request.password, expected_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials"

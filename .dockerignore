@@ -1,0 +1,135 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Environment files (CRITICAL - never include in Docker image)
+.env
+.env.local
+.env.*.local
+.env.production
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.pyc
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+*.cover
+.cache
+nosetests.xml
+coverage.xml
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Node (if any frontend in same repo)
+node_modules/
+npm-debug.log
+yarn-error.log
+.next/
+out/
+dist/
+
+# Database files (never in Docker image - use volumes)
+*.db
+*.sqlite
+*.sqlite3
+metadata.db
+
+# Logs and temporary files
+logs/
+*.log
+tmp/
+temp/
+
+# Documentation (reduces image size)
+*.md
+!README.md
+docs/
+architecture/
+examples/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+# Docker files themselves
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Claude/AI files
+.claude/
+CLAUDE.md
+*_GUIDE.md
+*_PLAN.md
+*_IMPLEMENTATION*.md
+*_EVALUATION*.md
+
+# Project-specific exclusions
+frontend/
+sonic-mind-forge-platform/
+mindwave-ai-complete/
+ai-audio-mix-partner/
+Apex/
+MarkerMatic/
+Social Content Engine/
+Long-Short-Content-Engine/
+wordpress/
+
+# Kubernetes/deployment configs
+k8s/
+nginx/
+scripts/
+
+# Backups
+backups/
+*.backup
+*.bak
+
+# Large data files
+data/
+models/
+*.h5
+*.pkl
+*.pth
+*.onnx

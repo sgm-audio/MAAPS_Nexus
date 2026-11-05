@@ -10,6 +10,7 @@ from typing import Optional, Dict, Any
 
 from .core import get_message_bus, get_agent_registry
 from .orchestration import get_coordinator, WorkflowEngine, create_audio_enhancement_workflow, create_music_production_workflow
+from .telemetry import get_telemetry_store
 
 # Configure logging
 logging.basicConfig(
@@ -31,6 +32,7 @@ class MultiAgentSystem:
         self.coordinator = get_coordinator()
         self.message_bus = get_message_bus()
         self.registry = get_agent_registry()
+        self.telemetry = get_telemetry_store()
 
         self.initialized = False
         self.workflow_engine: Optional[WorkflowEngine] = None
@@ -179,6 +181,8 @@ class MultiAgentSystem:
         if not enhancement_agent:
             raise RuntimeError("Audio enhancement agent not found")
 
+        self.telemetry.record_feature_usage('audio_enhancement')
+
         # Send enhancement request
         response = enhancement_agent.request(
             "audio.enhancement.request",
@@ -213,6 +217,8 @@ class MultiAgentSystem:
         content_agent = self.coordinator.agents.get('content_generation_agent')
         if not content_agent:
             raise RuntimeError("Content generation agent not found")
+
+        self.telemetry.record_feature_usage(f"music_{content_type}")
 
         topic_map = {
             'melody': 'music.generation.melody.request',
@@ -308,6 +314,14 @@ class MultiAgentSystem:
             return response.payload
         else:
             raise RuntimeError("Search request timed out")
+
+    def get_finance_metrics(self, hourly_rate: float = 75.0) -> Dict[str, Any]:
+        """Expose KPI snapshot for Finance dashboards."""
+        return self.telemetry.get_finance_metrics(hourly_rate)
+
+    def get_upgrade_metrics(self, account_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Expose Upgrade metrics (feature utilization, ROI, support load)."""
+        return self.telemetry.get_upgrade_metrics(account_context or {})
 
     def get_resource_metrics(self) -> Dict:
         """Get current system resource metrics"""

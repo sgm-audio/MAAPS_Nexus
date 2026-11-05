@@ -24,11 +24,22 @@ class MessageBusAdapter:
         self.pending_requests: Dict[str, asyncio.Future] = {}
         self.subscribers: Dict[str, Callable] = {}
         self.running = False
+        self.loop: Optional[asyncio.AbstractEventLoop] = None
+
+    def _ensure_bus(self):
+        if self.message_bus is None:
+            self.message_bus = get_message_bus()
+        if not self.message_bus._running:
+            self.message_bus.start()
 
     async def start(self):
         """Initialize and start the adapter"""
         logger.info("Starting message bus adapter...")
-        self.message_bus = get_message_bus()
+        self._ensure_bus()
+        try:
+            self.loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self.loop = None
         self.running = True
 
         # Subscribe to response topics
@@ -87,13 +98,13 @@ class MessageBusAdapter:
 
     def _handle_event(self, message: Message):
         """Handle event messages for WebSocket broadcasting"""
-        # Import here to avoid circular dependency
         from api.websocket import websocket_manager
 
-        # Broadcast to WebSocket clients
-        asyncio.create_task(
-            websocket_manager.broadcast_event(message.topic, message.payload)
-        )
+        if self.loop and self.loop.is_running():
+            asyncio.run_coroutine_threadsafe(
+                websocket_manager.broadcast_event(message.topic, message.payload),
+                self.loop
+            )
 
     async def request(
         self,
@@ -104,63 +115,30 @@ class MessageBusAdapter:
     ) -> Any:
         """
         Send a request to an agent and wait for response
-
-        Args:
-            topic: Message topic (e.g., "effects.chain.create")
-            payload: Message payload
-            timeout: Timeout in seconds
-            priority: Message priority
-
-        Returns:
-            Response data from agent
-
-        Raises:
-            TimeoutError: If request times out
-            Exception: If agent returns error
         """
+        self._ensure_bus()
         request_id = str(uuid.uuid4())
+        req_payload = dict(payload) if payload else {}
+        req_payload.setdefault("request_id", request_id)
 
-        # Add request ID and response topic to payload
-        payload["request_id"] = request_id
-        payload["response_topic"] = f"api.response.{request_id}"
-
-        # Create message
         message = Message(
             topic=topic,
             sender="api",
-            payload=payload,
+            payload=req_payload,
+            correlation_id=request_id,
             priority=priority
         )
 
-        # Create future for response
-        future = asyncio.Future()
-        self.pending_requests[request_id] = future
-
-        try:
-            # Publish message
-            self.message_bus.publish(message)
-            logger.debug(f"Sent request: {topic} (ID: {request_id})")
-
-            # Wait for response with timeout
-            response = await asyncio.wait_for(future, timeout=timeout)
-
-            # Check for error in response
-            if isinstance(response, dict) and "error" in response:
-                raise Exception(response["error"])
-
-            return response
-
-        except asyncio.TimeoutError:
+        response_msg = await asyncio.to_thread(self.message_bus.request, message, timeout)
+        if response_msg is None:
             logger.error(f"Request timeout: {topic} (ID: {request_id})")
-            if request_id in self.pending_requests:
-                del self.pending_requests[request_id]
             raise TimeoutError(f"Agent request timed out after {timeout}s")
 
-        except Exception as e:
-            logger.error(f"Request error: {topic} - {e}")
-            if request_id in self.pending_requests:
-                del self.pending_requests[request_id]
-            raise
+        response = response_msg.payload
+        if isinstance(response, dict) and response.get("success") is False and "error" in response:
+            raise Exception(response["error"])
+
+        return response
 
     def publish_event(
         self,
@@ -170,12 +148,8 @@ class MessageBusAdapter:
     ):
         """
         Publish an event (fire-and-forget, no response expected)
-
-        Args:
-            topic: Message topic
-            payload: Message payload
-            priority: Message priority
         """
+        self._ensure_bus()
         message = Message(
             topic=topic,
             sender="api",

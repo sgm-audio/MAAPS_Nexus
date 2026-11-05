@@ -1,0 +1,7 @@
+{
+  "name": "AI Audio Mix Partner",
+  "description": "An AI-powered audio analysis app that provides a real-time collaborative partner for mixing advice. leverage Gemini for live conversation, transcription, text-to-speech, grounded search for latest trends, and deep analysis for complex queries.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

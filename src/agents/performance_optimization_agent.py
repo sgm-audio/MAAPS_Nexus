@@ -22,9 +22,12 @@ import logging
 
 try:
     import psutil
-    import GPUtil
 except ImportError:
     psutil = None
+
+try:
+    import GPUtil
+except ImportError:
     GPUtil = None
 
 from ..core import BaseAgent, Message, Topics, Priority
@@ -193,6 +196,12 @@ class PerformanceOptimizationAgent(BaseAgent):
         with self.metrics_lock:
             current = self.current_metrics
 
+        if current is None and psutil is not None:
+            current = self._collect_metrics()
+            with self.metrics_lock:
+                self.current_metrics = current
+                self.resource_history.append(current)
+
         if current:
             self.respond(message, {
                 'success': True,
@@ -293,7 +302,8 @@ class PerformanceOptimizationAgent(BaseAgent):
         try:
             data_bytes = pickle.dumps(data)
             size_bytes = len(data_bytes)
-        except:
+        except Exception as e:
+            logger.error(f"Error sizing cache entry: {e}")
             size_bytes = len(str(data).encode())
 
         with self.cache_lock:
@@ -460,8 +470,8 @@ class PerformanceOptimizationAgent(BaseAgent):
                     gpu = gpus[0]
                     gpu_usage = gpu.load * 100
                     gpu_memory = gpu.memoryUtil * 100
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Error reading GPU metrics: {e}")
 
         # Disk I/O
         disk_io = psutil.disk_io_counters() if psutil else None

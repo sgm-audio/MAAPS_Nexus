@@ -521,7 +521,8 @@ class PerformanceAutomationAgent(BaseAgent):
             minutes = int(parts[1])
             seconds = float(parts[2])
             return hours * 3600 + minutes * 60 + seconds
-        except:
+        except Exception as e:
+            logger.error(f"Error parsing timecode '{timecode}': {e}")
             return 0.0
 
     def _execute_cue(self, cue: PerformanceCue):

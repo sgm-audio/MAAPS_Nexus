@@ -31,11 +31,14 @@ class ClockState:
 class SynchronizationClockAgent(BaseAgent):
     """Agent for tempo and timing synchronization"""
 
-    def __init__(self):
+    def __init__(self, agent_id: str = "synchronization_clock_agent", active: bool = True):
         super().__init__(
-            agent_id="synchronization_clock_agent",
+            agent_id=agent_id,
             agent_name="Synchronization & Clock Agent"
         )
+
+        # Role control for redundancy (primary/standby)
+        self.active = active
 
         self.clock_state = ClockState()
         self.clock_lock = threading.Lock()
@@ -69,6 +72,7 @@ class SynchronizationClockAgent(BaseAgent):
         self.subscribe("sync.transport.play")
         self.subscribe("sync.transport.stop")
         self.subscribe("sync.transport.pause")
+        self.subscribe("sync.status.get")
         self.subscribe("sync.midi.clock.enable")
         self.subscribe("sync.link.enable")
         self.subscribe("sync.tempo.detect")
@@ -78,11 +82,15 @@ class SynchronizationClockAgent(BaseAgent):
 
     def teardown(self):
         """Cleanup resources"""
+        for topic in self._subscribed_topics[:]:
+            self.unsubscribe(topic)
         self._stop_clock_thread()
         self.log("INFO", "Synchronization & Clock Agent shutdown complete")
 
     def handle_message(self, message: Message):
         """Process incoming messages"""
+        if not self.active:
+            return
         try:
             if message.topic == "sync.tempo.set":
                 self._handle_tempo_set(message)
@@ -94,6 +102,8 @@ class SynchronizationClockAgent(BaseAgent):
                 self._handle_transport_stop(message)
             elif message.topic == "sync.transport.pause":
                 self._handle_transport_pause(message)
+            elif message.topic == "sync.status.get":
+                self._handle_status_get(message)
             elif message.topic == "sync.midi.clock.enable":
                 self._handle_midi_clock_enable(message)
             elif message.topic == "sync.link.enable":
@@ -102,6 +112,41 @@ class SynchronizationClockAgent(BaseAgent):
                 self._handle_tempo_detect(message)
         except Exception as e:
             self.log("ERROR", f"Error handling message: {e}", {"topic": message.topic})
+
+    def _handle_status_get(self, message: Message):
+        """Handle clock status request"""
+        with self.clock_lock:
+            bpm = self.clock_state.bpm
+            time_sig = f"{self.clock_state.time_signature_numerator}/{self.clock_state.time_signature_denominator}"
+            playing = self.clock_state.is_playing
+            pos_seconds = self.clock_state.song_position
+            pos_beats = self.clock_state.current_beat
+            pos_bars = self.clock_state.current_bar
+
+        self.respond(message, {
+            'success': True,
+            'bpm': bpm,
+            'time_signature': time_sig,
+            'playing': playing,
+            'position': {
+                'seconds': pos_seconds,
+                'beats': pos_beats,
+                'bars': pos_bars,
+                'beat_in_bar': int(pos_beats) + 1
+            },
+            'midi_clock': {
+                'enabled': self.midi_clock_enabled,
+                'port': self.midi_clock_outputs[0] if self.midi_clock_outputs else None
+            },
+            'ableton_link': {
+                'enabled': self.link_enabled,
+                'peers': self.link_session_peers
+            }
+        })
+
+    def set_active(self, active: bool):
+        """Toggle processing for redundancy handoff"""
+        self.active = active
 
     def _handle_tempo_set(self, message: Message):
         """Handle tempo change"""

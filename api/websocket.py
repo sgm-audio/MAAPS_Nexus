@@ -46,8 +46,8 @@ class WebSocketManager:
         for client_id, websocket in list(self.active_connections.items()):
             try:
                 await websocket.close()
-            except:
-                pass
+            except Exception as e:
+                logger.error(f"Error closing websocket for {client_id}: {e}")
 
         self.active_connections.clear()
         self.subscriptions.clear()

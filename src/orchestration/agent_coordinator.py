@@ -17,6 +17,13 @@ from ..agents import (
     PerformanceOptimizationAgent,
     MetadataManagementAgent
 )
+from ..agents.live import (
+    RealtimeAudioIOAgent,
+    LiveEffectsChainAgent,
+    LiveLoopingAgent,
+    SynchronizationClockAgent,
+    PerformanceAutomationAgent
+)
 from .workflow_engine import WorkflowEngine
 
 logger = logging.getLogger(__name__)
@@ -40,6 +47,10 @@ class AgentCoordinator:
         # Registered agents
         self.agents: Dict[str, BaseAgent] = {}
         self.lock = threading.Lock()
+
+        # Live agent redundancy mapping (primary -> standby)
+        self.live_redundancy_pairs: Dict[str, str] = {}
+        self.promoted_live_agents: set[str] = set()
 
         # Health monitoring
         self.health_monitor_thread: Optional[threading.Thread] = None
@@ -110,14 +121,53 @@ class AgentCoordinator:
             ContentGenerationAgent(),
             PerformanceOptimizationAgent(),
             MetadataManagementAgent(),
+            PerformanceAutomationAgent(),
             WorkflowEngine()
         ]
+
+        # Add live performance agents with redundancy
+        agents_to_create.extend(self._create_live_agents())
 
         with self.lock:
             for agent in agents_to_create:
                 self.agents[agent.agent_id] = agent
                 self.registry.register(agent)
                 logger.info(f"Registered agent: {agent.agent_id}")
+
+    def _create_live_agents(self) -> List[BaseAgent]:
+        """Create primary/standby instances for live performance agents"""
+        # Primary agents keep legacy IDs for compatibility
+        live_agents = [
+            (
+                RealtimeAudioIOAgent(agent_id="realtime_audio_io_agent", active=True),
+                RealtimeAudioIOAgent(agent_id="realtime_audio_io_agent_standby", active=False)
+            ),
+            (
+                LiveEffectsChainAgent(agent_id="live_effects_chain_agent", active=True),
+                LiveEffectsChainAgent(agent_id="live_effects_chain_agent_standby", active=False)
+            ),
+            (
+                LiveLoopingAgent(agent_id="live_looping_agent", active=True),
+                LiveLoopingAgent(agent_id="live_looping_agent_standby", active=False)
+            ),
+            (
+                SynchronizationClockAgent(agent_id="synchronization_clock_agent", active=True),
+                SynchronizationClockAgent(agent_id="synchronization_clock_agent_standby", active=False)
+            ),
+        ]
+
+        # Track primary->standby mapping for failover
+        self.live_redundancy_pairs = {
+            primary.agent_id: standby.agent_id
+            for primary, standby in live_agents
+        }
+        self.promoted_live_agents.clear()
+
+        # Flatten list for registration
+        flattened = []
+        for primary, standby in live_agents:
+            flattened.extend([primary, standby])
+        return flattened
 
     def start_all_agents(self):
         """Start all registered agents"""
@@ -194,7 +244,8 @@ class AgentCoordinator:
                     'agent_id': agent.agent_id,
                     'agent_name': agent.agent_name,
                     'state': agent.get_state().value,
-                    'metrics': agent.get_metrics()
+                    'metrics': agent.get_metrics(),
+                    'active': getattr(agent, "active", True)
                 }
             else:
                 return None
@@ -210,7 +261,8 @@ class AgentCoordinator:
                     'agent_id': agent.agent_id,
                     'agent_name': agent.agent_name,
                     'state': agent.get_state().value,
-                    'metrics': agent.get_metrics()
+                    'metrics': agent.get_metrics(),
+                    'active': getattr(agent, "active", True)
                 })
 
         return statuses
@@ -284,6 +336,9 @@ class AgentCoordinator:
                         logger.info(f"Attempting to restart agent {agent_id}")
                         self.restart_agent(agent_id)
 
+                # Promote standby live agents if primaries are unhealthy
+                self._check_live_redundancy(statuses)
+
                 # Update message processing stats
                 bus_metrics = self.message_bus.get_metrics()
                 self.stats['total_messages_processed'] = bus_metrics.get('messages_delivered', 0)
@@ -293,6 +348,41 @@ class AgentCoordinator:
             except Exception as e:
                 logger.error(f"Error in health monitoring loop: {e}")
                 time.sleep(self.monitoring_interval)
+
+    def _check_live_redundancy(self, statuses: List[Dict]):
+        """Promote standby live agents when primaries fail"""
+        if not self.live_redundancy_pairs:
+            return
+
+        status_map = {s['agent_id']: s for s in statuses}
+
+        for primary_id, standby_id in self.live_redundancy_pairs.items():
+            primary_status = status_map.get(primary_id)
+
+            # Healthy primary -> no action
+            if primary_status and primary_status['state'] == 'running':
+                continue
+
+            standby_status = status_map.get(standby_id)
+            standby_agent = self.agents.get(standby_id)
+
+            if standby_agent and standby_status and standby_status['state'] == 'running':
+                if getattr(standby_agent, "active", True):
+                    # Already promoted
+                    continue
+
+                standby_agent.set_active(True)
+                self.promoted_live_agents.add(standby_id)
+                logger.warning(
+                    f"Promoted standby live agent {standby_id} to active role "
+                    f"after primary {primary_id} became unavailable"
+                )
+            elif standby_agent and standby_status and standby_status['state'] != 'running':
+                # Attempt to bring standby online if it's not running
+                logger.warning(
+                    f"Standby live agent {standby_id} not running; attempting restart"
+                )
+                self.restart_agent(standby_id)
 
 
 # Global coordinator instance

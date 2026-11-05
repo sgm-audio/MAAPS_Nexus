@@ -83,7 +83,7 @@
     },
     "metadata_management": {
       "enabled": true,
-      "database_path": "./data/metadata.db",
+      "database_path": "${METADATA_DB_PATH:./metadata.db}",
       "deep_analysis_default": true,
       "search_index_size": 10000,
       "auto_tag_enabled": true,

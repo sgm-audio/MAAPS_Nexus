@@ -501,8 +501,8 @@ class MetadataManagementAgent(BaseAgent):
                 # Normalize to 0-1 score
                 quality_score = min(1.0, dynamic_range / 60.0)
                 return float(quality_score)
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Error computing quality score: {e}")
 
         return 0.5  # Default medium quality
 

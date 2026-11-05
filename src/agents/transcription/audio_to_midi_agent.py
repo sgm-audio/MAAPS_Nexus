@@ -526,7 +526,8 @@ class AudioToMIDIAgent(BaseAgent):
         try:
             tempo, _ = librosa.beat.beat_track(y=audio, sr=sr)
             return float(tempo)
-        except:
+        except Exception as e:
+            logger.error(f"Tempo estimation failed: {e}")
             return 120.0
 
     def _estimate_key(self, audio: np.ndarray, sr: int) -> str:
@@ -537,7 +538,8 @@ class AudioToMIDIAgent(BaseAgent):
             key_idx = np.argmax(chroma_mean)
             keys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
             return f"{keys[key_idx]} major"
-        except:
+        except Exception as e:
+            logger.error(f"Key estimation failed: {e}")
             return "C major"
 
     def _estimate_accuracy(self, notes: List[MIDINote], voiced_probs: np.ndarray) -> float:

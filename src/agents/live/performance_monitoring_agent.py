@@ -294,7 +294,8 @@ class PerformanceMonitoringAgent(BaseAgent):
                 buffer_load_percent=buffer_load,
                 timestamp=time.time()
             )
-        except:
+        except Exception as e:
+            logger.error(f"Error collecting performance metrics: {e}")
             # Fallback if psutil not available
             return PerformanceMetrics(
                 cpu_usage_percent=25.0,

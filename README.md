@@ -484,3 +484,13 @@ Built with:
 ---
 
 **Multi-Agent Audio Processing System** - Professional-grade audio production automation
+
+## Deployment (API)
+
+1. Copy `.env.example` to `.env` and set `JWT_SECRET`, `AUTH_USERNAME`, and either `AUTH_PASSWORD_HASH` (preferred, bcrypt) or `AUTH_PASSWORD`. Update `ALLOWED_ORIGINS`.
+2. Build and run:
+   ```bash
+   docker build --pull -t maaps-api .
+   docker run --env-file .env -p 8000:8000 maaps-api
+   ```
+3. Health: `GET /health` (returns 200 when initialized). Auth: `POST /auth/login` to obtain a bearer token for protected endpoints.

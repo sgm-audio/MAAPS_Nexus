@@ -547,7 +547,8 @@ class MultiTrackCoordinatorAgent(BaseAgent):
                 'notes': [],
                 'difficulty_rating': 5.0
             }
-        except:
+        except Exception as e:
+            logger.error(f"Error generating tablature: {e}")
             return None
 
     def _analyze_harmony(self, audio: np.ndarray, sr: int, key: str) -> Dict[str, Any]:

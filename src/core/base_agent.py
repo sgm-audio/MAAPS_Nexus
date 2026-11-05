@@ -111,6 +111,10 @@ class BaseAgent(ABC):
             self._state = AgentState.STARTING
 
         try:
+            # Ensure message bus is running
+            if not self._message_bus._running:
+                self._message_bus.start()
+
             # Record start time
             with self._metrics_lock:
                 self._metrics["start_time"] = time.time()

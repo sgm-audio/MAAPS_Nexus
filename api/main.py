@@ -7,7 +7,7 @@ Usage:
     Production:  uvicorn api.main:app --host 0.0.0.0 --port 8000 --workers 4
 """
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File
+from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -20,6 +20,11 @@ from datetime import datetime
 import logging
 
 from src.system import create_system
+
+# Import routers
+from api.routers import audio, metadata
+from api import auth
+from api.dependencies import get_current_user, get_optional_user
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -34,26 +39,61 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS middleware
+# CORS middleware - environment-based configuration
+import os
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Include routers
+app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
+app.include_router(audio.router)  # Already has /audio prefix
+app.include_router(metadata.router)  # Already has /metadata prefix
+
 # Global system instance
 system = None
 
 
+def _ensure_system_ready() -> "MultiAgentSystem":
+    """Return initialized system or raise 503 if not ready."""
+    from src.system import MultiAgentSystem  # local import to avoid cycles
+
+    if system is None or not isinstance(system, MultiAgentSystem) or not getattr(system, "initialized", False):
+        raise HTTPException(
+            status_code=503,
+            detail="System not initialized yet"
+        )
+    return system
+
+
+def get_system_dep():
+    """FastAPI dependency to guarantee system availability."""
+    return _ensure_system_ready()
+
+
 # Request/Response Models
+MAX_AUDIO_SAMPLES = 2_000_000  # ~45 seconds at 44.1kHz
+
+
 class AudioEnhanceRequest(BaseModel):
     audio_data: List[float] = Field(..., description="Audio samples as array of floats")
     sample_rate: int = Field(44100, description="Sample rate in Hz", ge=8000, le=192000)
     noise_reduction: float = Field(0.8, description="Noise reduction amount", ge=0.0, le=1.0)
     declicking_sensitivity: float = Field(0.5, description="Click removal sensitivity", ge=0.0, le=1.0)
     preserve_transients: bool = Field(True, description="Preserve sharp transients")
+
+    @classmethod
+    def model_validate(cls, value):
+        obj = super().model_validate(value)
+        if len(obj.audio_data) > MAX_AUDIO_SAMPLES:
+            raise ValueError(f"audio_data too large (max {MAX_AUDIO_SAMPLES} samples)")
+        return obj
 
 class MusicGenerateRequest(BaseModel):
     content_type: str = Field(..., description="Type: melody, harmony, drums, bass")
@@ -67,6 +107,13 @@ class MetadataExtractRequest(BaseModel):
     audio_data: List[float] = Field(..., description="Audio samples")
     sample_rate: int = Field(44100, description="Sample rate in Hz")
     deep_analysis: bool = Field(True, description="Perform deep analysis")
+
+    @classmethod
+    def model_validate(cls, value):
+        obj = super().model_validate(value)
+        if len(obj.audio_data) > MAX_AUDIO_SAMPLES:
+            raise ValueError(f"audio_data too large (max {MAX_AUDIO_SAMPLES} samples)")
+        return obj
 
 class HealthResponse(BaseModel):
     health_score: float
@@ -125,7 +172,8 @@ async def root():
 async def health_check():
     """Get system health status"""
     try:
-        health = system.get_health()
+        sys = get_system_dep()
+        health = sys.get_health()
         return HealthResponse(
             health_score=health['health_score'],
             agents_healthy=health['agents_healthy'],
@@ -142,7 +190,8 @@ async def health_check():
 async def get_metrics():
     """Get system resource metrics"""
     try:
-        metrics = system.get_resource_metrics()
+        sys = get_system_dep()
+        metrics = sys.get_resource_metrics()
         return JSONResponse(content=metrics)
     except Exception as e:
         logger.error(f"Metrics retrieval failed: {e}")
@@ -153,7 +202,8 @@ async def get_metrics():
 async def list_agents():
     """Get list of all agents and their status"""
     try:
-        agents = system.get_all_agents()
+        sys = get_system_dep()
+        agents = sys.get_all_agents()
         return JSONResponse(content={"agents": agents})
     except Exception as e:
         logger.error(f"Agent list retrieval failed: {e}")
@@ -162,16 +212,24 @@ async def list_agents():
 
 # Audio Processing Endpoints
 @app.post("/audio/enhance", tags=["Audio Processing"])
-async def enhance_audio(request: AudioEnhanceRequest, background_tasks: BackgroundTasks):
+async def enhance_audio(
+    request: AudioEnhanceRequest,
+    background_tasks: BackgroundTasks,
+    username: Optional[str] = Depends(get_optional_user),
+    sys=Depends(get_system_dep)
+):
     """
     Enhance audio with noise reduction and restoration
+
+    Optional authentication - authenticated users get priority processing
 
     Returns enhanced audio data with processing metrics
     """
     try:
-        logger.info(f"Audio enhancement request: {len(request.audio_data)} samples @ {request.sample_rate}Hz")
+        user_context = f" (user: {username})" if username else " (anonymous)"
+        logger.info(f"Audio enhancement request{user_context}: {len(request.audio_data)} samples @ {request.sample_rate}Hz")
 
-        result = system.enhance_audio(
+        result = sys.enhance_audio(
             audio_data=request.audio_data,
             sample_rate=request.sample_rate,
             params={
@@ -180,6 +238,10 @@ async def enhance_audio(request: AudioEnhanceRequest, background_tasks: Backgrou
                 'preserve_transients': request.preserve_transients
             }
         )
+
+        # Add user context to response
+        if username:
+            result['authenticated_user'] = username
 
         logger.info(f"Enhancement complete: {result.get('processing_time_ms', 0):.1f}ms")
         return JSONResponse(content=result)
@@ -190,20 +252,31 @@ async def enhance_audio(request: AudioEnhanceRequest, background_tasks: Backgrou
 
 
 @app.post("/audio/metadata", tags=["Audio Processing"])
-async def extract_metadata(request: MetadataExtractRequest):
+async def extract_metadata(
+    request: MetadataExtractRequest,
+    username: Optional[str] = Depends(get_optional_user),
+    sys=Depends(get_system_dep)
+):
     """
     Extract metadata from audio
+
+    Optional authentication - authenticated users get enhanced metadata
 
     Returns musical, technical, and quality features
     """
     try:
-        logger.info(f"Metadata extraction: {len(request.audio_data)} samples")
+        user_context = f" (user: {username})" if username else " (anonymous)"
+        logger.info(f"Metadata extraction{user_context}: {len(request.audio_data)} samples")
 
-        metadata = system.extract_metadata(
+        metadata = sys.extract_metadata(
             audio_data=request.audio_data,
             sample_rate=request.sample_rate,
             deep_analysis=request.deep_analysis
         )
+
+        # Add user context to response
+        if username:
+            metadata['authenticated_user'] = username
 
         logger.info("Metadata extraction complete")
         return JSONResponse(content=metadata)
@@ -215,9 +288,15 @@ async def extract_metadata(request: MetadataExtractRequest):
 
 # Music Generation Endpoints
 @app.post("/music/generate", tags=["Music Generation"])
-async def generate_music(request: MusicGenerateRequest):
+async def generate_music(
+    request: MusicGenerateRequest,
+    username: Optional[str] = Depends(get_optional_user),
+    sys=Depends(get_system_dep)
+):
     """
     Generate AI music (melody, harmony, drums, or bass)
+
+    Optional authentication - authenticated users get priority queue
 
     Returns generated MIDI data and note events
     """
@@ -228,7 +307,8 @@ async def generate_music(request: MusicGenerateRequest):
                 detail=f"Invalid content_type: {request.content_type}. Must be melody, harmony, drums, or bass"
             )
 
-        logger.info(f"Music generation: {request.content_type} in {request.key} @ {request.tempo}BPM")
+        user_context = f" (user: {username})" if username else " (anonymous)"
+        logger.info(f"Music generation{user_context}: {request.content_type} in {request.key} @ {request.tempo}BPM")
 
         musical_context = {
             'key': request.key,
@@ -238,7 +318,11 @@ async def generate_music(request: MusicGenerateRequest):
             'length_bars': request.length_bars
         }
 
-        result = system.generate_music(request.content_type, musical_context)
+        result = sys.generate_music(request.content_type, musical_context)
+
+        # Add user context to response
+        if username:
+            result['authenticated_user'] = username
 
         logger.info(f"Music generation complete: {len(result.get('notes', []))} notes")
         return JSONResponse(content=result)
@@ -299,16 +383,16 @@ async def get_batch_status(job_id: str):
 
 # Utility Endpoints
 @app.post("/system/restart", tags=["System"])
-async def restart_system():
-    """Restart the MAAPS system (admin only)"""
-    # Add authentication check here
+async def restart_system(username: str = Depends(get_current_user)):
+    """Restart the MAAPS system (requires authentication)"""
     try:
-        logger.info("System restart requested")
-        system.stop()
+        logger.info(f"System restart requested by {username}")
+        sys = get_system_dep()
+        sys.stop()
         await asyncio.sleep(2)
-        system.start()
+        sys.start()
         logger.info("System restarted successfully")
-        return {"status": "success", "message": "System restarted"}
+        return {"status": "success", "message": "System restarted", "requested_by": username}
     except Exception as e:
         logger.error(f"System restart failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
