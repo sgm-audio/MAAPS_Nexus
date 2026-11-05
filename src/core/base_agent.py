@@ -415,11 +415,23 @@ class AgentRegistry:
         self._agents: Dict[str, BaseAgent] = {}
         self._lock = threading.Lock()
 
-    def register(self, agent: BaseAgent):
+    def register(self, agent: BaseAgent, replace: bool = True):
         """Register an agent"""
         with self._lock:
             if agent.agent_id in self._agents:
-                raise ValueError(f"Agent {agent.agent_id} already registered")
+                if replace:
+                    existing = self._agents[agent.agent_id]
+                    if existing is not agent:
+                        try:
+                            if existing.is_running():
+                                existing.stop()
+                        except Exception:
+                            pass
+                    self._agents[agent.agent_id] = agent
+                    logger.info(f"Updated registration for agent {agent.agent_id}")
+                    return
+                else:
+                    raise ValueError(f"Agent {agent.agent_id} already registered")
             self._agents[agent.agent_id] = agent
             logger.info(f"Registered agent {agent.agent_id}")
 

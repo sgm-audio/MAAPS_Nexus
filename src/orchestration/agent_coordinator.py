@@ -103,6 +103,12 @@ class AgentCoordinator:
             # Stop all agents
             self.stop_all_agents()
 
+            # Unregister agents from registry
+            with self.lock:
+                for agent_id in list(self.agents.keys()):
+                    self.registry.unregister(agent_id)
+                self.agents.clear()
+
             # Stop message bus
             if self.message_bus._running:
                 self.message_bus.stop()

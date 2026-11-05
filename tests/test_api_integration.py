@@ -3,13 +3,14 @@ Comprehensive API Integration Tests
 Tests all Phase 2 & 3 endpoints with the running server
 """
 
+import os
 import pytest
 import requests
 import json
 from typing import Dict, Any
 
 # API Base URL
-BASE_URL = "http://localhost:8000"
+BASE_URL = os.getenv("MAAPS_BASE_URL", "http://127.0.0.1:18000")
 API_V1 = f"{BASE_URL}/api/v1"
 
 
@@ -127,7 +128,7 @@ class TestEffectsChainAPI:
     def test_list_effect_chains(self):
         """Test listing all effect chains"""
         response = requests.get(f"{API_V1}/effects/chains")
-        print(f"\n✅ List Chains Response: {json.dumps(response.json(), indent=2)}")
+        print(f"\n[OK] List Chains Response: {json.dumps(response.json(), indent=2)}")
 
         assert response.status_code == 200
         data = response.json()
@@ -144,7 +145,7 @@ class TestEffectsChainAPI:
 
         url = f"{API_V1}/effects/chains/{chain_id}/effects/{effect_id}/parameters"
         response = requests.patch(url, json=payload)
-        print(f"\n✅ Update Parameters Response: {json.dumps(response.json(), indent=2)}")
+        print(f"\n[OK] Update Parameters Response: {json.dumps(response.json(), indent=2)}")
 
         assert response.status_code == 200
 
@@ -163,7 +164,7 @@ class TestLiveLoopingAPI:
         }
 
         response = requests.post(f"{API_V1}/looping/tracks", json=payload)
-        print(f"\n✅ Create Track Response: {json.dumps(response.json(), indent=2)}")
+        print(f"\n[OK] Create Track Response: {json.dumps(response.json(), indent=2)}")
 
         assert response.status_code == 201
         data = response.json()
@@ -175,7 +176,7 @@ class TestLiveLoopingAPI:
     def test_list_loop_tracks(self):
         """Test listing all loop tracks"""
         response = requests.get(f"{API_V1}/looping/tracks")
-        print(f"\n✅ List Tracks Response: {json.dumps(response.json(), indent=2)}")
+        print(f"\n[OK] List Tracks Response: {json.dumps(response.json(), indent=2)}")
 
         assert response.status_code == 200
         data = response.json()
@@ -189,14 +190,14 @@ class TestLiveLoopingAPI:
             f"{API_V1}/looping/tracks/{track_id}/record/start",
             json=payload
         )
-        print(f"\n✅ Start Recording Response: {json.dumps(response.json(), indent=2)}")
+        print(f"\n[OK] Start Recording Response: {json.dumps(response.json(), indent=2)}")
 
         assert response.status_code == 200
 
     def test_stop_recording(self, track_id: str):
         """Test stopping loop recording"""
         response = requests.post(f"{API_V1}/looping/tracks/{track_id}/record/stop")
-        print(f"\n✅ Stop Recording Response: {json.dumps(response.json(), indent=2)}")
+        print(f"\n[OK] Stop Recording Response: {json.dumps(response.json(), indent=2)}")
 
         assert response.status_code == 200
 
@@ -212,7 +213,7 @@ class TestSyncClockAPI:
         }
 
         response = requests.post(f"{API_V1}/sync/tempo/set", json=payload)
-        print(f"\n✅ Set Tempo Response: {json.dumps(response.json(), indent=2)}")
+        print(f"\n[OK] Set Tempo Response: {json.dumps(response.json(), indent=2)}")
 
         assert response.status_code == 200
         data = response.json()
@@ -221,28 +222,28 @@ class TestSyncClockAPI:
     def test_tap_tempo(self):
         """Test tap tempo"""
         response = requests.post(f"{API_V1}/sync/tempo/tap")
-        print(f"\n✅ Tap Tempo Response: {json.dumps(response.json(), indent=2)}")
+        print(f"\n[OK] Tap Tempo Response: {json.dumps(response.json(), indent=2)}")
 
         assert response.status_code == 200
 
     def test_transport_play(self):
         """Test transport play"""
         response = requests.post(f"{API_V1}/sync/transport/play")
-        print(f"\n✅ Transport Play Response: {json.dumps(response.json(), indent=2)}")
+        print(f"\n[OK] Transport Play Response: {json.dumps(response.json(), indent=2)}")
 
         assert response.status_code == 200
 
     def test_transport_stop(self):
         """Test transport stop"""
         response = requests.post(f"{API_V1}/sync/transport/stop")
-        print(f"\n✅ Transport Stop Response: {json.dumps(response.json(), indent=2)}")
+        print(f"\n[OK] Transport Stop Response: {json.dumps(response.json(), indent=2)}")
 
         assert response.status_code == 200
 
     def test_get_clock_status(self):
         """Test getting clock status"""
         response = requests.get(f"{API_V1}/sync/status")
-        print(f"\n✅ Clock Status Response: {json.dumps(response.json(), indent=2)}")
+        print(f"\n[OK] Clock Status Response: {json.dumps(response.json(), indent=2)}")
 
         assert response.status_code == 200
 
@@ -263,7 +264,7 @@ class TestAutomationAPI:
         }
 
         response = requests.post(f"{API_V1}/automation/scenes", json=payload)
-        print(f"\n✅ Create Scene Response: {json.dumps(response.json(), indent=2)}")
+        print(f"\n[OK] Create Scene Response: {json.dumps(response.json(), indent=2)}")
 
         assert response.status_code == 201
         data = response.json()
@@ -292,7 +293,7 @@ class TestAutomationAPI:
         }
 
         response = requests.post(f"{API_V1}/automation/macros", json=payload)
-        print(f"\n✅ Create Macro Response: {json.dumps(response.json(), indent=2)}")
+        print(f"\n[OK] Create Macro Response: {json.dumps(response.json(), indent=2)}")
 
         assert response.status_code == 201
         data = response.json()
@@ -308,7 +309,7 @@ class TestAutomationAPI:
             f"{API_V1}/automation/macros/{macro_id}/value",
             json=payload
         )
-        print(f"\n✅ Change Macro Response: {json.dumps(response.json(), indent=2)}")
+        print(f"\n[OK] Change Macro Response: {json.dumps(response.json(), indent=2)}")
 
         assert response.status_code == 200
 
@@ -333,7 +334,7 @@ class TestAutomationAPI:
         }
 
         response = requests.post(f"{API_V1}/automation/cues", json=payload)
-        print(f"\n✅ Create Cue Response: {json.dumps(response.json(), indent=2)}")
+        print(f"\n[OK] Create Cue Response: {json.dumps(response.json(), indent=2)}")
 
         assert response.status_code == 201
 
@@ -344,7 +345,7 @@ class TestSystemAPI:
     def test_get_health(self):
         """Test system health endpoint"""
         response = requests.get(f"{API_V1}/system/health")
-        print(f"\n✅ System Health Response: {json.dumps(response.json(), indent=2)}")
+        print(f"\n[OK] System Health Response: {json.dumps(response.json(), indent=2)}")
 
         assert response.status_code == 200
         data = response.json()
@@ -353,14 +354,14 @@ class TestSystemAPI:
     def test_get_metrics(self):
         """Test system metrics endpoint"""
         response = requests.get(f"{API_V1}/system/metrics")
-        print(f"\n✅ System Metrics Response: {json.dumps(response.json(), indent=2)}")
+        print(f"\n[OK] System Metrics Response: {json.dumps(response.json(), indent=2)}")
 
         assert response.status_code == 200
 
     def test_list_agents(self):
         """Test list agents endpoint"""
         response = requests.get(f"{API_V1}/system/agents")
-        print(f"\n✅ List Agents Response: {json.dumps(response.json(), indent=2)}")
+        print(f"\n[OK] List Agents Response: {json.dumps(response.json(), indent=2)}")
 
         assert response.status_code == 200
 
@@ -376,7 +377,7 @@ class TestAuthentication:
         }
 
         response = requests.post(f"{API_V1}/auth/login", json=payload)
-        print(f"\n✅ Login Response: {json.dumps(response.json(), indent=2)}")
+        print(f"\n[OK] Login Response: {json.dumps(response.json(), indent=2)}")
 
         assert response.status_code == 200
         data = response.json()
@@ -388,7 +389,7 @@ class TestAuthentication:
         """Test token verification"""
         headers = {"Authorization": f"Bearer {token}"}
         response = requests.get(f"{API_V1}/auth/verify", headers=headers)
-        print(f"\n✅ Verify Token Response: {json.dumps(response.json(), indent=2)}")
+        print(f"\n[OK] Verify Token Response: {json.dumps(response.json(), indent=2)}")
 
         assert response.status_code == 200
 

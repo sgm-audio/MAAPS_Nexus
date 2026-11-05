@@ -4,16 +4,19 @@ Demonstrates real-time event streaming and subscriptions
 """
 
 import asyncio
+import os
 import pytest
 import websockets
 import json
 from datetime import datetime
 from typing import Set
 
+DEFAULT_WS_URL = os.getenv("MAAPS_WS_URL", "ws://127.0.0.1:18000/ws")
+
 class WebSocketTestClient:
     """WebSocket test client for MAAPS API"""
 
-    def __init__(self, url: str = "ws://localhost:8000/ws"):
+    def __init__(self, url: str = DEFAULT_WS_URL):
         self.url = url
         self.ws = None
         self.subscriptions: Set[str] = set()

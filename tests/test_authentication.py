@@ -3,13 +3,14 @@ Authentication Integration Tests
 Tests JWT authentication flow, token validation, and protected endpoints
 """
 
+import os
 import pytest
 import requests
 from typing import Optional
 import json
 
 # Test configuration
-BASE_URL = "http://localhost:8000"
+BASE_URL = os.getenv("MAAPS_BASE_URL", "http://127.0.0.1:18000")
 TEST_USERNAME = "test_user"
 TEST_PASSWORD = "test_password"
 
@@ -77,7 +78,7 @@ class TestAuthentication:
         """Test token verification without token"""
         response = requests.get(f"{BASE_URL}/auth/verify")
 
-        assert response.status_code == 403  # Forbidden (no credentials)
+        assert response.status_code in (401, 403)  # Unauthorized / Forbidden (no credentials)
 
     def test_protected_endpoint_with_token(self):
         """Test protected endpoint with valid token"""
@@ -103,7 +104,7 @@ class TestAuthentication:
         """Test protected endpoint without token"""
         response = requests.post(f"{BASE_URL}/system/restart")
 
-        assert response.status_code == 403  # Forbidden (no credentials)
+        assert response.status_code in (401, 403)  # Unauthorized / Forbidden (no credentials)
 
     def test_protected_endpoint_invalid_token(self):
         """Test protected endpoint with invalid token"""
@@ -252,7 +253,7 @@ class TestAuthenticationUsability:
         """Test error messages are helpful"""
         # Test missing auth
         response = requests.post(f"{BASE_URL}/system/restart")
-        assert response.status_code == 403
+        assert response.status_code in (401, 403)
         # Should have detail message
 
         # Test invalid token

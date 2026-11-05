@@ -2,6 +2,7 @@
 Pytest configuration and shared fixtures.
 """
 
+import os
 import socket
 import sys
 import threading
@@ -10,6 +11,16 @@ import types
 import pytest
 import requests
 import uvicorn
+
+
+TEST_HOST = "127.0.0.1"
+TEST_PORT = int(os.getenv("MAAPS_TEST_PORT", "18000"))
+BASE_URL = f"http://{TEST_HOST}:{TEST_PORT}"
+WS_URL = f"ws://{TEST_HOST}:{TEST_PORT}/ws"
+
+os.environ["MAAPS_TEST_PORT"] = str(TEST_PORT)
+os.environ["MAAPS_BASE_URL"] = BASE_URL
+os.environ["MAAPS_WS_URL"] = WS_URL
 
 
 try:
@@ -33,22 +44,24 @@ except ModuleNotFoundError:  # pragma: no cover - environment specific
     sys.modules["zope.event"] = shim
 
 
-def _is_port_open(host: str, port: int) -> bool:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.settimeout(0.5)
-        return s.connect_ex((host, port)) == 0
+def _is_maaps_server(host: str, port: int) -> bool:
+    try:
+        r = requests.get(f"http://{host}:{port}/health", timeout=1.0)
+        return r.status_code == 200 and ("health_score" in r.text or "healthy" in r.text)
+    except Exception:
+        return False
 
 
 @pytest.fixture(scope="session", autouse=True)
 def ensure_api_server():
-    """Ensure the FastAPI server is running on localhost:8000 for integration tests."""
-    if _is_port_open("127.0.0.1", 8000):
+    """Ensure the FastAPI server is running for integration tests."""
+    if _is_maaps_server(TEST_HOST, TEST_PORT):
         yield
         return
 
     from api.main import app
 
-    config = uvicorn.Config(app, host="127.0.0.1", port=8000, log_level="warning")
+    config = uvicorn.Config(app, host=TEST_HOST, port=TEST_PORT, log_level="warning")
     server = uvicorn.Server(config)
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
@@ -56,13 +69,8 @@ def ensure_api_server():
     # Wait until server is ready
     deadline = time.time() + 15.0
     while time.time() < deadline:
-        if _is_port_open("127.0.0.1", 8000):
-            try:
-                r = requests.get("http://127.0.0.1:8000/health", timeout=2.0)
-                if r.status_code == 200:
-                    break
-            except Exception:
-                pass
+        if _is_maaps_server(TEST_HOST, TEST_PORT):
+            break
         time.sleep(0.2)
 
     yield
