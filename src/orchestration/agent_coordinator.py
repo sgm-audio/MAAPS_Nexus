@@ -438,7 +438,7 @@ class AgentCoordinator:
                     # Already promoted
                     continue
 
-                standby_agent.set_active(True)
+                standby_agent.start()
                 self.promoted_live_agents.add(standby_id)
                 logger.warning(
                     f"Promoted standby live agent {standby_id} to active role "

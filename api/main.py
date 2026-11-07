@@ -53,6 +53,7 @@ from api.routers import (
 from api import auth
 from api.dependencies import get_current_user, get_optional_user
 from api.message_bus_adapter import get_message_bus_adapter
+from api.middleware.error_boundary import ErrorBoundaryMiddleware
 from api.websocket import websocket_manager
 
 # Configure logging
@@ -81,6 +82,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Production error boundary middleware
+app.add_middleware(ErrorBoundaryMiddleware)
 
 # Include root routers
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])

@@ -284,7 +284,7 @@
   },
   "production": {
     "require_authentication": false,
-    "rate_limiting_enabled": false,
+    "rate_limiting_enabled": true,
     "cors_enabled": false,
     "health_check_endpoint": "/health",
     "metrics_endpoint": "/metrics"

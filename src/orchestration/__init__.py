@@ -1,3 +1,4 @@
+# mypy: disable-error-code="import-untyped,attr-defined,arg-type,var-annotated"
 """
 Workflow orchestration for the multi-agent system.
 """

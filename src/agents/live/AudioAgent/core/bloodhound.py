@@ -1,5 +1,5 @@
 import re
-from typing import Set
+from typing import Set, Optional
 from bs4 import BeautifulSoup
 
 
@@ -48,7 +48,7 @@ class Bloodhound:
         return clean
 
     @staticmethod
-    def find_contact_link(soup: BeautifulSoup, base_url: str) -> str:
+    def find_contact_link(soup: BeautifulSoup, base_url: str) -> Optional[str]:
         """Finds the most likely contact page URL."""
         if not soup:
             return None
@@ -71,7 +71,7 @@ class Bloodhound:
         return None
 
     @staticmethod
-    def rank_emails(emails: Set[str]) -> str:
+    def rank_emails(emails: Set[str]) -> Optional[str]:
         """Prioritizes the best email for a studio."""
         if not emails:
             return ""
