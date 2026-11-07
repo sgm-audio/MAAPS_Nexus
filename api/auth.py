@@ -15,6 +15,7 @@ import os
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
@@ -70,7 +71,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     if not SECRET_KEY:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="JWT secret not configured"
+            detail="JWT secret not configured",
         )
 
     to_encode = data.copy()
@@ -163,13 +164,14 @@ async def login(request: LoginRequest):
             logger.error("Authentication is not configured; rejecting login request")
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Authentication is not configured"
+                detail="Authentication is not configured",
             )
 
-        if request.username != expected_username or not _verify_password(request.password, expected_hash):
+        if request.username != expected_username or not _verify_password(
+            request.password, expected_hash
+        ):
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials"
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
             )
         subject = request.username
     else:
@@ -178,8 +180,7 @@ async def login(request: LoginRequest):
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": subject},
-        expires_delta=access_token_expires
+        data={"sub": subject}, expires_delta=access_token_expires
     )
 
     logger.info(f"User '{request.username}' logged in successfully")
@@ -192,8 +193,4 @@ async def login(request: LoginRequest):
 @router.get("/verify")
 async def verify(username: str = Depends(verify_token)):
     """Verify token validity"""
-    return {
-        "status": "valid",
-        "valid": True,
-        "username": username
-    }
+    return {"status": "valid", "valid": True, "username": username}

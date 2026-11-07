@@ -18,11 +18,11 @@ from typing import Any, Dict, Optional
 
 def _resolve_manual_hours(step_payload: Dict[str, Any]) -> float:
     """Best-effort manual effort estimate from workflow step definitions."""
-    if 'estimated_manual_hours' in step_payload:
-        return float(step_payload['estimated_manual_hours'])
+    if "estimated_manual_hours" in step_payload:
+        return float(step_payload["estimated_manual_hours"])
 
-    if 'estimated_manual_minutes' in step_payload:
-        return float(step_payload['estimated_manual_minutes']) / 60.0
+    if "estimated_manual_minutes" in step_payload:
+        return float(step_payload["estimated_manual_minutes"]) / 60.0
 
     # Conservative default (6 minutes) if nothing provided
     return 0.1
@@ -63,7 +63,9 @@ class TelemetryStore:
 
     def workflow_started(self, workflow: Any):
         """Track workflow metadata when execution begins."""
-        manual_hours = sum(_resolve_manual_hours(step.payload) for step in workflow.steps)
+        manual_hours = sum(
+            _resolve_manual_hours(step.payload) for step in workflow.steps
+        )
         record = WorkflowTelemetry(
             workflow_id=workflow.workflow_id,
             name=workflow.name,
@@ -88,20 +90,22 @@ class TelemetryStore:
             if workflow.started_at and workflow.completed_at:
                 record.duration_seconds = workflow.completed_at - workflow.started_at
 
-            project_id = record.context.get('project_id') or workflow.workflow_id
-            project = self._projects.setdefault(project_id, {
-                'workflows': [],
-                'client_fee': 0.0,
-                'last_completed_at': 0.0,
-            })
-            project['workflows'].append(workflow.workflow_id)
-            project['client_fee'] = max(
-                project['client_fee'],
-                float(record.context.get('client_fee', 0.0))
+            project_id = record.context.get("project_id") or workflow.workflow_id
+            project = self._projects.setdefault(
+                project_id,
+                {
+                    "workflows": [],
+                    "client_fee": 0.0,
+                    "last_completed_at": 0.0,
+                },
             )
-            project['last_completed_at'] = workflow.completed_at or time.time()
+            project["workflows"].append(workflow.workflow_id)
+            project["client_fee"] = max(
+                project["client_fee"], float(record.context.get("client_fee", 0.0))
+            )
+            project["last_completed_at"] = workflow.completed_at or time.time()
 
-            requested_at = record.context.get('revision_requested_at')
+            requested_at = record.context.get("revision_requested_at")
             if requested_at:
                 delivered_at = workflow.completed_at or time.time()
                 duration = max(delivered_at - requested_at, 0.0)
@@ -114,7 +118,7 @@ class TelemetryStore:
             if not record:
                 return
 
-            is_manual = step.payload.get('execution_mode') == 'manual'
+            is_manual = step.payload.get("execution_mode") == "manual"
             if is_manual:
                 record.manual_steps += 1
             else:
@@ -127,7 +131,9 @@ class TelemetryStore:
     def record_feature_usage(self, feature_name: str):
         """Increment usage counters for Upgrade page messaging."""
         with self._lock:
-            self._feature_usage[feature_name] = self._feature_usage.get(feature_name, 0) + 1
+            self._feature_usage[feature_name] = (
+                self._feature_usage.get(feature_name, 0) + 1
+            )
 
     # ------------------------------------------------------------------
     # KPI accessors
@@ -147,25 +153,26 @@ class TelemetryStore:
 
             revision_median = (
                 statistics.median(self._revision_durations)
-                if self._revision_durations else None
+                if self._revision_durations
+                else None
             )
 
             projects_delivered = len(self._projects)
-            revenue = sum(p['client_fee'] for p in self._projects.values())
+            revenue = sum(p["client_fee"] for p in self._projects.values())
 
             return {
-                'billable_hours_saved': hours_saved,
-                'dollar_savings': hours_saved * hourly_rate,
-                'projects_delivered': projects_delivered,
-                'automation_rate': automated_steps / total_steps,
-                'manual_intervention_ratio': (
+                "billable_hours_saved": hours_saved,
+                "dollar_savings": hours_saved * hourly_rate,
+                "projects_delivered": projects_delivered,
+                "automation_rate": automated_steps / total_steps,
+                "manual_intervention_ratio": (
                     self._manual_interventions / total_steps if total_steps else 0.0
                 ),
-                'revision_turnaround_seconds': revision_median,
-                'estimated_revenue': revenue + hours_saved * hourly_rate,
-                'total_steps_tracked': total_steps,
-                'automated_steps': automated_steps,
-                'manual_steps': manual_steps,
+                "revision_turnaround_seconds": revision_median,
+                "estimated_revenue": revenue + hours_saved * hourly_rate,
+                "total_steps_tracked": total_steps,
+                "automated_steps": automated_steps,
+                "manual_steps": manual_steps,
             }
 
     def get_upgrade_metrics(
@@ -175,15 +182,18 @@ class TelemetryStore:
     ) -> Dict[str, Any]:
         account_context = account_context or {}
         finance_snapshot = finance_snapshot or self.get_finance_metrics(
-            account_context.get('hourly_rate', 75.0)
+            account_context.get("hourly_rate", 75.0)
         )
 
-        feature_limits = account_context.get('feature_limits', {
-            'workflow_templates': 10,
-            'emergent_intelligence': 25,
-            'temporal_context': 15,
-            'collaborations': 3,
-        })
+        feature_limits = account_context.get(
+            "feature_limits",
+            {
+                "workflow_templates": 10,
+                "emergent_intelligence": 25,
+                "temporal_context": 15,
+                "collaborations": 3,
+            },
+        )
 
         with self._lock:
             utilization = {}
@@ -191,33 +201,36 @@ class TelemetryStore:
                 usage = self._feature_usage.get(feature, 0)
                 pct = min(usage / limit, 1.0) if limit else 0.0
                 utilization[feature] = {
-                    'used': usage,
-                    'limit': limit,
-                    'utilization': pct,
+                    "used": usage,
+                    "limit": limit,
+                    "utilization": pct,
                 }
 
-            workflow_records = [rec for rec in self._workflows.values() if rec.completed]
+            workflow_records = [
+                rec for rec in self._workflows.values() if rec.completed
+            ]
             success_count = sum(1 for rec in workflow_records if rec.success)
             total = len(workflow_records) or 1
             quality_score = success_count / total
 
-            dollar_savings_per_day = (
-                finance_snapshot['dollar_savings'] / max(total, 1)
-            )
-            upgrade_cost = account_context.get('upgrade_cost', 0.0)
+            dollar_savings_per_day = finance_snapshot["dollar_savings"] / max(total, 1)
+            upgrade_cost = account_context.get("upgrade_cost", 0.0)
 
             return {
-                'feature_utilization': utilization,
-                'quality_score': quality_score,
-                'support_load_reduction': 1.0 - finance_snapshot['manual_intervention_ratio'],
-                'collaboration_capacity': {
-                    'current': account_context.get('current_collaborators', 1),
-                    'limit': account_context.get('collaborator_limit', 3)
+                "feature_utilization": utilization,
+                "quality_score": quality_score,
+                "support_load_reduction": 1.0
+                - finance_snapshot["manual_intervention_ratio"],
+                "collaboration_capacity": {
+                    "current": account_context.get("current_collaborators", 1),
+                    "limit": account_context.get("collaborator_limit", 3),
                 },
-                'roi_projection_days': (
-                    upgrade_cost / dollar_savings_per_day if dollar_savings_per_day else None
+                "roi_projection_days": (
+                    upgrade_cost / dollar_savings_per_day
+                    if dollar_savings_per_day
+                    else None
                 ),
-                'dollar_savings_per_day': dollar_savings_per_day,
+                "dollar_savings_per_day": dollar_savings_per_day,
             }
 
 

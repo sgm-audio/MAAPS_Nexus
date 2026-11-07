@@ -81,10 +81,7 @@ class RealtimeAudioIOAgent(BaseAgent):
     """
 
     def __init__(self, agent_id: str = "realtime_audio_io_agent", active: bool = True):
-        super().__init__(
-            agent_id=agent_id,
-            agent_name="Real-Time Audio I/O Agent"
-        )
+        super().__init__(agent_id=agent_id, agent_name="Real-Time Audio I/O Agent")
 
         # Role control for redundancy (primary/standby)
         self.active = active

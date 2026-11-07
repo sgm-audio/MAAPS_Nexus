@@ -14,6 +14,7 @@ router = APIRouter()
 
 def get_system():
     from api.main import _ensure_system_ready
+
     return _ensure_system_ready()
 
 
@@ -46,7 +47,7 @@ async def get_system_metrics(system=Depends(get_system)):
         metrics["message_bus"] = {
             "queue_depth": queue_depth,
             "messages_per_second": msgs_per_sec,
-            **bus_metrics
+            **bus_metrics,
         }
         return success_response(metrics)
     except Exception as e:

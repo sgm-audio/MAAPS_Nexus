@@ -16,13 +16,18 @@ from ..core import (
     get_message_bus,
     AgentState,
 )
+from ..core.agent_factory import AgentFactory
 from ..agents.live import (
     RealtimeAudioIOAgent,
     LiveEffectsChainAgent,
     LiveLoopingAgent,
     SynchronizationClockAgent,
-    PerformanceAutomationAgent
+    PerformanceAutomationAgent,
 )
+from ..agents.audio_enhancement_agent import AudioEnhancementAgent
+from ..agents.content_generation_agent import ContentGenerationAgent
+from ..agents.performance_optimization_agent import PerformanceOptimizationAgent
+from ..agents.metadata_management_agent import MetadataManagementAgent
 from .workflow_engine import WorkflowEngine
 
 logger = logging.getLogger(__name__)
@@ -161,23 +166,22 @@ class AgentCoordinator:
             PerformanceOptimizationAgent(),
             MetadataManagementAgent(),
             PerformanceAutomationAgent(),
-            WorkflowEngine()
+            WorkflowEngine(),
         ]
 
         # Add live performance agents with redundancy
         agents_to_create.extend(self._create_live_agents())
 
         with self.lock:
-            for agent_type in agent_types:
+            for agent in agents_to_create:
                 try:
-                    agent = AgentFactory.create_agent(agent_type)
                     self.agents[agent.agent_id] = agent
                     self.registry.register(agent)
                     logger.info(
-                        f"Registered agent: {agent.agent_id} (type: {agent_type})"
+                        f"Registered agent: {agent.agent_id} (type: {agent.agent_type})"
                     )
                 except ValueError as e:
-                    logger.error(f"Failed to create agent of type {agent_type}: {e}")
+                    logger.error(f"Failed to register agent {agent.agent_id}: {e}")
                     raise
 
     def _create_live_agents(self) -> List[BaseAgent]:
@@ -186,26 +190,33 @@ class AgentCoordinator:
         live_agents = [
             (
                 RealtimeAudioIOAgent(agent_id="realtime_audio_io_agent", active=True),
-                RealtimeAudioIOAgent(agent_id="realtime_audio_io_agent_standby", active=False)
+                RealtimeAudioIOAgent(
+                    agent_id="realtime_audio_io_agent_standby", active=False
+                ),
             ),
             (
                 LiveEffectsChainAgent(agent_id="live_effects_chain_agent", active=True),
-                LiveEffectsChainAgent(agent_id="live_effects_chain_agent_standby", active=False)
+                LiveEffectsChainAgent(
+                    agent_id="live_effects_chain_agent_standby", active=False
+                ),
             ),
             (
                 LiveLoopingAgent(agent_id="live_looping_agent", active=True),
-                LiveLoopingAgent(agent_id="live_looping_agent_standby", active=False)
+                LiveLoopingAgent(agent_id="live_looping_agent_standby", active=False),
             ),
             (
-                SynchronizationClockAgent(agent_id="synchronization_clock_agent", active=True),
-                SynchronizationClockAgent(agent_id="synchronization_clock_agent_standby", active=False)
+                SynchronizationClockAgent(
+                    agent_id="synchronization_clock_agent", active=True
+                ),
+                SynchronizationClockAgent(
+                    agent_id="synchronization_clock_agent_standby", active=False
+                ),
             ),
         ]
 
         # Track primary->standby mapping for failover
         self.live_redundancy_pairs = {
-            primary.agent_id: standby.agent_id
-            for primary, standby in live_agents
+            primary.agent_id: standby.agent_id for primary, standby in live_agents
         }
         self.promoted_live_agents.clear()
 
@@ -287,11 +298,11 @@ class AgentCoordinator:
 
             if agent:
                 return {
-                    'agent_id': agent.agent_id,
-                    'agent_name': agent.agent_name,
-                    'state': agent.get_state().value,
-                    'metrics': agent.get_metrics(),
-                    'active': getattr(agent, "active", True)
+                    "agent_id": agent.agent_id,
+                    "agent_name": agent.agent_name,
+                    "state": agent.get_state().value,
+                    "metrics": agent.get_metrics(),
+                    "active": getattr(agent, "active", True),
                 }
             else:
                 return None
@@ -303,13 +314,15 @@ class AgentCoordinator:
         with self.lock:
             # Avoid nested locking by building the status objects directly
             for agent in self.agents.values():
-                statuses.append({
-                    'agent_id': agent.agent_id,
-                    'agent_name': agent.agent_name,
-                    'state': agent.get_state().value,
-                    'metrics': agent.get_metrics(),
-                    'active': getattr(agent, "active", True)
-                })
+                statuses.append(
+                    {
+                        "agent_id": agent.agent_id,
+                        "agent_name": agent.agent_name,
+                        "state": agent.get_state().value,
+                        "metrics": agent.get_metrics(),
+                        "active": getattr(agent, "active", True),
+                    }
+                )
 
         return statuses
 
@@ -404,19 +417,23 @@ class AgentCoordinator:
         if not self.live_redundancy_pairs:
             return
 
-        status_map = {s['agent_id']: s for s in statuses}
+        status_map = {s["agent_id"]: s for s in statuses}
 
         for primary_id, standby_id in self.live_redundancy_pairs.items():
             primary_status = status_map.get(primary_id)
 
             # Healthy primary -> no action
-            if primary_status and primary_status['state'] == 'running':
+            if primary_status and primary_status["state"] == "running":
                 continue
 
             standby_status = status_map.get(standby_id)
             standby_agent = self.agents.get(standby_id)
 
-            if standby_agent and standby_status and standby_status['state'] == 'running':
+            if (
+                standby_agent
+                and standby_status
+                and standby_status["state"] == "running"
+            ):
                 if getattr(standby_agent, "active", True):
                     # Already promoted
                     continue
@@ -427,7 +444,11 @@ class AgentCoordinator:
                     f"Promoted standby live agent {standby_id} to active role "
                     f"after primary {primary_id} became unavailable"
                 )
-            elif standby_agent and standby_status and standby_status['state'] != 'running':
+            elif (
+                standby_agent
+                and standby_status
+                and standby_status["state"] != "running"
+            ):
                 # Attempt to bring standby online if it's not running
                 logger.warning(
                     f"Standby live agent {standby_id} not running; attempting restart"

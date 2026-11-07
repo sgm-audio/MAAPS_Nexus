@@ -26,37 +26,39 @@ class NavigationDataProvider:
     def home_cards(self) -> Dict[str, Any]:
         """Summaries for Home tab."""
         return {
-            'health': self.system.get_health(),
-            'finance': self.system.get_finance_metrics(),
-            'agents': self.system.get_all_agents() if self.system.initialized else [],
+            "health": self.system.get_health(),
+            "finance": self.system.get_finance_metrics(),
+            "agents": self.system.get_all_agents() if self.system.initialized else [],
         }
 
     def discover_content(self) -> List[Dict[str, Any]]:
         """Highlight MAAPS concepts for Discover tab."""
         return [
             {
-                'title': 'Emergent Musical Intelligence',
-                'description': 'Cross-agent learning and context memory.',
-                'cta': 'Read Concept Brief'
+                "title": "Emergent Musical Intelligence",
+                "description": "Cross-agent learning and context memory.",
+                "cta": "Read Concept Brief",
             },
             {
-                'title': 'Temporal Context Awareness',
-                'description': 'Past-present-future processing for every workflow.',
-                'cta': 'View Demo'
+                "title": "Temporal Context Awareness",
+                "description": "Past-present-future processing for every workflow.",
+                "cta": "View Demo",
             },
         ]
 
     def spaces_projects(self) -> Dict[str, Any]:
         """Placeholder project summaries for Spaces tab."""
         return {
-            'projects': [],
-            'collaborations': [],
+            "projects": [],
+            "collaborations": [],
         }
 
     def finance_metrics(self, hourly_rate: float = 75.0) -> Dict[str, Any]:
         return self.system.get_finance_metrics(hourly_rate)
 
-    def upgrade_metrics(self, account_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def upgrade_metrics(
+        self, account_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         return self.system.get_upgrade_metrics(account_context or {})
 
 
@@ -67,7 +69,9 @@ class NavigationViewport(QWidget):  # type: ignore[misc]
     downstream code can still instantiate the class for tests.
     """
 
-    def __init__(self, provider: NavigationDataProvider, parent: Optional[QWidget] = None):
+    def __init__(
+        self, provider: NavigationDataProvider, parent: Optional[QWidget] = None
+    ):
         if QWidget is object:  # PySide6 unavailable
             self.provider = provider
             self._stack = None
@@ -87,7 +91,7 @@ class NavigationViewport(QWidget):  # type: ignore[misc]
         self.setLayout(layout)
 
         cards = self.provider.home_cards()
-        health = cards.get('health', {})
+        health = cards.get("health", {})
         label = QLabel(f"System Status: {health.get('status', 'unknown')}")
         self._stack.addWidget(label)
 

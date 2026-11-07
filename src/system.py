@@ -8,7 +8,12 @@ import logging
 from typing import Optional, Dict, Any
 
 from .core import get_message_bus, get_agent_registry
-from .orchestration import get_coordinator, WorkflowEngine, create_audio_enhancement_workflow, create_music_production_workflow
+from .orchestration import (
+    get_coordinator,
+    WorkflowEngine,
+    create_audio_enhancement_workflow,
+    create_music_production_workflow,
+)
 from .telemetry import get_telemetry_store
 
 # Configure logging
@@ -174,7 +179,7 @@ class MultiAgentSystem:
         if not enhancement_agent:
             raise RuntimeError("Audio enhancement agent not found")
 
-        self.telemetry.record_feature_usage('audio_enhancement')
+        self.telemetry.record_feature_usage("audio_enhancement")
 
         # Send enhancement request
         response = enhancement_agent.request(
@@ -279,7 +284,9 @@ class MultiAgentSystem:
         else:
             raise RuntimeError("Metadata extraction request timed out")
 
-    def search_metadata(self, query: str, filters: Optional[Dict] = None, limit: int = 10) -> Dict:
+    def search_metadata(
+        self, query: str, filters: Optional[Dict] = None, limit: int = 10
+    ) -> Dict:
         """
         Search for audio files by metadata.
 
@@ -300,12 +307,8 @@ class MultiAgentSystem:
 
         response = metadata_agent.request(
             "metadata.search.request",
-            {
-                'query': query,
-                'filters': filters or {},
-                'limit': limit
-            },
-            timeout=30.0
+            {"query": query, "filters": filters or {}, "limit": limit},
+            timeout=30.0,
         )
 
         if response:
@@ -317,7 +320,9 @@ class MultiAgentSystem:
         """Expose KPI snapshot for Finance dashboards."""
         return self.telemetry.get_finance_metrics(hourly_rate)
 
-    def get_upgrade_metrics(self, account_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def get_upgrade_metrics(
+        self, account_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """Expose Upgrade metrics (feature utilization, ROI, support load)."""
         return self.telemetry.get_upgrade_metrics(account_context or {})
 

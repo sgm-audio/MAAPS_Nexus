@@ -282,8 +282,8 @@ class PerformanceAutomationAgent(BaseAgent):
         """Handle scene creation"""
         payload = message.payload
 
-        parameter_snapshots = payload.get('parameter_snapshots') or {}
-        transition_curves_raw = payload.get('transition_curves') or {}
+        parameter_snapshots = payload.get("parameter_snapshots") or {}
+        transition_curves_raw = payload.get("transition_curves") or {}
         transition_curves = {}
         for k, v in transition_curves_raw.items():
             try:
@@ -292,23 +292,26 @@ class PerformanceAutomationAgent(BaseAgent):
                 transition_curves[k] = AutomationCurve.LINEAR
 
         scene = Scene(
-            scene_id=payload.get('scene_id', f"scene_{time.time()}"),
-            scene_name=payload['scene_name'],
+            scene_id=payload.get("scene_id", f"scene_{time.time()}"),
+            scene_name=payload["scene_name"],
             parameter_snapshots=parameter_snapshots,
             transition_curves=transition_curves,
-            transition_time=payload.get('transition_time', 0.0)
+            transition_time=payload.get("transition_time", 0.0),
         )
 
         with self.scenes_lock:
             self.scenes[scene.scene_id] = scene
 
-        self.respond(message, {
-            'success': True,
-            'scene_id': scene.scene_id,
-            'scene_name': scene.scene_name,
-            'num_parameters': len(scene.parameter_snapshots),
-            'transition_time': scene.transition_time
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "scene_id": scene.scene_id,
+                "scene_name": scene.scene_name,
+                "num_parameters": len(scene.parameter_snapshots),
+                "transition_time": scene.transition_time,
+            },
+        )
 
     def _handle_macro_create(self, message: Message):
         """Handle macro creation"""

@@ -13,6 +13,7 @@ from typing import Set
 
 DEFAULT_WS_URL = os.getenv("MAAPS_WS_URL", "ws://127.0.0.1:18000/ws")
 
+
 class WebSocketTestClient:
     """WebSocket test client for MAAPS API"""
 
@@ -39,10 +40,7 @@ class WebSocketTestClient:
             return
 
         self.subscriptions.update(topics)
-        message = {
-            "type": "subscribe",
-            "topics": topics
-        }
+        message = {"type": "subscribe", "topics": topics}
 
         print(f"\n[{self._timestamp()}] Subscribing to topics:")
         for topic in topics:
@@ -57,7 +55,9 @@ class WebSocketTestClient:
             print("Not connected!")
             return
 
-        print(f"\n[{self._timestamp()}] Listening for events (duration: {duration}s)...")
+        print(
+            f"\n[{self._timestamp()}] Listening for events (duration: {duration}s)..."
+        )
         print("=" * 60)
 
         try:
@@ -133,11 +133,9 @@ async def test_effects_events():
     client = WebSocketTestClient()
 
     assert await client.connect()
-    await client.subscribe([
-        "effects.parameter.change",
-        "effects.chain.created",
-        "effects.bypass.toggled"
-    ])
+    await client.subscribe(
+        ["effects.parameter.change", "effects.chain.created", "effects.bypass.toggled"]
+    )
     await client.listen(duration=1)
     await client.disconnect()
 
@@ -148,12 +146,14 @@ async def test_looping_events():
     client = WebSocketTestClient()
 
     assert await client.connect()
-    await client.subscribe([
-        "loop.record.started",
-        "loop.record.stopped",
-        "loop.playback.started",
-        "loop.playback.stopped"
-    ])
+    await client.subscribe(
+        [
+            "loop.record.started",
+            "loop.record.stopped",
+            "loop.playback.started",
+            "loop.playback.stopped",
+        ]
+    )
     await client.listen(duration=1)
     await client.disconnect()
 
@@ -164,11 +164,9 @@ async def test_sync_events():
     client = WebSocketTestClient()
 
     assert await client.connect()
-    await client.subscribe([
-        "sync.tempo.changed",
-        "sync.clock.position",
-        "sync.transport.changed"
-    ])
+    await client.subscribe(
+        ["sync.tempo.changed", "sync.clock.position", "sync.transport.changed"]
+    )
     await client.listen(duration=1)
     await client.disconnect()
 

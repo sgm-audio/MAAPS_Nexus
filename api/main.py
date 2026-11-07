@@ -1,13 +1,23 @@
 """
 MAAPS REST API - Production-Ready FastAPI Interface
-Provides HTTP endpoints for audio processing, music generation, live performance, and system management
+Provides HTTP endpoints for audio processing, music generation,
+live performance, and system management
 
 Usage:
     Development: uvicorn api.main:app --reload
     Production:  uvicorn api.main:app --host 0.0.0.0 --port 8000 --workers 4
 """
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Depends, WebSocket, WebSocketDisconnect
+from fastapi import (
+    FastAPI,
+    HTTPException,
+    BackgroundTasks,
+    UploadFile,
+    File,
+    Depends,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -22,6 +32,7 @@ import os
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
@@ -37,7 +48,7 @@ from api.routers import (
     looping,
     sync,
     automation,
-    system as system_router
+    system as system_router,
 )
 from api import auth
 from api.dependencies import get_current_user, get_optional_user
@@ -60,7 +71,7 @@ app = FastAPI(
 # CORS middleware - environment-based configuration
 allowed_origins = os.getenv(
     "ALLOWED_ORIGINS",
-    "http://localhost:3000,http://localhost:3001,http://localhost:5173,http://localhost:8000"
+    "http://localhost:3000,http://localhost:3001,http://localhost:5173,http://localhost:8000",
 ).split(",")
 
 app.add_middleware(
@@ -73,15 +84,17 @@ app.add_middleware(
 
 # Include root routers
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
-app.include_router(audio.router)      # /audio/*
-app.include_router(metadata.router)   # /metadata/*
+app.include_router(audio.router)  # /audio/*
+app.include_router(metadata.router)  # /metadata/*
 
 # Include /api/v1 routers (Phase 2 & 3 + UI client)
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication V1"])
 app.include_router(effects.router, prefix="/api/v1/effects", tags=["Effects Chain"])
 app.include_router(looping.router, prefix="/api/v1/looping", tags=["Live Looping"])
 app.include_router(sync.router, prefix="/api/v1/sync", tags=["Sync & Clock"])
-app.include_router(automation.router, prefix="/api/v1/automation", tags=["Performance Automation"])
+app.include_router(
+    automation.router, prefix="/api/v1/automation", tags=["Performance Automation"]
+)
 app.include_router(system_router.router, prefix="/api/v1/system", tags=["System V1"])
 app.include_router(audio.router, prefix="/api/v1")
 app.include_router(metadata.router, prefix="/api/v1")
@@ -90,7 +103,9 @@ app.include_router(metadata.router, prefix="/api/v1")
 system = None
 
 
-def _ensure_system_ready() -> "MultiAgentSystem":
+def _ensure_system_ready() -> (
+    "Any"
+):  # Type checked locally; MultiAgentSystem imported inside
     """Return initialized system, initializing lazily if needed, or raise 503."""
     global system
     from src.system import MultiAgentSystem  # local import to avoid cycles
@@ -276,14 +291,16 @@ async def list_agents():
 async def extract_metadata(
     request: MetadataExtractRequest,
     username: Optional[str] = Depends(get_optional_user),
-    sys=Depends(get_system_dep)
+    sys=Depends(get_system_dep),
 ):
     """
     Extract metadata from audio
     """
     try:
         user_context = f" (user: {username})" if username else " (anonymous)"
-        logger.info(f"Metadata extraction{user_context}: {len(request.audio_data)} samples")
+        logger.info(
+            f"Metadata extraction{user_context}: {len(request.audio_data)} samples"
+        )
 
         metadata_res = sys.extract_metadata(
             audio_data=request.audio_data,
@@ -292,7 +309,7 @@ async def extract_metadata(
         )
 
         if username:
-            metadata_res['authenticated_user'] = username
+            metadata_res["authenticated_user"] = username
 
         logger.info("Metadata extraction complete")
         return JSONResponse(content=metadata_res)
@@ -307,7 +324,7 @@ async def extract_metadata(
 async def generate_music(
     request: MusicGenerateRequest,
     username: Optional[str] = Depends(get_optional_user),
-    sys=Depends(get_system_dep)
+    sys=Depends(get_system_dep),
 ):
     """
     Generate AI music (melody, harmony, drums, or bass)
@@ -323,7 +340,11 @@ async def generate_music(
             )
 
         user_context = f" (user: {username})" if username else " (anonymous)"
-        logger.info(f"Music generation{user_context}: {request.content_type} in {request.key} @ {request.tempo}BPM")
+        logger.info(
+            f"Music generation{user_context}: "
+            f"{request.content_type} in {request.key} @ "
+            f"{request.tempo}BPM"
+        )
 
         musical_context = {
             "key": request.key,
@@ -336,7 +357,7 @@ async def generate_music(
         result = sys.generate_music(request.content_type, musical_context)
 
         if username:
-            result['authenticated_user'] = username
+            result["authenticated_user"] = username
 
         logger.info(f"Music generation complete: {len(result.get('notes', []))} notes")
         return JSONResponse(content=result)
@@ -368,11 +389,13 @@ async def batch_enhance(
         "results": [],
     }
 
-    return JSONResponse(content={
-        'job_id': job_id,
-        'status': 'queued',
-        'message': f'Batch job created with {len(files)} files'
-    })
+    return JSONResponse(
+        content={
+            "job_id": job_id,
+            "status": "queued",
+            "message": f"Batch job created with {len(files)} files",
+        }
+    )
 
 
 @app.get("/batch/{job_id}", response_model=JobStatusResponse, tags=["Batch Processing"])
@@ -402,7 +425,11 @@ async def restart_system(username: str = Depends(get_current_user)):
         await asyncio.sleep(0.5)
         sys.start()
         logger.info("System restarted successfully")
-        return {"status": "success", "message": "System restarted", "requested_by": username}
+        return {
+            "status": "success",
+            "message": "System restarted",
+            "requested_by": username,
+        }
     except Exception as e:
         logger.error(f"System restart failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -415,7 +442,7 @@ async def get_version():
         "api_version": "1.0.0",
         "system_version": "1.0.0",
         "python_version": "3.11+",
-        "agents": 10
+        "agents": 10,
     }
 
 

@@ -3,7 +3,7 @@ API Dependencies
 Reusable dependencies for authentication, rate limiting, etc.
 """
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional
 import os
@@ -18,7 +18,7 @@ optional_security = HTTPBearer(auto_error=False)
 
 # Optional authentication - routes can use this to optionally require auth
 def get_optional_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_security)
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_security),
 ) -> Optional[str]:
     """
     Optional authentication dependency.
@@ -37,7 +37,7 @@ def get_optional_user(
 
 # Required authentication - routes use this to enforce auth
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> str:
     """
     Required authentication dependency.

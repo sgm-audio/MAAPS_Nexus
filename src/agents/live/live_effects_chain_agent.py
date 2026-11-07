@@ -121,11 +121,13 @@ class LiveEffectsChainAgent(BaseAgent):
     - A/B comparison
     """
 
-    def __init__(self, sample_rate: int = 44100, agent_id: str = "live_effects_chain_agent", active: bool = True):
-        super().__init__(
-            agent_id=agent_id,
-            agent_name="Live Effects Chain Agent"
-        )
+    def __init__(
+        self,
+        sample_rate: int = 44100,
+        agent_id: str = "live_effects_chain_agent",
+        active: bool = True,
+    ):
+        super().__init__(agent_id=agent_id, agent_name="Live Effects Chain Agent")
 
         # Role control for redundancy (primary/standby)
         self.active = active
@@ -270,17 +272,21 @@ class LiveEffectsChainAgent(BaseAgent):
         )
 
         # Add effects to chain
-        for effect_data in payload.get('effects', []):
-            eff_type = effect_data['type']
+        for effect_data in payload.get("effects", []):
+            eff_type = effect_data["type"]
             if isinstance(eff_type, str):
                 eff_type = EffectType(eff_type)
             effect = Effect(
-                effect_id=effect_data.get('effect_id', f"effect_{time.time()}_{len(chain.effects)}"),
+                effect_id=effect_data.get(
+                    "effect_id", f"effect_{time.time()}_{len(chain.effects)}"
+                ),
                 effect_type=eff_type,
-                parameters=effect_data.get('parameters', {}),
-                bypassed=effect_data.get('bypassed', effect_data.get('bypass', False)),
-                wet_dry_mix=effect_data.get('wet_dry_mix', effect_data.get('wet_dry', 1.0)),
-                position=effect_data.get('position', len(chain.effects))
+                parameters=effect_data.get("parameters", {}),
+                bypassed=effect_data.get("bypassed", effect_data.get("bypass", False)),
+                wet_dry_mix=effect_data.get(
+                    "wet_dry_mix", effect_data.get("wet_dry", 1.0)
+                ),
+                position=effect_data.get("position", len(chain.effects)),
             )
             chain.effects.append(effect)
 
@@ -290,23 +296,26 @@ class LiveEffectsChainAgent(BaseAgent):
         with self.chains_lock:
             self.effect_chains[chain.chain_id] = chain
 
-        self.respond(message, {
-            'success': True,
-            'chain_id': chain.chain_id,
-            'chain_name': chain.chain_name,
-            'num_effects': len(chain.effects),
-            'effects': [
-                {
-                    'effect_id': e.effect_id,
-                    'type': e.effect_type.value,
-                    'bypass': e.bypassed,
-                    'bypassed': e.bypassed,
-                    'wet_dry': e.wet_dry_mix,
-                    'parameters': e.parameters
-                }
-                for e in chain.effects
-            ]
-        })
+        self.respond(
+            message,
+            {
+                "success": True,
+                "chain_id": chain.chain_id,
+                "chain_name": chain.chain_name,
+                "num_effects": len(chain.effects),
+                "effects": [
+                    {
+                        "effect_id": e.effect_id,
+                        "type": e.effect_type.value,
+                        "bypass": e.bypassed,
+                        "bypassed": e.bypassed,
+                        "wet_dry": e.wet_dry_mix,
+                        "parameters": e.parameters,
+                    }
+                    for e in chain.effects
+                ],
+            },
+        )
 
         self.publish(
             "effects.chain.created",
@@ -316,23 +325,23 @@ class LiveEffectsChainAgent(BaseAgent):
 
     def _serialize_chain(self, chain: EffectChain) -> Dict[str, Any]:
         return {
-            'chain_id': chain.chain_id,
-            'chain_name': chain.chain_name,
-            'bypass': not chain.enabled,
-            'enabled': chain.enabled,
-            'routing': chain.routing,
-            'num_effects': len(chain.effects),
-            'effects': [
+            "chain_id": chain.chain_id,
+            "chain_name": chain.chain_name,
+            "bypass": not chain.enabled,
+            "enabled": chain.enabled,
+            "routing": chain.routing,
+            "num_effects": len(chain.effects),
+            "effects": [
                 {
-                    'effect_id': e.effect_id,
-                    'type': e.effect_type.value,
-                    'bypass': e.bypassed,
-                    'bypassed': e.bypassed,
-                    'wet_dry': e.wet_dry_mix,
-                    'parameters': e.parameters
+                    "effect_id": e.effect_id,
+                    "type": e.effect_type.value,
+                    "bypass": e.bypassed,
+                    "bypassed": e.bypassed,
+                    "wet_dry": e.wet_dry_mix,
+                    "parameters": e.parameters,
                 }
                 for e in chain.effects
-            ]
+            ],
         }
 
     def _handle_chain_list(self, message: Message):
@@ -340,23 +349,21 @@ class LiveEffectsChainAgent(BaseAgent):
         with self.chains_lock:
             chains = [self._serialize_chain(c) for c in self.effect_chains.values()]
 
-        self.respond(message, {
-            'success': True,
-            'chains': chains,
-            'total_chains': len(chains)
-        })
+        self.respond(
+            message, {"success": True, "chains": chains, "total_chains": len(chains)}
+        )
 
     def _handle_chain_get(self, message: Message):
         """Handle getting a single effect chain"""
-        chain_id = message.payload.get('chain_id')
+        chain_id = message.payload.get("chain_id")
         with self.chains_lock:
             chain = self.effect_chains.get(chain_id)
             if not chain:
-                self.respond(message, {'success': False, 'error': 'Chain not found'})
+                self.respond(message, {"success": False, "error": "Chain not found"})
                 return
             data = self._serialize_chain(chain)
 
-        self.respond(message, {'success': True, **data})
+        self.respond(message, {"success": True, **data})
 
     def _handle_chain_update(self, message: Message):
         """Handle effect chain update"""
@@ -476,35 +483,45 @@ class LiveEffectsChainAgent(BaseAgent):
     def _handle_parameter_change(self, message: Message):
         """Handle effect parameter change"""
         payload = message.payload
-        effect_id = payload.get('effect_id')
-        ramp_time = payload.get('ramp_time', 0.0)
+        effect_id = payload.get("effect_id")
+        ramp_time = payload.get("ramp_time", 0.0)
 
         # Support batch parameters dict (from REST API)
-        if effect_id and 'parameters' in payload and isinstance(payload['parameters'], dict):
+        if (
+            effect_id
+            and "parameters" in payload
+            and isinstance(payload["parameters"], dict)
+        ):
             effect = self._find_effect(effect_id)
             if effect is None:
-                self.respond(message, {'success': False, 'error': 'Effect not found'})
+                self.respond(message, {"success": False, "error": "Effect not found"})
                 return
-            for param, val in payload['parameters'].items():
+            for param, val in payload["parameters"].items():
                 effect.parameters[param] = val
-            self.respond(message, {
-                'success': True,
-                'effect_id': effect_id,
-                'parameters': effect.parameters
-            })
+            self.respond(
+                message,
+                {
+                    "success": True,
+                    "effect_id": effect_id,
+                    "parameters": effect.parameters,
+                },
+            )
             return
 
         # Support parameter_path (from automation agent)
-        if not effect_id and 'parameter_path' in payload:
-            self.respond(message, {
-                'success': True,
-                'parameter_path': payload['parameter_path'],
-                'value': payload.get('value')
-            })
+        if not effect_id and "parameter_path" in payload:
+            self.respond(
+                message,
+                {
+                    "success": True,
+                    "parameter_path": payload["parameter_path"],
+                    "value": payload.get("value"),
+                },
+            )
             return
 
-        parameter = payload['parameter']
-        value = payload['value']
+        parameter = payload["parameter"]
+        value = payload["value"]
 
         # Find the effect
         effect = self._find_effect(effect_id)
@@ -547,8 +564,8 @@ class LiveEffectsChainAgent(BaseAgent):
     def _handle_bypass_toggle(self, message: Message):
         """Handle effect bypass toggle"""
         payload = message.payload
-        effect_id = payload['effect_id']
-        bypassed = payload.get('bypassed', payload.get('bypass'))  # None = toggle
+        effect_id = payload["effect_id"]
+        bypassed = payload.get("bypassed", payload.get("bypass"))  # None = toggle
 
         effect = self._find_effect(effect_id)
 

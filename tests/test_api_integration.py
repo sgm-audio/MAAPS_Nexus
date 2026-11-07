@@ -42,7 +42,9 @@ def effect_id(created_chain):
     effects = created_chain.get("effects", [])
     if effects:
         return effects[0]["effect_id"]
-    chain_resp = requests.get(f"{API_V1}/effects/chains/{created_chain['chain_id']}").json()
+    chain_resp = requests.get(
+        f"{API_V1}/effects/chains/{created_chain['chain_id']}"
+    ).json()
     return chain_resp["data"]["effects"][0]["effect_id"]
 
 
@@ -65,7 +67,12 @@ def macro_id():
     payload = {
         "macro_name": "Fixture Energy",
         "target_parameters": [
-            {"param": "effects.eq.gain3", "min": 0.0, "max": 6.0, "curve": "exponential"}
+            {
+                "param": "effects.eq.gain3",
+                "min": 0.0,
+                "max": 6.0,
+                "curve": "exponential",
+            }
         ],
     }
     resp = requests.post(f"{API_V1}/automation/macros", json=payload)
@@ -93,13 +100,9 @@ class TestEffectsChainAPI:
             "effects": [
                 {
                     "type": "gate",
-                    "parameters": {
-                        "threshold": -40.0,
-                        "attack": 5.0,
-                        "release": 50.0
-                    },
+                    "parameters": {"threshold": -40.0, "attack": 5.0, "release": 50.0},
                     "bypass": False,
-                    "wet_dry": 1.0
+                    "wet_dry": 1.0,
                 },
                 {
                     "type": "compressor",
@@ -107,12 +110,12 @@ class TestEffectsChainAPI:
                         "threshold": -18.0,
                         "ratio": 4.0,
                         "attack": 5.0,
-                        "release": 50.0
+                        "release": 50.0,
                     },
                     "bypass": False,
-                    "wet_dry": 1.0
-                }
-            ]
+                    "wet_dry": 1.0,
+                },
+            ],
         }
 
         response = requests.post(f"{API_V1}/effects/chains", json=payload)
@@ -136,16 +139,13 @@ class TestEffectsChainAPI:
 
     def test_update_effect_parameters(self, chain_id: str, effect_id: str):
         """Test updating effect parameters"""
-        payload = {
-            "parameters": {
-                "threshold": -20.0,
-                "ratio": 6.0
-            }
-        }
+        payload = {"parameters": {"threshold": -20.0, "ratio": 6.0}}
 
         url = f"{API_V1}/effects/chains/{chain_id}/effects/{effect_id}/parameters"
         response = requests.patch(url, json=payload)
-        print(f"\n[OK] Update Parameters Response: {json.dumps(response.json(), indent=2)}")
+        print(
+            f"\n[OK] Update Parameters Response: {json.dumps(response.json(), indent=2)}"
+        )
 
         assert response.status_code == 200
 
@@ -160,7 +160,7 @@ class TestLiveLoopingAPI:
             "length_beats": 4,
             "sync_to_tempo": True,
             "volume": 0.8,
-            "pan": 0.0
+            "pan": 0.0,
         }
 
         response = requests.post(f"{API_V1}/looping/tracks", json=payload)
@@ -187,17 +187,20 @@ class TestLiveLoopingAPI:
         payload = {"mode": "replace"}
 
         response = requests.post(
-            f"{API_V1}/looping/tracks/{track_id}/record/start",
-            json=payload
+            f"{API_V1}/looping/tracks/{track_id}/record/start", json=payload
         )
-        print(f"\n[OK] Start Recording Response: {json.dumps(response.json(), indent=2)}")
+        print(
+            f"\n[OK] Start Recording Response: {json.dumps(response.json(), indent=2)}"
+        )
 
         assert response.status_code == 200
 
     def test_stop_recording(self, track_id: str):
         """Test stopping loop recording"""
         response = requests.post(f"{API_V1}/looping/tracks/{track_id}/record/stop")
-        print(f"\n[OK] Stop Recording Response: {json.dumps(response.json(), indent=2)}")
+        print(
+            f"\n[OK] Stop Recording Response: {json.dumps(response.json(), indent=2)}"
+        )
 
         assert response.status_code == 200
 
@@ -207,10 +210,7 @@ class TestSyncClockAPI:
 
     def test_set_tempo(self):
         """Test setting tempo"""
-        payload = {
-            "bpm": 128.0,
-            "time_signature": "4/4"
-        }
+        payload = {"bpm": 128.0, "time_signature": "4/4"}
 
         response = requests.post(f"{API_V1}/sync/tempo/set", json=payload)
         print(f"\n[OK] Set Tempo Response: {json.dumps(response.json(), indent=2)}")
@@ -229,14 +229,18 @@ class TestSyncClockAPI:
     def test_transport_play(self):
         """Test transport play"""
         response = requests.post(f"{API_V1}/sync/transport/play")
-        print(f"\n[OK] Transport Play Response: {json.dumps(response.json(), indent=2)}")
+        print(
+            f"\n[OK] Transport Play Response: {json.dumps(response.json(), indent=2)}"
+        )
 
         assert response.status_code == 200
 
     def test_transport_stop(self):
         """Test transport stop"""
         response = requests.post(f"{API_V1}/sync/transport/stop")
-        print(f"\n[OK] Transport Stop Response: {json.dumps(response.json(), indent=2)}")
+        print(
+            f"\n[OK] Transport Stop Response: {json.dumps(response.json(), indent=2)}"
+        )
 
         assert response.status_code == 200
 
@@ -258,9 +262,9 @@ class TestAutomationAPI:
             "parameter_snapshots": {
                 "effects.filter.cutoff": 20000.0,
                 "effects.reverb.wet_dry": 0.4,
-                "effects.delay.feedback": 0.6
+                "effects.delay.feedback": 0.6,
             },
-            "transition_time": 2.0
+            "transition_time": 2.0,
         }
 
         response = requests.post(f"{API_V1}/automation/scenes", json=payload)
@@ -281,15 +285,15 @@ class TestAutomationAPI:
                     "param": "effects.eq.gain3",
                     "min": 0.0,
                     "max": 6.0,
-                    "curve": "exponential"
+                    "curve": "exponential",
                 },
                 {
                     "param": "effects.compressor.ratio",
                     "min": 2.0,
                     "max": 8.0,
-                    "curve": "logarithmic"
-                }
-            ]
+                    "curve": "logarithmic",
+                },
+            ],
         }
 
         response = requests.post(f"{API_V1}/automation/macros", json=payload)
@@ -306,8 +310,7 @@ class TestAutomationAPI:
         payload = {"value": 0.75}
 
         response = requests.post(
-            f"{API_V1}/automation/macros/{macro_id}/value",
-            json=payload
+            f"{API_V1}/automation/macros/{macro_id}/value", json=payload
         )
         print(f"\n[OK] Change Macro Response: {json.dumps(response.json(), indent=2)}")
 
@@ -321,16 +324,16 @@ class TestAutomationAPI:
             "actions": [
                 {
                     "action_type": "scene_change",
-                    "parameters": {"scene_id": "scene_drop"}
+                    "parameters": {"scene_id": "scene_drop"},
                 },
                 {
                     "action_type": "parameter_change",
                     "parameters": {
                         "parameter_path": "effects.filter.cutoff",
-                        "value": 5000.0
-                    }
-                }
-            ]
+                        "value": 5000.0,
+                    },
+                },
+            ],
         }
 
         response = requests.post(f"{API_V1}/automation/cues", json=payload)
@@ -354,7 +357,9 @@ class TestSystemAPI:
     def test_get_metrics(self):
         """Test system metrics endpoint"""
         response = requests.get(f"{API_V1}/system/metrics")
-        print(f"\n[OK] System Metrics Response: {json.dumps(response.json(), indent=2)}")
+        print(
+            f"\n[OK] System Metrics Response: {json.dumps(response.json(), indent=2)}"
+        )
 
         assert response.status_code == 200
 
@@ -371,10 +376,7 @@ class TestAuthentication:
 
     def test_login(self):
         """Test login endpoint"""
-        payload = {
-            "username": "admin",
-            "password": "password"
-        }
+        payload = {"username": "admin", "password": "password"}
 
         response = requests.post(f"{API_V1}/auth/login", json=payload)
         print(f"\n[OK] Login Response: {json.dumps(response.json(), indent=2)}")
@@ -396,22 +398,22 @@ class TestAuthentication:
 
 def run_all_tests():
     """Run all API tests"""
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("MAAPS API Integration Tests")
-    print("="*80)
+    print("=" * 80)
 
     # Test Effects Chain
-    print("\n" + "-"*80)
+    print("\n" + "-" * 80)
     print("Testing Effects Chain API")
-    print("-"*80)
+    print("-" * 80)
     effects_tests = TestEffectsChainAPI()
     chain_id = effects_tests.test_create_effect_chain()
     effects_tests.test_list_effect_chains()
 
     # Test Live Looping
-    print("\n" + "-"*80)
+    print("\n" + "-" * 80)
     print("Testing Live Looping API")
-    print("-"*80)
+    print("-" * 80)
     looping_tests = TestLiveLoopingAPI()
     track_id = looping_tests.test_create_loop_track()
     looping_tests.test_list_loop_tracks()
@@ -419,9 +421,9 @@ def run_all_tests():
     looping_tests.test_stop_recording(track_id)
 
     # Test Sync & Clock
-    print("\n" + "-"*80)
+    print("\n" + "-" * 80)
     print("Testing Sync & Clock API")
-    print("-"*80)
+    print("-" * 80)
     sync_tests = TestSyncClockAPI()
     sync_tests.test_set_tempo()
     sync_tests.test_tap_tempo()
@@ -430,9 +432,9 @@ def run_all_tests():
     sync_tests.test_transport_stop()
 
     # Test Automation
-    print("\n" + "-"*80)
+    print("\n" + "-" * 80)
     print("Testing Performance Automation API")
-    print("-"*80)
+    print("-" * 80)
     automation_tests = TestAutomationAPI()
     scene_id = automation_tests.test_create_scene()
     macro_id = automation_tests.test_create_macro()
@@ -440,25 +442,25 @@ def run_all_tests():
     automation_tests.test_create_cue()
 
     # Test System
-    print("\n" + "-"*80)
+    print("\n" + "-" * 80)
     print("Testing System API")
-    print("-"*80)
+    print("-" * 80)
     system_tests = TestSystemAPI()
     system_tests.test_get_health()
     system_tests.test_get_metrics()
     system_tests.test_list_agents()
 
     # Test Authentication
-    print("\n" + "-"*80)
+    print("\n" + "-" * 80)
     print("Testing Authentication API")
-    print("-"*80)
+    print("-" * 80)
     auth_tests = TestAuthentication()
     token = auth_tests.test_login()
     auth_tests.test_verify_token(token)
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("All API Tests Completed Successfully!")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
 
 if __name__ == "__main__":

@@ -32,11 +32,10 @@ class ClockState:
 class SynchronizationClockAgent(BaseAgent):
     """Agent for tempo and timing synchronization"""
 
-    def __init__(self, agent_id: str = "synchronization_clock_agent", active: bool = True):
-        super().__init__(
-            agent_id=agent_id,
-            agent_name="Synchronization & Clock Agent"
-        )
+    def __init__(
+        self, agent_id: str = "synchronization_clock_agent", active: bool = True
+    ):
+        super().__init__(agent_id=agent_id, agent_name="Synchronization & Clock Agent")
 
         # Role control for redundancy (primary/standby)
         self.active = active
@@ -120,26 +119,31 @@ class SynchronizationClockAgent(BaseAgent):
             pos_beats = self.clock_state.current_beat
             pos_bars = self.clock_state.current_bar
 
-        self.respond(message, {
-            'success': True,
-            'bpm': bpm,
-            'time_signature': time_sig,
-            'playing': playing,
-            'position': {
-                'seconds': pos_seconds,
-                'beats': pos_beats,
-                'bars': pos_bars,
-                'beat_in_bar': int(pos_beats) + 1
+        self.respond(
+            message,
+            {
+                "success": True,
+                "bpm": bpm,
+                "time_signature": time_sig,
+                "playing": playing,
+                "position": {
+                    "seconds": pos_seconds,
+                    "beats": pos_beats,
+                    "bars": pos_bars,
+                    "beat_in_bar": int(pos_beats) + 1,
+                },
+                "midi_clock": {
+                    "enabled": self.midi_clock_enabled,
+                    "port": (
+                        self.midi_clock_outputs[0] if self.midi_clock_outputs else None
+                    ),
+                },
+                "ableton_link": {
+                    "enabled": self.link_enabled,
+                    "peers": self.link_session_peers,
+                },
             },
-            'midi_clock': {
-                'enabled': self.midi_clock_enabled,
-                'port': self.midi_clock_outputs[0] if self.midi_clock_outputs else None
-            },
-            'ableton_link': {
-                'enabled': self.link_enabled,
-                'peers': self.link_session_peers
-            }
-        })
+        )
 
     def set_active(self, active: bool):
         """Toggle processing for redundancy handoff"""
