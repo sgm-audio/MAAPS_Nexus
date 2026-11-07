@@ -163,13 +163,15 @@ class WorkflowEngine(BaseAgent):
     def _handle_workflow_create(self, message: Message):
         """Handle workflow creation request"""
         payload = message.payload
-        workflow_name = payload.get('name', 'Untitled Workflow')
-        description = payload.get('description', '')
-        steps_data = payload.get('steps', [])
-        context = payload.get('context', {})
+        workflow_name = payload.get("name", "Untitled Workflow")
+        description = payload.get("description", "")
+        steps_data = payload.get("steps", [])
+        context = payload.get("context", {})
 
         # Create workflow
-        workflow = self._create_workflow(workflow_name, description, steps_data, context)
+        workflow = self._create_workflow(
+            workflow_name, description, steps_data, context
+        )
 
         # Store workflow
         with self.workflows_lock:
@@ -302,7 +304,7 @@ class WorkflowEngine(BaseAgent):
         name: str,
         description: str,
         steps_data: List[Dict],
-        context: Optional[Dict[str, Any]] = None
+        context: Optional[Dict[str, Any]] = None,
     ) -> Workflow:
         """Create a new workflow from definition"""
         workflow_id = str(uuid.uuid4())
@@ -326,7 +328,7 @@ class WorkflowEngine(BaseAgent):
             name=name,
             description=description,
             steps=steps,
-            context=context or {}
+            context=context or {},
         )
 
         return workflow

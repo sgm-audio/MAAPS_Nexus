@@ -35,14 +35,12 @@ class TagRequest(BaseModel):
 def get_system():
     """Get the MAAPS system instance"""
     from api.main import _ensure_system_ready
+
     return _ensure_system_ready()
 
 
 @router.post("/extract")
-async def extract_metadata(
-    request: MetadataExtractRequest,
-    system=Depends(get_system)
-):
+async def extract_metadata(request: MetadataExtractRequest, system=Depends(get_system)):
     """
     Extract metadata from audio
 
@@ -54,7 +52,7 @@ async def extract_metadata(
         metadata = system.extract_metadata(
             audio_data=request.audio_data,
             sample_rate=request.sample_rate,
-            deep_analysis=request.deep_analysis
+            deep_analysis=request.deep_analysis,
         )
 
         logger.info("Metadata extraction complete")
@@ -66,10 +64,7 @@ async def extract_metadata(
 
 
 @router.post("/search")
-async def search_metadata(
-    request: MetadataSearchRequest,
-    system=Depends(get_system)
-):
+async def search_metadata(request: MetadataSearchRequest, system=Depends(get_system)):
     """
     Search metadata database
 
@@ -79,9 +74,7 @@ async def search_metadata(
         logger.info(f"Metadata search: '{request.query}' with {request.limit} results")
 
         results = system.search_metadata(
-            query=request.query,
-            filters=request.filters or {},
-            limit=request.limit
+            query=request.query, filters=request.filters or {}, limit=request.limit
         )
 
         logger.info(f"Search complete: {len(results.get('results', []))} results found")
@@ -93,10 +86,7 @@ async def search_metadata(
 
 
 @router.get("/file/{file_id}")
-async def get_file_metadata(
-    file_id: str,
-    system=Depends(get_system)
-):
+async def get_file_metadata(file_id: str, system=Depends(get_system)):
     """Get metadata for a specific file by ID"""
     try:
         # This would query the metadata database
@@ -104,7 +94,7 @@ async def get_file_metadata(
         return {
             "file_id": file_id,
             "status": "not_implemented",
-            "message": "Metadata database query not yet implemented"
+            "message": "Metadata database query not yet implemented",
         }
 
     except Exception as e:
@@ -113,10 +103,7 @@ async def get_file_metadata(
 
 
 @router.post("/tags/add")
-async def add_tags(
-    request: TagRequest,
-    system=Depends(get_system)
-):
+async def add_tags(request: TagRequest, system=Depends(get_system)):
     """Add tags to a file"""
     try:
         logger.info(f"Adding tags to {request.file_id}: {request.tags}")
@@ -125,7 +112,7 @@ async def add_tags(
         return {
             "file_id": request.file_id,
             "tags_added": request.tags,
-            "status": "success"
+            "status": "success",
         }
 
     except Exception as e:
@@ -137,18 +124,14 @@ async def add_tags(
 async def remove_tags(
     file_id: str = Query(..., description="File ID"),
     tags: List[str] = Query(..., description="Tags to remove"),
-    system=Depends(get_system)
+    system=Depends(get_system),
 ):
     """Remove tags from a file"""
     try:
         logger.info(f"Removing tags from {file_id}: {tags}")
 
         # This would update the metadata database
-        return {
-            "file_id": file_id,
-            "tags_removed": tags,
-            "status": "success"
-        }
+        return {"file_id": file_id, "tags_removed": tags, "status": "success"}
 
     except Exception as e:
         logger.error(f"Failed to remove tags: {e}")
@@ -165,7 +148,7 @@ async def get_metadata_stats(system=Depends(get_system)):
             "total_tags": 0,
             "unique_artists": 0,
             "unique_genres": 0,
-            "total_size_gb": 0.0
+            "total_size_gb": 0.0,
         }
 
     except Exception as e:
@@ -180,8 +163,16 @@ async def list_genres(system=Depends(get_system)):
         # This would query unique genres from database
         return {
             "genres": [
-                "rock", "pop", "jazz", "classical", "electronic",
-                "hip-hop", "r&b", "country", "metal", "indie"
+                "rock",
+                "pop",
+                "jazz",
+                "classical",
+                "electronic",
+                "hip-hop",
+                "r&b",
+                "country",
+                "metal",
+                "indie",
             ]
         }
 
@@ -192,8 +183,7 @@ async def list_genres(system=Depends(get_system)):
 
 @router.get("/tags/popular")
 async def get_popular_tags(
-    limit: int = Query(20, ge=1, le=100),
-    system=Depends(get_system)
+    limit: int = Query(20, ge=1, le=100), system=Depends(get_system)
 ):
     """Get most popular tags"""
     try:
@@ -204,7 +194,7 @@ async def get_popular_tags(
                 {"tag": "energetic", "count": 120},
                 {"tag": "mellow", "count": 100},
                 {"tag": "ambient", "count": 95},
-                {"tag": "aggressive", "count": 80}
+                {"tag": "aggressive", "count": 80},
             ][:limit]
         }
 

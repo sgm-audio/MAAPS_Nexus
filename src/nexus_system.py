@@ -19,7 +19,7 @@ import asyncio
 import os
 
 # Import MAAPS components
-from src.infrastructure.ray_cluster import RayClusterManager
+from src.infrastructure.ray_cluster import RayClusterManager, RayClusterConfig
 from src.core.audio_ontology import (
     AudioState,
     AudioAttribute,
@@ -81,8 +81,9 @@ class MAAPSNexusSystem:
 
         # Initialize Ray cluster
         logger.info("Initializing Ray cluster...")
-        self.cluster = RayClusterManager(num_cpus=num_cpus, num_gpus=num_gpus)
-        self.cluster.initialize()
+        ray_config = RayClusterConfig(num_cpus=num_cpus, num_gpus=num_gpus)
+        self.cluster = RayClusterManager(config=ray_config)
+        self.cluster.initialize_cluster()
 
         # Initialize ontology
         logger.info("Initializing audio ontology...")
@@ -243,17 +244,17 @@ class MAAPSNexusSystem:
         eq_proposal = AgentProposal(
             agent_id="eq_agent",
             action=eq_action,
-            predicted_impact={AudioAttribute.CLARITY: 0.1},  # Simplified
-            predicted_satisfaction=0.7,
+            predicted_reward=0.1,
             confidence=0.8,
+            affected_concepts=["clarity"],
         )
 
         dynamics_proposal = AgentProposal(
             agent_id="dynamics_agent",
             action=dynamics_action,
-            predicted_impact={AudioAttribute.PUNCH: 0.1},  # Simplified
-            predicted_satisfaction=0.75,
+            predicted_reward=0.1,
             confidence=0.85,
+            affected_concepts=["punch"],
         )
 
         # Step 2: Coordinate between agents
@@ -288,7 +289,7 @@ class MAAPSNexusSystem:
         )
 
         # Step 5: Update agents with reward (RL training)
-        reward = evaluation.reward
+        reward = evaluation.satisfaction_score
 
         # Store experiences for training
         ray.get(

@@ -1,9 +1,13 @@
+import logging
+
 import random
 import time
 from playwright.sync_api import sync_playwright
 from bs4 import BeautifulSoup
 from config import Config
 from core.bloodhound import Bloodhound
+
+logger = logging.getLogger(__name__)
 
 
 class Hunter:
@@ -46,8 +50,8 @@ class Hunter:
                 for _ in range(4):  # Deeper scroll
                     feed.evaluate("node => node.scrollTop += 2000")
                     page.wait_for_timeout(1000)
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"Deep scroll interrupted: {e}")
 
             listings = page.locator('div[class*="Nv2PK"]').all()
             print(f"   ↳ Found {len(listings)} raw signals.")
@@ -75,8 +79,8 @@ class Hunter:
                 if href and href.startswith("http") and "google" not in href:
                     website = href
                     break
-        except:
-            pass
+        except Exception as e:
+            logger.warning(f"Link extraction interrupted: {e}")
 
         # BLOODHOUND ENGAGE
         email = ""
@@ -104,8 +108,8 @@ class Hunter:
                             emails.update(
                                 Bloodhound.extract_emails(site_page.content())
                             )
-                        except:
-                            pass
+                        except Exception as e:
+                            logger.warning(f"Email extraction failed: {e}")
 
                 site_page.close()
 

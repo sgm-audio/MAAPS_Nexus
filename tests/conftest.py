@@ -12,7 +12,6 @@ import pytest
 import requests
 import uvicorn
 
-
 TEST_HOST = "127.0.0.1"
 TEST_PORT = int(os.getenv("MAAPS_TEST_PORT", "18000"))
 BASE_URL = f"http://{TEST_HOST}:{TEST_PORT}"
@@ -47,7 +46,9 @@ except ModuleNotFoundError:  # pragma: no cover - environment specific
 def _is_maaps_server(host: str, port: int) -> bool:
     try:
         r = requests.get(f"http://{host}:{port}/health", timeout=1.0)
-        return r.status_code == 200 and ("health_score" in r.text or "healthy" in r.text)
+        return r.status_code == 200 and (
+            "health_score" in r.text or "healthy" in r.text
+        )
     except Exception:
         return False
 

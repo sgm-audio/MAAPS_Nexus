@@ -105,7 +105,7 @@ class MessageBusAdapter:
         if self.loop and self.loop.is_running():
             asyncio.run_coroutine_threadsafe(
                 websocket_manager.broadcast_event(message.topic, message.payload),
-                self.loop
+                self.loop,
             )
 
     async def request(
@@ -128,16 +128,22 @@ class MessageBusAdapter:
             sender="api",
             payload=req_payload,
             correlation_id=request_id,
-            priority=priority
+            priority=priority,
         )
 
-        response_msg = await asyncio.to_thread(self.message_bus.request, message, timeout)
+        response_msg = await asyncio.to_thread(
+            self.message_bus.request, message, timeout
+        )
         if response_msg is None:
             logger.error(f"Request timeout: {topic} (ID: {request_id})")
             raise TimeoutError(f"Agent request timed out after {timeout}s")
 
         response = response_msg.payload
-        if isinstance(response, dict) and response.get("success") is False and "error" in response:
+        if (
+            isinstance(response, dict)
+            and response.get("success") is False
+            and "error" in response
+        ):
             raise Exception(response["error"])
 
         return response
@@ -149,12 +155,7 @@ class MessageBusAdapter:
         Publish an event (fire-and-forget, no response expected)
         """
         self._ensure_bus()
-        message = Message(
-            topic=topic,
-            sender="api",
-            payload=payload,
-            priority=priority
-        )
+        message = Message(topic=topic, sender="api", payload=payload, priority=priority)
 
         self.message_bus.publish(message)
         logger.debug(f"Published event: {topic}")

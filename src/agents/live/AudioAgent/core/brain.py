@@ -1,6 +1,10 @@
+import logging
+
 import json
 from groq import Groq
 from config import Config
+
+logger = logging.getLogger(__name__)
 
 
 class Brain:
@@ -33,5 +37,11 @@ class Brain:
                 response_format={"type": "json_object"},
             )
             return json.loads(completion.choices[0].message.content)
-        except:
-            return {"hook": "professional audio services", "segment": "Studio"}
+        except Exception as e:
+            logger.error(f"Brain analysis failed: {e}")
+            return {
+                "status": "error",
+                "hook": "analysis_failed",
+                "segment": "unknown",
+                "message": str(e),
+            }

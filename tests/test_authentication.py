@@ -22,7 +22,7 @@ class TestAuthentication:
         """Test successful login returns JWT token"""
         response = requests.post(
             f"{BASE_URL}/auth/login",
-            json={"username": TEST_USERNAME, "password": TEST_PASSWORD}
+            json={"username": TEST_USERNAME, "password": TEST_PASSWORD},
         )
 
         assert response.status_code == 200
@@ -36,8 +36,7 @@ class TestAuthentication:
     def test_login_invalid_credentials(self):
         """Test login with empty credentials"""
         response = requests.post(
-            f"{BASE_URL}/auth/login",
-            json={"username": "", "password": ""}
+            f"{BASE_URL}/auth/login", json={"username": "", "password": ""}
         )
 
         # Current implementation accepts any username/password
@@ -50,14 +49,13 @@ class TestAuthentication:
         # Get token
         login_response = requests.post(
             f"{BASE_URL}/auth/login",
-            json={"username": TEST_USERNAME, "password": TEST_PASSWORD}
+            json={"username": TEST_USERNAME, "password": TEST_PASSWORD},
         )
         token = login_response.json()["token"]
 
         # Verify token
         response = requests.get(
-            f"{BASE_URL}/auth/verify",
-            headers={"Authorization": f"Bearer {token}"}
+            f"{BASE_URL}/auth/verify", headers={"Authorization": f"Bearer {token}"}
         )
 
         assert response.status_code == 200
@@ -69,7 +67,7 @@ class TestAuthentication:
         """Test token verification with invalid token"""
         response = requests.get(
             f"{BASE_URL}/auth/verify",
-            headers={"Authorization": "Bearer invalid_token_here"}
+            headers={"Authorization": "Bearer invalid_token_here"},
         )
 
         assert response.status_code == 401
@@ -78,21 +76,23 @@ class TestAuthentication:
         """Test token verification without token"""
         response = requests.get(f"{BASE_URL}/auth/verify")
 
-        assert response.status_code in (401, 403)  # Unauthorized / Forbidden (no credentials)
+        assert response.status_code in (
+            401,
+            403,
+        )  # Unauthorized / Forbidden (no credentials)
 
     def test_protected_endpoint_with_token(self):
         """Test protected endpoint with valid token"""
         # Get token
         login_response = requests.post(
             f"{BASE_URL}/auth/login",
-            json={"username": TEST_USERNAME, "password": TEST_PASSWORD}
+            json={"username": TEST_USERNAME, "password": TEST_PASSWORD},
         )
         token = login_response.json()["token"]
 
         # Access protected endpoint
         response = requests.post(
-            f"{BASE_URL}/system/restart",
-            headers={"Authorization": f"Bearer {token}"}
+            f"{BASE_URL}/system/restart", headers={"Authorization": f"Bearer {token}"}
         )
 
         assert response.status_code == 200
@@ -104,13 +104,16 @@ class TestAuthentication:
         """Test protected endpoint without token"""
         response = requests.post(f"{BASE_URL}/system/restart")
 
-        assert response.status_code in (401, 403)  # Unauthorized / Forbidden (no credentials)
+        assert response.status_code in (
+            401,
+            403,
+        )  # Unauthorized / Forbidden (no credentials)
 
     def test_protected_endpoint_invalid_token(self):
         """Test protected endpoint with invalid token"""
         response = requests.post(
             f"{BASE_URL}/system/restart",
-            headers={"Authorization": "Bearer invalid_token"}
+            headers={"Authorization": "Bearer invalid_token"},
         )
 
         assert response.status_code == 401  # Unauthorized
@@ -120,7 +123,7 @@ class TestAuthentication:
         # Get token
         login_response = requests.post(
             f"{BASE_URL}/auth/login",
-            json={"username": TEST_USERNAME, "password": TEST_PASSWORD}
+            json={"username": TEST_USERNAME, "password": TEST_PASSWORD},
         )
         token = login_response.json()["token"]
 
@@ -134,8 +137,8 @@ class TestAuthentication:
                 "tempo": 120.0,
                 "time_signature": "4/4",
                 "chord_progression": ["C", "Am", "F", "G"],
-                "length_bars": 8
-            }
+                "length_bars": 8,
+            },
         )
 
         assert response.status_code == 200
@@ -153,8 +156,8 @@ class TestAuthentication:
                 "tempo": 120.0,
                 "time_signature": "4/4",
                 "chord_progression": ["C", "Am", "F", "G"],
-                "length_bars": 8
-            }
+                "length_bars": 8,
+            },
         )
 
         # Should still work without token
@@ -184,8 +187,10 @@ class TestAuthentication:
             elif method == "POST":
                 response = requests.post(f"{BASE_URL}{endpoint}")
 
-            assert response.status_code in [200, 500], \
-                f"{method} {endpoint} failed with {response.status_code}"
+            assert response.status_code in [
+                200,
+                500,
+            ], f"{method} {endpoint} failed with {response.status_code}"
 
 
 class TestAuthenticationSecurity:
@@ -195,7 +200,7 @@ class TestAuthenticationSecurity:
         """Test that tokens have expiration time"""
         response = requests.post(
             f"{BASE_URL}/auth/login",
-            json={"username": TEST_USERNAME, "password": TEST_PASSWORD}
+            json={"username": TEST_USERNAME, "password": TEST_PASSWORD},
         )
 
         data = response.json()
@@ -206,19 +211,20 @@ class TestAuthenticationSecurity:
         """Test JWT token doesn't contain password"""
         response = requests.post(
             f"{BASE_URL}/auth/login",
-            json={"username": TEST_USERNAME, "password": TEST_PASSWORD}
+            json={"username": TEST_USERNAME, "password": TEST_PASSWORD},
         )
 
         token = response.json()["token"]
 
         # Decode JWT (without verification for testing)
         import base64
+
         # JWT format: header.payload.signature
-        parts = token.split('.')
+        parts = token.split(".")
         if len(parts) >= 2:
             # Decode payload (add padding if needed)
             payload = parts[1]
-            payload += '=' * (4 - len(payload) % 4)
+            payload += "=" * (4 - len(payload) % 4)
             decoded = base64.b64decode(payload)
             payload_data = json.loads(decoded)
 
@@ -228,8 +234,7 @@ class TestAuthenticationSecurity:
     def test_cors_headers_present(self):
         """Test CORS headers are configured"""
         response = requests.options(
-            f"{BASE_URL}/auth/login",
-            headers={"Origin": "http://localhost:3000"}
+            f"{BASE_URL}/auth/login", headers={"Origin": "http://localhost:3000"}
         )
 
         # Check CORS headers exist
@@ -243,7 +248,7 @@ class TestAuthenticationUsability:
         """Test token uses Bearer format"""
         response = requests.post(
             f"{BASE_URL}/auth/login",
-            json={"username": TEST_USERNAME, "password": TEST_PASSWORD}
+            json={"username": TEST_USERNAME, "password": TEST_PASSWORD},
         )
 
         data = response.json()
@@ -258,8 +263,7 @@ class TestAuthenticationUsability:
 
         # Test invalid token
         response = requests.post(
-            f"{BASE_URL}/system/restart",
-            headers={"Authorization": "Bearer invalid"}
+            f"{BASE_URL}/system/restart", headers={"Authorization": "Bearer invalid"}
         )
         assert response.status_code == 401
         data = response.json()
@@ -299,7 +303,10 @@ if __name__ == "__main__":
         ("Verify Valid Token", test_auth.test_verify_valid_token),
         ("Verify Invalid Token", test_auth.test_verify_invalid_token),
         ("Protected Endpoint With Token", test_auth.test_protected_endpoint_with_token),
-        ("Protected Endpoint Without Token", test_auth.test_protected_endpoint_without_token),
+        (
+            "Protected Endpoint Without Token",
+            test_auth.test_protected_endpoint_without_token,
+        ),
         ("Optional Auth With Token", test_auth.test_optional_auth_with_token),
         ("Optional Auth Without Token", test_auth.test_optional_auth_without_token),
         ("Public Endpoints", test_auth.test_public_endpoints_no_auth_required),

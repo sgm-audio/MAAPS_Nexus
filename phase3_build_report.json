@@ -1,0 +1,194 @@
+{
+  "audit_timestamp": "2026-11-06T05:13:00Z",
+  "repository_path": "/home/user/MAAPS_Nexus",
+  "branch": "arena/6ca117c7-maaps-nexus",
+  "commit_base": "feae32074b7db5caed20a9c12bbdaf9388c6bbb2",
+  "phase": 3,
+  "status": "FAIL",
+  "artifact_attached": "[ARTIFACT: phase3_build_report.json]",
+  "input_artifacts": ["[ARTIFACT: phase2_verification.json]"],
+  "build_report_version": "1.0.0",
+  "stack_equivalent_tools": {
+    "dependency_install": "pip install (frozen requirements-*.txt) - PARTIAL (no lockfile; requirements files present)",
+    "linter": "flake8==7.3.0 (installed with --break-system-packages)",
+    "formatter": "black==26.10.1",
+    "type_checker": "mypy==1.18.2",
+    "build_command": "No dedicated Python build command; Dockerfile + docker-compose used",
+    "test_runner": "pytest==9.0.3 (declared in requirements.txt)"
+  },
+  "build_environment": {
+    "python_version": "3.11 (CI spec from .github/workflows/ci-cd.yml)",
+    "installed_lint_deps": true,
+    "installed_build_deps": false,
+    "system_packages_available": ["flake8", "black", "mypy"],
+    "full_project_deps_installed": false,
+    "reason": "PEP 668 system protection; full dependency install requires --break-system-packages or venv"
+  },
+  "build_log": {
+    "dependency_install_status": "PARTIAL - lint deps installed; full runtime/dependency install not completed due to PEP 668",
+    "lint_command": "flake8 src/ api/ maaps_nexus_main.py --max-line-length=100 --exclude=__pycache__ --count",
+    "lint_result": "FAIL - 16 errors",
+    "lint_exit_code": 0,
+    "lint_output_summary": "16 errors: 5 line-too-long (E501), 1 unused import (F401), 1 undefined name (F821) in api/main.py, 4 line-too-long in api/routers/audio.py, 5 undefined names (F821) in src/orchestration/agent_coordinator.py",
+    "black_command": "black --check --quiet src/ api/ maaps_nexus_main.py",
+    "black_result": "FAIL - 18 files would be reformatted",
+    "black_exit_code": 0,
+    "mypy_command": "mypy src/ --ignore-missing-imports --show-error-codes",
+    "mypy_result": "FAIL - 90 errors in 31 files",
+    "mypy_exit_code": 0,
+    "mypy_output_summary": "Key errors: undefined names (F821 equivalents), unexpected keyword arguments (call-arg), missing attributes (attr-defined), untyped function bodies (annotation-unchecked)"
+  },
+  "lint_report": {
+    "total_errors": 16,
+    "total_warnings": 0,
+    "error_breakdown": {
+      "E501_line_too_long": 5,
+      "F401_imported_but_unused": 1,
+      "F821_undefined_name": 5,
+      "other": 0
+    },
+    "errors_by_file": [
+      {"file": "api/auth.py", "line": 169, "code": "E501", "message": "line too long (106 > 100 characters)"},
+      {"file": "api/dependencies.py", "line": 6, "code": "F401", "message": "'fastapi.status' imported but unused"},
+      {"file": "api/main.py", "line": 3, "code": "E501", "message": "line too long (103 > 100 characters)"},
+      {"file": "api/main.py", "line": 10, "code": "E501", "message": "line too long (118 > 100 characters)"},
+      {"file": "api/main.py", "line": 93, "code": "F821", "message": "undefined name 'MultiAgentSystem'", "severity": "CRITICAL"},
+      {"file": "api/main.py", "line": 326, "code": "E501", "message": "line too long (116 > 100 characters)"},
+      {"file": "api/routers/audio.py", "line": 23, "code": "E501", "message": "line too long (103 > 100 characters)"},
+      {"file": "api/routers/audio.py", "line": 56, "code": "E501", "message": "line too long (110 > 100 characters)"},
+      {"file": "api/routers/audio.py", "line": 94, "code": "E501", "message": "line too long (111 > 100 characters)"},
+      {"file": "api/routers/audio.py", "line": 97, "code": "E501", "message": "line too long (102 > 100 characters)"},
+      {"file": "src/orchestration/agent_coordinator.py", "line": 159, "code": "F821", "message": "undefined name 'AudioEnhancementAgent'", "severity": "CRITICAL"},
+      {"file": "src/orchestration/agent_coordinator.py", "line": 160, "code": "F821", "message": "undefined name 'ContentGenerationAgent'", "severity": "CRITICAL"},
+      {"file": "src/orchestration/agent_coordinator.py", "line": 160, "code": "F821", "message": "undefined name 'PerformanceOptimizationAgent'", "severity": "CRITICAL"},
+      {"file": "src/orchestration/agent_coordinator.py", "line": 160, "code": "F821", "message": "undefined name 'MetadataManagementAgent'", "severity": "CRITICAL"},
+      {"file": "src/orchestration/agent_coordinator.py", "line": 161, "code": "F821", "message": "undefined name 'AgentFactory'", "severity": "CRITICAL"},
+      {"file": "src/orchestration/agent_coordinator.py", "line": 171, "code": "F821", "message": "undefined name 'agent_types'", "severity": "CRITICAL"}
+    ],
+    "lint_justification_for_suppressions": "No suppressions applied. All errors require code fixes.",
+    "strict_mode_enforced": true,
+    "strict_mode_violations": {
+      "implicit_any": "Not explicitly configured in .flake8; mypy shows untyped function bodies",
+      "unused_vars": "F401 detected",
+      "fallthrough": "Not applicable",
+      "unsafe_casts": "Not applicable"
+    }
+  },
+  "type_errors_fixed": 0,
+  "type_errors_remaining": 90,
+  "type_errors_by_file": [
+    {"file": "src/nexus_system.py", "line": 84, "code": "call-arg", "message": "Unexpected keyword argument 'num_cpus' for 'RayClusterManager'", "severity": "CRITICAL", "note": "Constructor expects 'config: Optional[RayClusterConfig]'"},
+    {"file": "src/nexus_system.py", "line": 85, "code": "call-arg", "message": "Unexpected keyword argument 'num_gpus' for 'RayClusterManager'", "severity": "CRITICAL", "note": "Same root cause as line 84"},
+    {"file": "src/nexus_system.py", "line": 85, "code": "attr-defined", "message": "'RayClusterManager' has no attribute 'initialize'; maybe '_initialized' or 'is_initialized'?", "severity": "CRITICAL", "note": "Method name is 'initialize_cluster', not 'initialize'"},
+    {"file": "src/nexus_system.py", "line": 170, "code": "truthy-function", "message": "Function 'StreamingPluginCommunicator' could always be true in boolean context", "severity": "LOW"},
+    {"file": "src/nexus_system.py", "line": 186, "code": "truthy-function", "message": "Function 'AraPluginCommunicator' could always be true in boolean context", "severity": "LOW"},
+    {"file": "src/nexus_system.py", "line": 243, "code": "call-arg", "message": "Unexpected keyword argument 'predicted_impact' for 'AgentProposal'", "severity": "HIGH"},
+    {"file": "src/nexus_system.py", "line": 243, "code": "call-arg", "message": "Unexpected keyword argument 'predicted_satisfaction' for 'AgentProposal'", "severity": "HIGH"},
+    {"file": "src/nexus_system.py", "line": 251, "code": "call-arg", "message": "Unexpected keyword argument 'predicted_impact' for 'AgentProposal'", "severity": "HIGH"},
+    {"file": "src/nexus_system.py", "line": 291, "code": "attr-defined", "message": "'CriticJudgment' has no attribute 'reward'", "severity": "HIGH", "note": "Judgment returned by evaluate.remote has 'satisfaction_score'; not 'reward'"},
+    {"file": "api/main.py", "line": 93, "code": "attr-defined", "message": "undefined name 'MultiAgentSystem'", "severity": "CRITICAL", "note": "Used in docstring/type hint context but not imported at module level; import is inside function"},
+    {"file": "src/orchestration/agent_coordinator.py", "lines": [159, 160, 161, 171, 173], "code": "attr-defined/undefined", "message": "Multiple undefined agent names and missing AgentFactory reference; broken agent creation flow", "severity": "CRITICAL"},
+    {"file": "src/system.py", "line": 242, "code": "assignment", "message": "Incompatible default for argument 'audio_path' (default None vs type str)", "severity": "MED"}
+  ],
+  "env_var_schema": {
+    "env_example_present": true,
+    "env_file_present": false,
+    "required_vars_declared": [
+      "VERTEX_PROJECT_ID", "VERTEX_LOCATION", "VERTEX_MODEL",
+      "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OLLAMA_BASE_URL",
+      "AGENT_LOG_LEVEL", "MESSAGE_BUS_MAX_QUEUE_SIZE",
+      "MAX_CPU_USAGE", "MAX_MEMORY_USAGE", "CACHE_MAX_SIZE_MB",
+      "SECRET_KEY", "ACCESS_TOKEN_EXPIRE_MINUTES", "CORS_ORIGINS"
+    ],
+    "env_vars_used_in_code_with_fallbacks": {
+      "SECRET_KEY / JWT_SECRET": "api/auth.py uses env with hardcoded DEFAULT_DEV_SECRET fallback",
+      "VERTEX_PROJECT_ID": "vertex_ai_integration.py: raises ValueError if missing",
+      "ANTHROPIC_API_KEY": "llm_integration.py / vertex_ai_integration.py: uses env or parameter",
+      "ACCESS_TOKEN_EXPIRE_MINUTES": "api/auth.py: int(os.getenv(..., '60'))",
+      "AGENT_LOG_LEVEL": "Not strictly enforced globally; logging.basicConfig uses INFO default"
+    },
+    "env_vars_not_used_or_unenforced": {
+      "MAX_CPU_USAGE / MAX_MEMORY_USAGE": "Declared in config.json; no runtime enforcement verified",
+      "CORS_ORIGINS": "Used in api/main.py (reads ALLOWED_ORIGINS); .env.example references CORS_ORIGINS but code uses different env name"
+    },
+    "missing_env_validation": "No runtime schema validator (e.g., pydantic-settings BaseSettings with strict validation) for all required variables. api/auth.py validates SECRET_KEY presence only in production mode.",
+    "env_var_status": "PARTIAL - declared but not fully enforced; hardcoded fallbacks present for security-critical variables"
+  },
+  "deterministic_build": {
+    "python_lockfile_committed": false,
+    "python_lockfile_path": "MISSING (no requirements.lock, no poetry.lock, no pipenv lock)",
+    "requirements_files_present": [
+      "requirements.txt",
+      "requirements-api.txt",
+      "requirements-gui.txt",
+      "requirements-lint.txt",
+      "requirements-performance.txt"
+    ],
+    "npm_lockfile_committed": true,
+    "npm_lockfiles": [
+      "ai-audio-mix-partner/package-lock.json",
+      "frontend/maaps-ui/package-lock.json"
+    ],
+    "postinstall_scripts_with_side_effects": "None detected in package.json or requirements",
+    "reproducible_output": false,
+    "reasons": [
+      "No Python lockfile means dependency resolution depends on PyPI state at install time",
+      "Mixed React/Vite versions between frontend packages may cause non-reproducible builds",
+      "requirements-api.txt includes starlette==0.49.1 but previous versions had incorrect references (now fixed)"
+    ]
+  },
+  "build_artifact_manifest": {
+    "build_artifacts_generated": [],
+    "build_artifacts_expected": [
+      "Docker image (Dockerfile.production)",
+      "Frontend build (vite build output in dist/)",
+      "Python package artifacts (setup.py/build not configured)"
+    ],
+    "checksum_available": false,
+    "checksums": {}
+  },
+  "static_analysis_errors_fixed": 0,
+  "static_analysis_errors_remaining": 106,
+  "total_errors_summary": {
+    "lint_errors": 16,
+    "format_errors_files": 18,
+    "type_errors": 90,
+    "total_remaining_errors": 106,
+    "critical_errors": 8,
+    "high_errors": 6,
+    "medium_errors": 10,
+    "low_errors": 2,
+    "critical_errors_by_path": [
+      {"file": "api/main.py", "line": 93, "error": "F821 undefined 'MultiAgentSystem'"},
+      {"file": "src/nexus_system.py", "lines": [84, 85], "error": "Broken RayClusterManager constructor call and method call"},
+      {"file": "src/nexus_system.py", "line": 243, "error": "AgentProposal unexpected keyword args"},
+      {"file": "src/nexus_system.py", "line": 291, "error": "CriticJudgment missing 'reward' attribute"},
+      {"file": "src/orchestration/agent_coordinator.py", "lines": [159, 160, 161, 171, 173], "error": "Broken agent creation flow: missing imports, undefined variables"}
+    ]
+  },
+  "production_readiness_gate_violations": {
+    "build_fails_or_errors_remain": true,
+    "types_lint_errors_remain": true,
+    "deterministic_build_missing_lockfile": true,
+    "env_vars_not_strictly_validated": true,
+    "hardcoded_secrets_remain": true,
+    "status_decision": "FAIL",
+    "remediation_path": "Fix broken constructor/reference errors in src/nexus_system.py and src/orchestration/agent_coordinator.py; resolve undefined MultiAgentSystem reference in api/main.py; fix line length and import errors; add Python lockfile; implement strict env validation; remove hardcoded secret fallbacks. Re-run Phase 3 after fixes."
+  },
+  "validation": {
+    "all_imports_resolve_to_declared_dependencies_or_stdlib": false,
+    "unresolved_imports_or_references": [
+      "api/main.py: MultiAgentSystem (used but not imported at module level)",
+      "src/nexus_system.py: RayClusterManager constructor signature mismatch",
+      "src/nexus_system.py: AgentProposal attribute mismatch",
+      "src/nexus_system.py: CriticJudgment attribute 'reward' missing",
+      "src/orchestration/agent_coordinator.py: AgentFactory / agent_classes / agent_types undefined"
+    ],
+    "zero_compilation_errors": false,
+    "zero_lint_errors": false,
+    "zero_type_errors": false,
+    "all_dependencies_resolved_and_audited": false,
+    "env_vars_declared_typed_and_fallback_safe": false
+  },
+  "next_phase_gate": "Phase 4 (Dynamic Testing) is BLOCKED until Phase 3 passes. Required actions: fix broken references in nexus_system.py and agent_coordinator.py; resolve api/main.py import/reference errors; clean lint/type errors; add Python lockfile or document reproducible build strategy. Only proceed after [STATUS: PASS] for Phase 3 is achieved."
+}

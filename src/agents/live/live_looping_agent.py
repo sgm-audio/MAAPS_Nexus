@@ -81,11 +81,13 @@ class LiveLoopingAgent(BaseAgent):
     - Tempo-locked loops
     """
 
-    def __init__(self, sample_rate: int = 44100, agent_id: str = "live_looping_agent", active: bool = True):
-        super().__init__(
-            agent_id=agent_id,
-            agent_name="Live Looping Agent"
-        )
+    def __init__(
+        self,
+        sample_rate: int = 44100,
+        agent_id: str = "live_looping_agent",
+        active: bool = True,
+    ):
+        super().__init__(agent_id=agent_id, agent_name="Live Looping Agent")
 
         # Role control for redundancy (primary/standby)
         self.active = active
@@ -243,17 +245,17 @@ class LiveLoopingAgent(BaseAgent):
 
     def _serialize_track(self, track: LoopTrack) -> Dict[str, Any]:
         return {
-            'track_id': track.track_id,
-            'track_name': track.track_name,
-            'status': track.state.value,
-            'state': track.state.value,
-            'length_beats': track.length_beats,
-            'length_samples': len(track.audio_data),
-            'sync_to_tempo': track.sync_to_tempo,
-            'volume': track.volume,
-            'pan': track.pan,
-            'undo_available': len(track.undo_history),
-            'redo_available': len(track.redo_stack)
+            "track_id": track.track_id,
+            "track_name": track.track_name,
+            "status": track.state.value,
+            "state": track.state.value,
+            "length_beats": track.length_beats,
+            "length_samples": len(track.audio_data),
+            "sync_to_tempo": track.sync_to_tempo,
+            "volume": track.volume,
+            "pan": track.pan,
+            "undo_available": len(track.undo_history),
+            "redo_available": len(track.redo_stack),
         }
 
     def _handle_track_list(self, message: Message):
@@ -261,23 +263,21 @@ class LiveLoopingAgent(BaseAgent):
         with self.tracks_lock:
             tracks = [self._serialize_track(t) for t in self.loop_tracks.values()]
 
-        self.respond(message, {
-            'success': True,
-            'tracks': tracks,
-            'total_tracks': len(tracks)
-        })
+        self.respond(
+            message, {"success": True, "tracks": tracks, "total_tracks": len(tracks)}
+        )
 
     def _handle_track_get(self, message: Message):
         """Handle getting loop track details"""
-        track_id = message.payload.get('track_id')
+        track_id = message.payload.get("track_id")
         with self.tracks_lock:
             track = self.loop_tracks.get(track_id)
             if not track:
-                self.respond(message, {'success': False, 'error': 'Track not found'})
+                self.respond(message, {"success": False, "error": "Track not found"})
                 return
             data = self._serialize_track(track)
 
-        self.respond(message, {'success': True, **data})
+        self.respond(message, {"success": True, **data})
 
     def _handle_track_delete(self, message: Message):
         """Handle loop track deletion"""
