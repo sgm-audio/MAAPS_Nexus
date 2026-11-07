@@ -718,7 +718,7 @@ class DynamicsRLAgent(BaseAgent):
                     # Inference mode
                     if self.best_params:
                         processed_audio = self.apply_dynamics(audio, self.best_params)
-                        params_dict = {
+                        params_dict: Dict[str, float] = {
                             "threshold": self.best_params.threshold,
                             "ratio": self.best_params.ratio,
                             "attack_ms": self.best_params.attack_ms,
@@ -727,7 +727,7 @@ class DynamicsRLAgent(BaseAgent):
                         }
                     else:
                         processed_audio = audio
-                        params_dict = {}
+                        params_dict: Dict[str, float] = {}
 
                     return {
                         "status": "success",

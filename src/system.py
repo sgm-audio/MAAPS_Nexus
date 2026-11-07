@@ -244,7 +244,7 @@ class MultiAgentSystem:
     def extract_metadata(
         self,
         audio_data: Any = None,
-        audio_path: str = None,
+        audio_path: Optional[str] = None,
         sample_rate: int = 44100,
         deep_analysis: bool = True,
     ) -> Dict:

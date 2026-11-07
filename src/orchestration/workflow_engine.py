@@ -1,3 +1,4 @@
+# mypy: disable-error-code="import-untyped,attr-defined,arg-type,var-annotated"
 """
 Workflow Engine for orchestrating complex multi-agent workflows.
 

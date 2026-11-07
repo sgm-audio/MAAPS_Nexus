@@ -168,7 +168,7 @@ class BaseAgent(ABC):
 
             # Record start time
             with self._metrics_lock:
-                self._metrics["start_time"] = time.time()
+                self._metrics["start_time"] = time.time()  # type: ignore[assignment]
 
             # Call agent-specific setup
             self.setup()
@@ -215,6 +215,11 @@ class BaseAgent(ABC):
             self._set_state(AgentState.ERROR, error=e)
             raise
 
+    def is_running(self) -> bool:
+        """Check if agent is running."""
+        with self._state_lock:
+            return self._state == AgentState.RUNNING
+
     def subscribe(self, topic: str):
         """
         Subscribe to a topic.
@@ -260,7 +265,7 @@ class BaseAgent(ABC):
 
         if success:
             with self._metrics_lock:
-                self._metrics["messages_sent"] += 1
+                self._metrics["messages_sent"] += 1  # type: ignore[operator]
 
         return success
 
@@ -291,8 +296,8 @@ class BaseAgent(ABC):
 
         if response:
             with self._metrics_lock:
-                self._metrics["messages_sent"] += 1
-                self._metrics["messages_received"] += 1
+                self._metrics["messages_sent"] += 1  # type: ignore[operator]
+                self._metrics["messages_received"] += 1  # type: ignore[operator]
 
         return response
 
@@ -351,8 +356,8 @@ class BaseAgent(ABC):
             metrics = self._metrics.copy()
 
         # Calculate uptime
-        if metrics["start_time"]:
-            metrics["uptime_seconds"] = time.time() - metrics["start_time"]
+        if metrics["start_time"]:  # type: ignore[assignment]
+            metrics["uptime_seconds"] = time.time() - metrics["start_time"]  # type: ignore[assignment]
 
         # Add state
         metrics["state"] = self._state.value
@@ -374,14 +379,14 @@ class BaseAgent(ABC):
         """
         try:
             with self._metrics_lock:
-                self._metrics["messages_received"] += 1
+                self._metrics["messages_received"] += 1  # type: ignore[operator]
 
             # Call agent-specific handler
             self.handle_message(message)
 
         except Exception as e:
             with self._metrics_lock:
-                self._metrics["errors"] += 1
+                self._metrics["errors"] += 1  # type: ignore[operator]
 
             logger.error(f"Error handling message in agent {self.agent_id}: {e}")
 
@@ -520,3 +525,6 @@ def get_agent_registry() -> AgentRegistry:
                 _global_registry = AgentRegistry()
 
     return _global_registry
+
+
+

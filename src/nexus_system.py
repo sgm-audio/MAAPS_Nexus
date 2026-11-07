@@ -168,7 +168,7 @@ class MAAPSNexusSystem:
 
         # Streaming (VST3/CLAP)
         if self.plugin_mode in ["vst3", "clap"]:
-            if StreamingPluginCommunicator:
+            if StreamingPluginCommunicator is not None:
                 self.streaming_comm = StreamingPluginCommunicator(
                     buffer_size=self.buffer_size,
                     num_channels=2,
@@ -184,7 +184,7 @@ class MAAPSNexusSystem:
 
         # ARA
         if self.plugin_mode == "ara":
-            if AraPluginCommunicator:
+            if AraPluginCommunicator is not None:
                 self.ara_comm = AraPluginCommunicator(
                     callback_handler=self.handle_ara_request
                 )

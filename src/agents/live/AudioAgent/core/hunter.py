@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class Hunter:
     def __init__(self, headless: bool = False):
         self.headless = headless
-        self.leads = []
+        self.leads: list = []
 
     def hunt(self, cities=None):
         cities = cities or Config.TARGET_CITIES
