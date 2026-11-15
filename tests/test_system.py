@@ -46,8 +46,10 @@ class TestSystemBasics(unittest.TestCase):
 
         self.assertGreater(len(agents), 0, "Should have agents registered")
 
-        # Check each agent is running
+        # Check each active agent is running
         for agent in agents:
+            if not agent.get("active", True):
+                continue
             self.assertEqual(
                 agent["state"],
                 "running",

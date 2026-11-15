@@ -66,6 +66,7 @@ class TestMAAPSNexusSystem:
             mock_critic_instance = Mock()
             mock_critic_instance.evaluate.remote.return_value = Mock(reward=0.5)
             mock_critic.return_value = mock_critic_instance
+            mock_critic.remote.return_value = mock_critic_instance
 
             mock_eq_instance = Mock()
             mock_eq_instance.process_audio.remote.return_value = (
@@ -75,6 +76,7 @@ class TestMAAPSNexusSystem:
             mock_eq_instance.store_experience.remote.return_value = None
             mock_eq_instance.train_step.remote.return_value = None
             mock_eq.return_value = mock_eq_instance
+            mock_eq.remote.return_value = mock_eq_instance
 
             mock_dynamics_instance = Mock()
             mock_dynamics_instance.process_audio.remote.return_value = (
@@ -84,6 +86,7 @@ class TestMAAPSNexusSystem:
             mock_dynamics_instance.store_experience.remote.return_value = None
             mock_dynamics_instance.train_step.remote.return_value = None
             mock_dynamics.return_value = mock_dynamics_instance
+            mock_dynamics.remote.return_value = mock_dynamics_instance
 
             mock_coordinator_instance = Mock()
             mock_coordinator_instance.coordinate.remote.return_value = Mock(
@@ -92,6 +95,7 @@ class TestMAAPSNexusSystem:
             mock_coordinator_instance.get_statistics.remote.return_value = {}
             mock_coordinator_instance.register_agent.remote.return_value = None
             mock_coordinator.return_value = mock_coordinator_instance
+            mock_coordinator.remote.return_value = mock_coordinator_instance
 
             yield {
                 "critic": mock_critic,
