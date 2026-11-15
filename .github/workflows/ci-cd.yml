@@ -35,7 +35,15 @@ jobs:
         pip install -r requirements-lint.txt
 
     - name: Run Black (formatting check)
-      run: black --check --diff src/ tests/ api/
+      run: |
+        black --diff src/ tests/ api/ > black_output.txt 2>&1 || true
+        if grep -q "would be reformatted" black_output.txt; then
+          cat black_output.txt
+          while IFS= read -r line; do
+            echo "::error file=.github::$line"
+          done < <(grep -E "^(---|\+\+\+|@@|would be reformatted)" black_output.txt | head -n 25)
+          exit 1
+        fi
 
     - name: Run Flake8 (linting)
       run: flake8 src/ tests/ api/ --max-line-length=100 --exclude=__pycache__
