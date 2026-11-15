@@ -24,7 +24,7 @@ class TestMAAPSNexusSystem:
         with patch("src.nexus_system.ray") as mock_ray:
             mock_ray.is_initialized.return_value = False
             mock_ray.init.return_value = None
-            mock_ray.get.return_value = Mock()
+            mock_ray.get.side_effect = lambda x: [r for r in x] if isinstance(x, list) else x
             yield mock_ray
 
     @pytest.fixture

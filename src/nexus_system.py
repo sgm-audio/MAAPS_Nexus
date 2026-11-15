@@ -81,9 +81,8 @@ class MAAPSNexusSystem:
 
         # Initialize Ray cluster
         logger.info("Initializing Ray cluster...")
-        ray_config = RayClusterConfig(num_cpus=num_cpus, num_gpus=num_gpus)
-        self.cluster = RayClusterManager(config=ray_config)
-        self.cluster.initialize_cluster()
+        self.cluster = RayClusterManager(num_cpus=num_cpus, num_gpus=num_gpus)
+        self.cluster.initialize()
 
         # Initialize ontology
         logger.info("Initializing audio ontology...")
