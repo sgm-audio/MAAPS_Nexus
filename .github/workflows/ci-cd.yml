@@ -78,7 +78,15 @@ jobs:
 
     - name: Run pytest
       run: |
-        pytest tests/ -v --cov=src --cov-report=xml --cov-report=term
+        set -o pipefail
+        pytest tests/ -v --tb=short --cov=src --cov-report=xml --cov-report=term 2>&1 | tee pytest_output.log || {
+          exit_code=$?
+          echo "::error::Pytest failed with exit code $exit_code"
+          grep -E "(FAILED|ERROR |AssertionError|ModuleNotFoundError|AttributeError|ImportError)" pytest_output.log | tail -n 25 | while IFS= read -r line; do
+            echo "::error::$line"
+          done
+          exit $exit_code
+        }
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
