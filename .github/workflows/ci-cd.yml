@@ -41,7 +41,7 @@ jobs:
           cat black_output.txt
           while IFS= read -r line; do
             echo "::error file=.github::$line"
-          done < <(grep -E "^(---|\+\+\+|@@|would be reformatted)" black_output.txt | head -n 25)
+          done < <(head -n 30 black_output.txt)
           exit 1
         fi
 
