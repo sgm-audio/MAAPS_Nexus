@@ -525,6 +525,3 @@ def get_agent_registry() -> AgentRegistry:
                 _global_registry = AgentRegistry()
 
     return _global_registry
-
-
-

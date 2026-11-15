@@ -137,7 +137,9 @@ class LLMClient:
             if system_prompt:
                 request_params["system"] = system_prompt
 
-            response = self._client.messages.create(**request_params)  # noqa: F821 (stub mismatch)
+            response = self._client.messages.create(
+                **request_params
+            )  # noqa: F821 (stub mismatch)
             return response.content[0].text
 
         elif self.provider == LLMProvider.OPENAI:
@@ -147,12 +149,14 @@ class LLMClient:
                 chat_messages.append({"role": "system", "content": system_prompt})
             chat_messages.extend(messages)
 
-            response = self._client.chat.completions.create(  # noqa: F821 (stub mismatch)
-                model=model,
-                messages=chat_messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                **kwargs,
+            response = (
+                self._client.chat.completions.create(  # noqa: F821 (stub mismatch)
+                    model=model,
+                    messages=chat_messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    **kwargs,
+                )
             )
             return response.choices[0].message.content
 
