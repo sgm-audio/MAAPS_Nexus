@@ -12,6 +12,30 @@ import os
 
 logger = logging.getLogger(__name__)
 
+# Ensure bcrypt 4.0+ compatibility with passlib by truncating >72 byte inputs
+try:
+    import bcrypt
+
+    _orig_hashpw = bcrypt.hashpw
+    _orig_checkpw = bcrypt.checkpw
+
+    def _safe_hashpw(password, salt):
+        if isinstance(password, str):
+            password = password.encode("utf-8")
+        return _orig_hashpw(password[:72], salt)
+
+    def _safe_checkpw(password, hashed_password):
+        if isinstance(password, str):
+            password = password.encode("utf-8")
+        if isinstance(hashed_password, str):
+            hashed_password = hashed_password.encode("utf-8")
+        return _orig_checkpw(password[:72], hashed_password)
+
+    bcrypt.hashpw = _safe_hashpw  # type: ignore[assignment]
+    bcrypt.checkpw = _safe_checkpw  # type: ignore[assignment]
+except Exception:
+    pass
+
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

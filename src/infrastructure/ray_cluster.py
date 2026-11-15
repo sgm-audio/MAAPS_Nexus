@@ -41,8 +41,20 @@ class RayClusterManager:
     - Actor and task deployment
     """
 
-    def __init__(self, config: Optional[RayClusterConfig] = None):
-        self.config = config or RayClusterConfig()
+    def __init__(
+        self,
+        config: Optional[RayClusterConfig] = None,
+        num_cpus: Optional[int] = None,
+        num_gpus: Optional[int] = None,
+    ):
+        if config is None:
+            config = RayClusterConfig(num_cpus=num_cpus, num_gpus=num_gpus)
+        else:
+            if num_cpus is not None:
+                config.num_cpus = num_cpus
+            if num_gpus is not None:
+                config.num_gpus = num_gpus
+        self.config = config
         self._initialized = False
         self._cluster_resources: Dict[str, Any] = {}
 
@@ -77,7 +89,6 @@ class RayClusterManager:
             init_kwargs = {
                 "num_cpus": self.config.num_cpus,
                 "num_gpus": self.config.num_gpus,
-                "memory": self.config.memory * 1024 * 1024,  # Convert to bytes
                 "object_store_memory": self.config.object_store_memory * 1024 * 1024,
                 "include_dashboard": self.config.include_dashboard,
                 "dashboard_host": self.config.dashboard_host,
@@ -180,6 +191,22 @@ class RayClusterManager:
     def is_initialized(self) -> bool:
         """Check if cluster is initialized"""
         return self._initialized and ray.is_initialized()
+
+    def initialize(self, head_node: bool = True) -> bool:
+        """Alias for initialize_cluster."""
+        return self.initialize_cluster(head_node=head_node)
+
+    def shutdown(self):
+        """Alias for shutdown_cluster."""
+        self.shutdown_cluster()
+
+    def get_cluster_info(self) -> Dict[str, Any]:
+        """Get information about cluster resources and status."""
+        return {
+            "cluster_resources": self.get_cluster_resources(),
+            "available_resources": self.get_available_resources(),
+            "status": self.get_cluster_status(),
+        }
 
 
 @ray.remote

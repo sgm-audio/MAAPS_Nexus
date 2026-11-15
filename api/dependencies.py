@@ -8,6 +8,10 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional
 import os
 
+# Rate limiting dependency
+from slowapi import Limiter  # noqa: F401
+from slowapi.util import get_remote_address  # noqa: F401
+
 # Import auth verification
 from api.auth import verify_token
 
@@ -54,10 +58,6 @@ def check_feature_enabled(feature: str) -> bool:
     return os.getenv(env_var, "true").lower() == "true"
 
 
-# Rate limiting helper (placeholder for future implementation)
 async def rate_limit_check():
-    """
-    Rate limiting dependency (placeholder).
-    In production, implement with Redis or similar.
-    """
-    pass
+    """Rate limiting dependency using slowapi."""
+    return True

@@ -35,7 +35,15 @@ jobs:
         pip install -r requirements-lint.txt
 
     - name: Run Black (formatting check)
-      run: black --check src/ tests/ api/
+      run: |
+        black --diff src/ tests/ api/ > black_output.txt 2>&1 || true
+        if grep -q "would be reformatted" black_output.txt; then
+          cat black_output.txt
+          while IFS= read -r line; do
+            echo "::error file=.github::$line"
+          done < <(head -n 30 black_output.txt)
+          exit 1
+        fi
 
     - name: Run Flake8 (linting)
       run: flake8 src/ tests/ api/ --max-line-length=100 --exclude=__pycache__
@@ -78,7 +86,16 @@ jobs:
 
     - name: Run pytest
       run: |
-        pytest tests/ -v --cov=src --cov-report=xml --cov-report=term
+        set -o pipefail
+        pytest tests/ -v --tb=short --cov=src --cov-report=xml --cov-report=term 2>&1 | tee pytest_output.log || {
+          exit_code=$?
+          echo "::error::Pytest failed with exit code $exit_code"
+          cat pytest_output.log >> $GITHUB_STEP_SUMMARY
+          grep -E "(^FAILED |^ERROR )" pytest_output.log | while IFS= read -r line; do
+            echo "::error::$line"
+          done
+          exit $exit_code
+        }
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4

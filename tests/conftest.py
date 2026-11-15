@@ -20,6 +20,31 @@ WS_URL = f"ws://{TEST_HOST}:{TEST_PORT}/ws"
 os.environ["MAAPS_TEST_PORT"] = str(TEST_PORT)
 os.environ["MAAPS_BASE_URL"] = BASE_URL
 os.environ["MAAPS_WS_URL"] = WS_URL
+os.environ.setdefault("JWT_SECRET", "test-secret-key-for-testing-only")
+os.environ.setdefault("AUTH_PASSWORD", "test_password")
+
+try:
+    import bcrypt
+
+    _orig_hashpw = bcrypt.hashpw
+    _orig_checkpw = bcrypt.checkpw
+
+    def _safe_hashpw(password, salt):
+        if isinstance(password, str):
+            password = password.encode("utf-8")
+        return _orig_hashpw(password[:72], salt)
+
+    def _safe_checkpw(password, hashed_password):
+        if isinstance(password, str):
+            password = password.encode("utf-8")
+        if isinstance(hashed_password, str):
+            hashed_password = hashed_password.encode("utf-8")
+        return _orig_checkpw(password[:72], hashed_password)
+
+    bcrypt.hashpw = _safe_hashpw  # type: ignore[assignment]
+    bcrypt.checkpw = _safe_checkpw  # type: ignore[assignment]
+except Exception:
+    pass
 
 
 try:
@@ -51,6 +76,37 @@ def _is_maaps_server(host: str, port: int) -> bool:
         )
     except Exception:
         return False
+
+
+try:
+    import ray
+
+    RAY_AVAILABLE = True
+except ImportError:
+    ray = None
+    RAY_AVAILABLE = False
+
+
+@pytest.fixture(scope="session", autouse=True)
+def ray_session():
+    """Initialize Ray once for the entire test session if ray is installed."""
+    if not RAY_AVAILABLE:
+        yield
+        return
+
+    if not ray.is_initialized():
+        try:
+            ray.init(ignore_reinit_error=True, num_cpus=2)
+        except Exception:
+            pass
+
+    yield
+
+    if ray.is_initialized():
+        try:
+            ray.shutdown()
+        except Exception:
+            pass
 
 
 @pytest.fixture(scope="session", autouse=True)

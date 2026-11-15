@@ -21,7 +21,7 @@ import threading
 import queue
 import time
 import logging
-from typing import Optional, Tuple, Dict
+from typing import Optional, Tuple, Dict, Any
 import os
 import platform
 
@@ -248,8 +248,8 @@ class StreamingPluginCommunicator:
         )
 
         # Audio processing queue
-        self.audio_queue = queue.Queue(maxsize=10)
-        self.processed_queue = queue.Queue(maxsize=10)
+        self.audio_queue: "queue.Queue[Any]" = queue.Queue(maxsize=10)
+        self.processed_queue: "queue.Queue[Any]" = queue.Queue(maxsize=10)
 
         # Processing thread
         self.running = False

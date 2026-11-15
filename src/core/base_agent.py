@@ -47,7 +47,7 @@ class BaseAgent(ABC):
 
     def __init__(
         self,
-        agent_id: str,
+        agent_id: Optional[str] = None,
         agent_name: Optional[str] = None,
         agent_type: Optional[str] = None,
         capabilities: Optional[List["AgentCapability"]] = None,
@@ -64,7 +64,7 @@ class BaseAgent(ABC):
             message_bus: Optional message bus override. Falls back to the
                 process-wide singleton if not provided.
         """
-        self.agent_id = agent_id
+        self.agent_id = agent_id or f"{self.__class__.__name__.lower()}_{id(self)}"
         self.agent_name = agent_name or agent_id
         self.agent_type = agent_type
         self.capabilities = list(capabilities or [])
@@ -99,6 +99,23 @@ class BaseAgent(ABC):
         self._metrics_lock = threading.Lock()
 
         logger.info(f"Agent {self.agent_id} ({self.agent_name}) created")
+
+    @classmethod
+    def remote(cls, *args, **kwargs):
+        """Create a Ray remote actor instance for this agent."""
+        import ray
+
+        if not ray.is_initialized():
+            try:
+                ray.init(ignore_reinit_error=True)
+            except Exception:
+                pass
+
+        actor_cls = getattr(cls, "_ray_actor_cls", None)
+        if actor_cls is None:
+            actor_cls = ray.remote(cls)
+            cls._ray_actor_cls = actor_cls
+        return actor_cls.remote(*args, **kwargs)
 
     def setup(self):
         """Optional lifecycle hook. Override to subscribe to topics, etc."""
@@ -168,7 +185,7 @@ class BaseAgent(ABC):
 
             # Record start time
             with self._metrics_lock:
-                self._metrics["start_time"] = time.time()
+                self._metrics["start_time"] = time.time()  # type: ignore[assignment]
 
             # Call agent-specific setup
             self.setup()
@@ -215,6 +232,11 @@ class BaseAgent(ABC):
             self._set_state(AgentState.ERROR, error=e)
             raise
 
+    def is_running(self) -> bool:
+        """Check if agent is running."""
+        with self._state_lock:
+            return self._state == AgentState.RUNNING
+
     def subscribe(self, topic: str):
         """
         Subscribe to a topic.
@@ -260,7 +282,7 @@ class BaseAgent(ABC):
 
         if success:
             with self._metrics_lock:
-                self._metrics["messages_sent"] += 1
+                self._metrics["messages_sent"] += 1  # type: ignore[operator]
 
         return success
 
@@ -291,8 +313,8 @@ class BaseAgent(ABC):
 
         if response:
             with self._metrics_lock:
-                self._metrics["messages_sent"] += 1
-                self._metrics["messages_received"] += 1
+                self._metrics["messages_sent"] += 1  # type: ignore[operator]
+                self._metrics["messages_received"] += 1  # type: ignore[operator]
 
         return response
 
@@ -351,8 +373,10 @@ class BaseAgent(ABC):
             metrics = self._metrics.copy()
 
         # Calculate uptime
-        if metrics["start_time"]:
-            metrics["uptime_seconds"] = time.time() - metrics["start_time"]
+        if metrics["start_time"]:  # type: ignore[assignment]
+            metrics["uptime_seconds"] = (
+                time.time() - metrics["start_time"]  # type: ignore[assignment]
+            )
 
         # Add state
         metrics["state"] = self._state.value
@@ -374,14 +398,14 @@ class BaseAgent(ABC):
         """
         try:
             with self._metrics_lock:
-                self._metrics["messages_received"] += 1
+                self._metrics["messages_received"] += 1  # type: ignore[operator]
 
             # Call agent-specific handler
             self.handle_message(message)
 
         except Exception as e:
             with self._metrics_lock:
-                self._metrics["errors"] += 1
+                self._metrics["errors"] += 1  # type: ignore[operator]
 
             logger.error(f"Error handling message in agent {self.agent_id}: {e}")
 

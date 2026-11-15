@@ -16,6 +16,7 @@ class Priority(Enum):
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
+    CRITICAL = "critical"
 
 
 class MessageType(Enum):

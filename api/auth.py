@@ -31,15 +31,20 @@ router = APIRouter()
 security = HTTPBearer()
 
 # Configuration from environment variables
-DEFAULT_DEV_SECRET = "PKHTzidW4AzlQ4yLS4cVqmCnXGecegsixxNXt8tu82ElKMoa_9onvG0OW6RaPahH"
-SECRET_KEY = os.getenv("JWT_SECRET", DEFAULT_DEV_SECRET).strip() or DEFAULT_DEV_SECRET
+# REMOVED hardcoded default - env injection required
+DEFAULT_DEV_SECRET = None
+SECRET_KEY = os.getenv("JWT_SECRET", "").strip()
+if not SECRET_KEY:
+    raise ValueError(
+        "JWT_SECRET environment variable must be set; hardcoded defaults removed for security"
+    )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
 # Authentication configuration
 AUTH_USERNAME = os.getenv("AUTH_USERNAME", "maaps_admin").strip()
 AUTH_PASSWORD_HASH = os.getenv("AUTH_PASSWORD_HASH", "").strip()
-AUTH_PASSWORD = os.getenv("AUTH_PASSWORD", "rhLi5ytwsLd8KNBEq2_1MvQ71LDXPwMU").strip()
+AUTH_PASSWORD = os.getenv("AUTH_PASSWORD", "").strip()
 MAAPS_ENV = os.getenv("MAAPS_ENV", "development").strip().lower()
 
 if CryptContext:
