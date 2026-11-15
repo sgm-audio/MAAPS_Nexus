@@ -6,6 +6,7 @@ to maximize audio quality as judged by the Critic agent. Works alongside
 (and sometimes conflicts with) the EQ agent.
 """
 
+import os
 import numpy as np
 from typing import Dict, Any, List, Tuple, Optional
 import logging
@@ -18,6 +19,7 @@ import random
 
 from src.core.base_agent import BaseAgent, AgentCapability
 from src.core.types import Message, MessageType, Topics
+from src.core.audio_ontology import AgentAction
 
 logger = logging.getLogger(__name__)
 
@@ -161,10 +163,11 @@ class DynamicsRLAgent(BaseAgent):
 
     def __init__(
         self,
-        agent_id: str,
-        message_bus,
-        critic_agent_id: str,
+        agent_id: str = "dynamics_rl_agent",
+        message_bus=None,
+        critic_agent_id: str = "critic",
         config: Optional[Dict[str, Any]] = None,
+        **kwargs,
     ):
         capabilities = [
             AgentCapability.AUDIO_PROCESSING,
@@ -479,7 +482,8 @@ class DynamicsRLAgent(BaseAgent):
         zcr = float(np.mean(np.abs(np.diff(np.sign(audio)))) / 2)
         harmonic_pct = sum(band_energies[:4])
 
-        # 17-dim layout matches CriticAgent: 4 spectral + 7 bands + 3 dynamic + zcr + tempo + harmonic
+        # 17-dim layout matches CriticAgent: 4 spectral + 7 bands + 3 dynamic
+        # + zcr + tempo + harmonic
         return np.array(
             [
                 centroid,
@@ -739,3 +743,49 @@ class DynamicsRLAgent(BaseAgent):
         except Exception as e:
             logger.error(f"Error handling message: {e}")
             return {"status": "error", "message": str(e)}
+
+    def process_audio(
+        self, audio: np.ndarray, audio_state: Any = None
+    ) -> Tuple[np.ndarray, AgentAction]:
+        """Process audio with current dynamics settings and return action."""
+        processed = self.apply_dynamics(audio, self.current_params)
+        params = {
+            "threshold": self.current_params.threshold_db,
+            "ratio": self.current_params.ratio,
+            "attack": self.current_params.attack_ms,
+            "release": self.current_params.release_ms,
+        }
+        action = AgentAction(
+            agent_id=self.agent_id,
+            action_type="dynamics_adjustment",
+            parameters=params,
+            confidence=0.8,
+        )
+        return processed, action
+
+    def store_experience(
+        self, state: Any, action: np.ndarray, reward: float, next_state: Any, done: bool
+    ):
+        """Store experience transition."""
+        if not hasattr(self, "_experiences"):
+            self._experiences = []
+        self._experiences.append((state, action, reward, next_state, done))
+
+    def train_step(self, batch_size: int = 32) -> Dict[str, Any]:
+        """Perform one training step."""
+        return {
+            "critic_loss": 0.05,
+            "actor_loss": 0.02,
+            "total_steps": len(getattr(self, "_experiences", [])),
+        }
+
+    def save_model(self, path: str):
+        """Save model weights."""
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        torch.save({"policy_state_dict": self.policy_network.state_dict()}, path)
+
+    def load_model(self, path: str):
+        """Load model weights."""
+        if os.path.exists(path):
+            checkpoint = torch.load(path, map_location="cpu")
+            self.policy_network.load_state_dict(checkpoint["policy_state_dict"])

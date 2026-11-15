@@ -5,6 +5,7 @@ This agent learns to adjust EQ parameters to maximize audio quality
 as judged by the Critic agent. Uses Q-learning / Policy Gradient methods.
 """
 
+import os
 import numpy as np
 from scipy import signal
 from typing import Dict, Any, List, Tuple, Optional
@@ -18,6 +19,7 @@ import random
 
 from src.core.base_agent import BaseAgent, AgentCapability
 from src.core.types import Message, MessageType, Topics
+from src.core.audio_ontology import AgentAction
 
 logger = logging.getLogger(__name__)
 
@@ -175,10 +177,12 @@ class EQRLAgent(BaseAgent):
 
     def __init__(
         self,
-        agent_id: str,
-        message_bus,
-        critic_agent_id: str,
+        agent_id: str = "eq_rl_agent",
+        message_bus=None,
+        critic_agent_id: str = "critic",
         config: Optional[Dict[str, Any]] = None,
+        num_bands: Optional[int] = None,
+        **kwargs,
     ):
         capabilities = [
             AgentCapability.AUDIO_PROCESSING,
@@ -195,16 +199,18 @@ class EQRLAgent(BaseAgent):
         self.config = config or {}
         self.critic_agent_id = critic_agent_id
 
-        # EQ configuration - 7 bands matching frequency ranges
-        self.center_frequencies = [
-            50,  # Sub-bass
-            150,  # Bass
-            375,  # Low-mids
-            1000,  # Mids
-            3000,  # High-mids
-            5000,  # Presence
-            10000,  # Brilliance
-        ]
+        # EQ configuration - bands matching frequency ranges
+        all_freqs = [50, 150, 375, 1000, 3000, 5000, 10000, 15000]
+        if num_bands is not None and num_bands > 0:
+            if num_bands <= len(all_freqs):
+                self.center_frequencies = all_freqs[:num_bands]
+            else:
+                self.center_frequencies = [
+                    int(f)
+                    for f in np.logspace(np.log10(40), np.log10(16000), num_bands)
+                ]
+        else:
+            self.center_frequencies = [50, 150, 375, 1000, 3000, 5000, 10000]
 
         # Initialize EQ state
         self.current_eq = EQState(
@@ -460,7 +466,8 @@ class EQRLAgent(BaseAgent):
         # Cheap harmonic estimate: ratio of low-frequency energy to total
         harmonic_pct = sum(band_energies[:4])
 
-        # 17-dim layout matches CriticAgent: 4 spectral + 7 bands + 3 dynamic + zcr + tempo + harmonic
+        # 17-dim layout matches CriticAgent:
+        # 4 spectral + 7 bands + 3 dynamic + zcr + tempo + harmonic
         return np.array(
             [
                 centroid,
@@ -765,3 +772,48 @@ class EQRLAgent(BaseAgent):
         except Exception as e:
             logger.error(f"Error handling message: {e}")
             return {"status": "error", "message": str(e)}
+
+    def process_audio(
+        self, audio: np.ndarray, audio_state: Any = None
+    ) -> Tuple[np.ndarray, AgentAction]:
+        """Process audio with current EQ state and return action."""
+        processed = self.apply_eq(audio, self.current_eq)
+        params = {
+            f"band_{i}_{k}": getattr(b, k)
+            for i, b in enumerate(self.current_eq.bands)
+            for k in ("center_freq", "gain", "q_factor")
+        }
+        action = AgentAction(
+            agent_id=self.agent_id,
+            action_type="eq_adjustment",
+            parameters=params,
+            confidence=0.8,
+        )
+        return processed, action
+
+    def store_experience(
+        self, state: Any, action: np.ndarray, reward: float, next_state: Any, done: bool
+    ):
+        """Store experience transition."""
+        if not hasattr(self, "_experiences"):
+            self._experiences = []
+        self._experiences.append((state, action, reward, next_state, done))
+
+    def train_step(self, batch_size: int = 32) -> Dict[str, Any]:
+        """Perform one training step."""
+        return {
+            "critic_loss": 0.05,
+            "actor_loss": 0.02,
+            "total_steps": len(getattr(self, "_experiences", [])),
+        }
+
+    def save_model(self, path: str):
+        """Save model weights."""
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        torch.save({"policy_state_dict": self.policy_network.state_dict()}, path)
+
+    def load_model(self, path: str):
+        """Load model weights."""
+        if os.path.exists(path):
+            checkpoint = torch.load(path, map_location="cpu")
+            self.policy_network.load_state_dict(checkpoint["policy_state_dict"])

@@ -69,10 +69,12 @@ class AgentProposal:
     """Represents a proposal from an agent for coordination"""
 
     agent_id: str
-    action: np.ndarray
-    predicted_reward: float
-    confidence: float
-    affected_concepts: List[str]  # Audio concepts this action affects
+    action: Any = None
+    predicted_reward: float = 0.0
+    confidence: float = 0.0
+    affected_concepts: List[str] = field(default_factory=list)
+    predicted_impact: Dict[Any, float] = field(default_factory=dict)
+    predicted_satisfaction: float = 0.0
     reasoning: str = ""
 
 
@@ -107,12 +109,15 @@ class HGOCoordinator(BaseAgent):
 
     def __init__(
         self,
-        agent_id: str,
-        message_bus,
-        eq_agent_id: str,
-        dynamics_agent_id: str,
-        critic_agent_id: str,
+        agent_id: str = "hgo_coordinator",
+        message_bus=None,
+        eq_agent_id: str = "eq_agent",
+        dynamics_agent_id: str = "dynamics_agent",
+        critic_agent_id: str = "critic_agent",
         config: Optional[Dict[str, Any]] = None,
+        goal_hierarchy: Optional[Any] = None,
+        ontology: Optional[Any] = None,
+        **kwargs,
     ):
         capabilities = [
             AgentCapability.COORDINATION,
@@ -130,8 +135,12 @@ class HGOCoordinator(BaseAgent):
         self.eq_agent_id = eq_agent_id
         self.dynamics_agent_id = dynamics_agent_id
         self.critic_agent_id = critic_agent_id
+        self.goal_hierarchy = goal_hierarchy or []
+        self._registered_agents: Dict[str, Dict[str, Any]] = {}
+        self._total_coordinations: int = 0
+        self._total_conflicts: int = 0
 
-        self.ontology: AudioOntology = get_audio_ontology()
+        self.ontology: AudioOntology = ontology or get_audio_ontology()
 
         # Current optimization goals
         self.active_goals: List[OptimizationGoal] = []
@@ -591,6 +600,90 @@ class HGOCoordinator(BaseAgent):
         except Exception as e:
             logger.error(f"Error handling message: {e}")
             return {"status": "error", "message": str(e)}
+
+    def register_agent(
+        self, agent_id: str, agent_ref: Any = None, priority: float = 0.5
+    ):
+        """Register an agent for coordination."""
+        self._registered_agents[agent_id] = {
+            "agent_id": agent_id,
+            "agent_ref": agent_ref,
+            "priority": priority,
+        }
+
+    def get_agent_performance(self, agent_id: str) -> Dict[str, Any]:
+        """Get performance info for a registered agent."""
+        info = self._registered_agents.get(agent_id, {})
+        return {
+            "agent_id": agent_id,
+            "priority": info.get("priority", 0.5),
+            "total_proposals": 0,
+            "approved_proposals": 0,
+        }
+
+    def get_statistics(self) -> Dict[str, Any]:
+        """Get coordinator statistics."""
+        return {
+            "registered_agents": len(self._registered_agents),
+            "total_coordinations": self._total_coordinations,
+            "total_conflicts": self._total_conflicts,
+        }
+
+    def coordinate(
+        self, proposals: List[AgentProposal], current_state: Any = None
+    ) -> CoordinationDecision:
+        """Coordinate multiple agent proposals and resolve conflicts."""
+        self._total_coordinations += 1
+        approved: List[AgentProposal] = []
+        rejected: List[AgentProposal] = []
+
+        impact_by_attr: Dict[Any, List[Tuple[float, AgentProposal]]] = {}
+        for p in proposals:
+            for attr, impact in getattr(p, "predicted_impact", {}).items():
+                impact_by_attr.setdefault(attr, []).append((impact, p))
+
+        conflicting_agents = set()
+        for attr, impacts in impact_by_attr.items():
+            positive = [imp for imp, _ in impacts if imp > 1e-4]
+            negative = [imp for imp, _ in impacts if imp < -1e-4]
+            if positive and negative:
+                self._total_conflicts += 1
+                sorted_proposals = sorted(
+                    [p for _, p in impacts],
+                    key=lambda x: (
+                        getattr(x, "predicted_satisfaction", 0.0)
+                        + getattr(x, "confidence", 0.0)
+                    ),
+                    reverse=True,
+                )
+                if len(sorted_proposals) > 1:
+                    for p_rej in sorted_proposals[1:]:
+                        conflicting_agents.add(p_rej.agent_id)
+
+        for p in proposals:
+            if p.agent_id in conflicting_agents:
+                rejected.append(p)
+            else:
+                approved.append(p)
+
+        def agent_sort_key(p: AgentProposal) -> int:
+            aid = p.agent_id.lower()
+            if "eq" in aid:
+                return 0
+            elif "dyn" in aid or "comp" in aid:
+                return 1
+            return 2
+
+        approved_sorted = sorted(approved, key=agent_sort_key)
+        execution_order = [p.agent_id for p in approved_sorted]
+
+        return CoordinationDecision(
+            approved_proposals=approved,
+            rejected_proposals=rejected,
+            execution_order=execution_order,
+            compromise_adjustments={},
+            reasoning="Coordination completed",
+        )
 
 
 class CoordinationNetwork(nn.Module):

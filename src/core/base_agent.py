@@ -47,7 +47,7 @@ class BaseAgent(ABC):
 
     def __init__(
         self,
-        agent_id: str,
+        agent_id: Optional[str] = None,
         agent_name: Optional[str] = None,
         agent_type: Optional[str] = None,
         capabilities: Optional[List["AgentCapability"]] = None,
@@ -64,7 +64,7 @@ class BaseAgent(ABC):
             message_bus: Optional message bus override. Falls back to the
                 process-wide singleton if not provided.
         """
-        self.agent_id = agent_id
+        self.agent_id = agent_id or f"{self.__class__.__name__.lower()}_{id(self)}"
         self.agent_name = agent_name or agent_id
         self.agent_type = agent_type
         self.capabilities = list(capabilities or [])
@@ -99,6 +99,23 @@ class BaseAgent(ABC):
         self._metrics_lock = threading.Lock()
 
         logger.info(f"Agent {self.agent_id} ({self.agent_name}) created")
+
+    @classmethod
+    def remote(cls, *args, **kwargs):
+        """Create a Ray remote actor instance for this agent."""
+        import ray
+
+        if not ray.is_initialized():
+            try:
+                ray.init(ignore_reinit_error=True)
+            except Exception:
+                pass
+
+        actor_cls = getattr(cls, "_ray_actor_cls", None)
+        if actor_cls is None:
+            actor_cls = ray.remote(cls)
+            cls._ray_actor_cls = actor_cls
+        return actor_cls.remote(*args, **kwargs)
 
     def setup(self):
         """Optional lifecycle hook. Override to subscribe to topics, etc."""

@@ -55,6 +55,37 @@ def _is_maaps_server(host: str, port: int) -> bool:
         return False
 
 
+try:
+    import ray
+
+    RAY_AVAILABLE = True
+except ImportError:
+    ray = None
+    RAY_AVAILABLE = False
+
+
+@pytest.fixture(scope="session", autouse=True)
+def ray_session():
+    """Initialize Ray once for the entire test session if ray is installed."""
+    if not RAY_AVAILABLE:
+        yield
+        return
+
+    if not ray.is_initialized():
+        try:
+            ray.init(ignore_reinit_error=True, num_cpus=2)
+        except Exception:
+            pass
+
+    yield
+
+    if ray.is_initialized():
+        try:
+            ray.shutdown()
+        except Exception:
+            pass
+
+
 @pytest.fixture(scope="session", autouse=True)
 def ensure_api_server():
     """Ensure the FastAPI server is running for integration tests."""

@@ -82,7 +82,8 @@ jobs:
         pytest tests/ -v --tb=short --cov=src --cov-report=xml --cov-report=term 2>&1 | tee pytest_output.log || {
           exit_code=$?
           echo "::error::Pytest failed with exit code $exit_code"
-          grep -E "(FAILED|ERROR |AssertionError|ModuleNotFoundError|AttributeError|ImportError)" pytest_output.log | tail -n 25 | while IFS= read -r line; do
+          cat pytest_output.log >> $GITHUB_STEP_SUMMARY
+          grep -E "(^FAILED |^ERROR )" pytest_output.log | while IFS= read -r line; do
             echo "::error::$line"
           done
           exit $exit_code
