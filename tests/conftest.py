@@ -20,6 +20,8 @@ WS_URL = f"ws://{TEST_HOST}:{TEST_PORT}/ws"
 os.environ["MAAPS_TEST_PORT"] = str(TEST_PORT)
 os.environ["MAAPS_BASE_URL"] = BASE_URL
 os.environ["MAAPS_WS_URL"] = WS_URL
+os.environ.setdefault("JWT_SECRET", "test-secret-key-for-testing-only")
+os.environ.setdefault("AUTH_PASSWORD", "test_password")
 
 
 try:

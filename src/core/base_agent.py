@@ -357,7 +357,9 @@ class BaseAgent(ABC):
 
         # Calculate uptime
         if metrics["start_time"]:  # type: ignore[assignment]
-            metrics["uptime_seconds"] = time.time() - metrics["start_time"]  # type: ignore[assignment]
+            metrics["uptime_seconds"] = (
+                time.time() - metrics["start_time"]  # type: ignore[assignment]
+            )
 
         # Add state
         metrics["state"] = self._state.value
