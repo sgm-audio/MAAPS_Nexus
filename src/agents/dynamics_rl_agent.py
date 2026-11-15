@@ -750,7 +750,7 @@ class DynamicsRLAgent(BaseAgent):
         """Process audio with current dynamics settings and return action."""
         processed = self.apply_dynamics(audio, self.current_params)
         params = {
-            "threshold": self.current_params.threshold_db,
+            "threshold": self.current_params.threshold,
             "ratio": self.current_params.ratio,
             "attack": self.current_params.attack_ms,
             "release": self.current_params.release_ms,

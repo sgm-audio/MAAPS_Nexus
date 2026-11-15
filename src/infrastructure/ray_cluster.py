@@ -77,7 +77,6 @@ class RayClusterManager:
             init_kwargs = {
                 "num_cpus": self.config.num_cpus,
                 "num_gpus": self.config.num_gpus,
-                "memory": self.config.memory * 1024 * 1024,  # Convert to bytes
                 "object_store_memory": self.config.object_store_memory * 1024 * 1024,
                 "include_dashboard": self.config.include_dashboard,
                 "dashboard_host": self.config.dashboard_host,

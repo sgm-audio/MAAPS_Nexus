@@ -62,6 +62,7 @@ class AgentAction:
     action_vector: np.ndarray
     predicted_reward: float
     confidence: float
+    affected_concepts: List[str] = field(default_factory=list)
 
 
 @dataclass
